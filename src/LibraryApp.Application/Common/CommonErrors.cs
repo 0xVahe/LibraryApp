@@ -2,6 +2,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Common;
 
+/// <summary>Errors raised by the platform (unit of work, locks), not by a module rule: no module prefix in the code.</summary>
 public static class CommonErrors
 {
     public static readonly Error ValidationFailed =
