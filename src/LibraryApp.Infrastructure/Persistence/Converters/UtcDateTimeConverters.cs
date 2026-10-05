@@ -6,6 +6,10 @@ namespace LibraryApp.Infrastructure.Persistence.Converters;
 /// Refuses to write a DateTime that is not UTC (on save and as a query parameter or constant) and marks every value
 /// read from the database as UTC. Registered once for DateTime; EF Core applies it to DateTime? as well
 /// (null never reaches the converter).
+/// <para>
+/// A value with Kind = Unspecified is refused too: accepting it would silently store a local wall-clock time as if it
+/// were UTC (four hours off for Yerevan).
+/// </para>
 /// </summary>
 public sealed class UtcDateTimeConverter() : ValueConverter<DateTime, DateTime>(
     v => UtcDateTime.RequireUtc(v),
@@ -18,5 +22,7 @@ public static class UtcDateTime
             ? value
             : throw new InvalidOperationException(
                 $"Only UTC DateTime values may be written to the database (got Kind = {value.Kind}). " +
-                "Use IClock.UtcNow, IClock.StartOfLocalDayUtc(...) or DateTime.SpecifyKind(value, DateTimeKind.Utc).");
+                "Take the moment from IClock.UtcNow, or a library-day boundary from IClock.StartOfLocalDayUtc / " +
+                "EndOfLocalDayUtc. DateTime.SpecifyKind does not convert anything, it only changes the label: use it " +
+                "only for a value that is already UTC but lost its Kind (for example read from an external source).");
 }

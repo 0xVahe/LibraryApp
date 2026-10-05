@@ -23,6 +23,7 @@ public class UtcDateTimeConverterTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => _converter.ConvertToProvider(value));
         Assert.Contains(kind.ToString(), ex.Message);
+        Assert.Contains("SpecifyKind does not convert", ex.Message);   // the message must not suggest relabelling a local time
     }
 
     [Fact]
