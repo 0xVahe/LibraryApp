@@ -74,10 +74,12 @@ jobs:
           dotnet-version: 8.0.x
       - name: No pending model changes
         run: |
-          contexts=$(grep -rEl --include='*.cs' 'class[[:space:]]+[A-Za-z0-9_]+[^{;]*:[[:space:]]*([A-Za-z.]*)?(Identity)?DbContext\b' src || true)
+          set -eu
+          # -z reads each file as one record, so a declaration split over several lines is still found.
+          contexts=$(grep -rlzE --include='*.cs' 'class[[:space:]]+[A-Za-z0-9_]+[^{;]*:[[:space:]]*([A-Za-z.]*)?(Identity)?DbContext\b' src || true)
           if [ -z "$contexts" ]; then
-            echo "No DbContext in src yet - nothing to check."
-            exit 0
+            echo "::error::No DbContext found in src. LibraryDbContext must exist in src/LibraryApp.Infrastructure; if it does, the detection pattern in this workflow needs fixing."
+            exit 1
           fi
           echo "DbContext found in: $contexts"
 
@@ -86,7 +88,7 @@ jobs:
             exit 1
           fi
           if [ ! -f .config/dotnet-tools.json ]; then
-            echo "::error::.config/dotnet-tools.json (dotnet-ef) is missing, but a DbContext exists."
+            echo "::error::.config/dotnet-tools.json (dotnet-ef) is missing."
             exit 1
           fi
           if ! grep -rqE --include='*.cs' 'IDesignTimeDbContextFactory<' src/LibraryApp.Infrastructure; then
