@@ -22,6 +22,135 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LibraryApp.Domain.Staff.Department", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Departments_Name");
+
+                    b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Staff.StaffCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("LoanDays")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaxLoans")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MaxRenewals")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffCategories_Name");
+
+                    b.ToTable("StaffCategories", t =>
+                        {
+                            t.HasCheckConstraint("CK_StaffCategories_LoanDaysPositive", "[LoanDays] > 0");
+
+                            t.HasCheckConstraint("CK_StaffCategories_MaxLoansPositive", "[MaxLoans] > 0");
+
+                            t.HasCheckConstraint("CK_StaffCategories_MaxRenewalsNotNegative", "[MaxRenewals] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Staff.StaffMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorporateEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EmployeeId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("JoinedLibraryAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("LineManagerEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("StaffCategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorporateEmail")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffMembers_CorporateEmail");
+
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("IX_StaffMembers_DepartmentId");
+
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffMembers_EmployeeId");
+
+                    b.HasIndex("StaffCategoryId")
+                        .HasDatabaseName("IX_StaffMembers_StaffCategoryId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_StaffMembers_Status");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StaffMembers_UserId");
+
+                    b.ToTable("StaffMembers");
+                });
+
             modelBuilder.Entity("LibraryApp.Infrastructure.Identity.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -232,6 +361,27 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Staff.StaffMember", b =>
+                {
+                    b.HasOne("LibraryApp.Domain.Staff.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffCategory", null)
+                        .WithMany()
+                        .HasForeignKey("StaffCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LibraryApp.Infrastructure.Identity.AppUser", null)
+                        .WithOne()
+                        .HasForeignKey("LibraryApp.Domain.Staff.StaffMember", "UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
