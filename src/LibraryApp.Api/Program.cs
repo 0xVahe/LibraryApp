@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using LibraryApp.Application.Abstractions.Common;
-using LibraryApp.Infrastructure;
+using LibraryApp.Infrastructure.Extensions;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
