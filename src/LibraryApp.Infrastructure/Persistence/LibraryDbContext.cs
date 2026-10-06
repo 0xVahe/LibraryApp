@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Catalog;
     
 namespace LibraryApp.Infrastructure.Persistence;
 
@@ -27,6 +28,13 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     // Catalog (Group 1)
+    
+    public DbSet<Publisher> Publishers => Set<Publisher>();
+    public DbSet<Category> Categories => Set<Category>();
+    public DbSet<Author> Authors => Set<Author>();
+    public DbSet<Book> Books => Set<Book>();
+    public DbSet<BookAuthor> BookAuthors => Set<BookAuthor>();
+    public DbSet<BookCopy> BookCopies => Set<BookCopy>();
 
     // Staff (Group 2)
     
