@@ -3,8 +3,9 @@ using LibraryApp.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using LibraryApp.Domain.Staff;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Borrowing;
     
 namespace LibraryApp.Infrastructure.Persistence;
 
@@ -43,6 +44,10 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
     public DbSet<StaffCategory> StaffCategories => Set<StaffCategory>();
 
     // Borrowing (Group 3)
+    
+    public DbSet<Loan> Loans => Set<Loan>();
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+    public DbSet<PenaltyRecord> PenaltyRecords => Set<PenaltyRecord>();
 
     // Notifications (Group 4)
 
