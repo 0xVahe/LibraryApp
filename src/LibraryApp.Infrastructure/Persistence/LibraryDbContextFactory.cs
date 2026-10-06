@@ -18,6 +18,8 @@ public sealed class LibraryDbContextFactory : IDesignTimeDbContextFactory<Librar
 
     public LibraryDbContext CreateDbContext(string[] args)
     {
+        DotNetEnv.Env.TraversePath().NoClobber().Load();
+        
         var connectionString = Environment.GetEnvironmentVariable(ConnectionStringVariable);
         if (string.IsNullOrWhiteSpace(connectionString))
             connectionString = DefaultConnection;
