@@ -18,7 +18,7 @@ builder.Services.AddPlatform(builder.Configuration, builder.Environment);
 // Modules: each group uncomments or adds ONE line for its module here, in its own pull request. Nothing else.
 // builder.Services.AddLibraryIdentity();                          // Group 2 — Identity (+ JWT authentication later)
 // builder.Services.AddStaffModule(builder.Configuration);         // Group 2
-// builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
+builder.Services.AddCatalogModule(builder.Configuration);         // Group 1
 // builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
 // builder.Services.AddNotificationsModule(builder.Configuration); // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
