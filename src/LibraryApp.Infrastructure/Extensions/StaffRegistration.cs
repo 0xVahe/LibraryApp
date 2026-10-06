@@ -4,9 +4,9 @@ using LibraryApp.Application.Staff.Services;
 using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace LibraryApp.Infrastructure.Staff;
+namespace LibraryApp.Infrastructure.Extensions;
 
-public static class StaffRegistration
+public static class StaffRegistrationExtensions
 {
     /// <summary>Staff module services. Called from Program.cs.</summary>
     public static IServiceCollection AddStaffModule(this IServiceCollection services)
