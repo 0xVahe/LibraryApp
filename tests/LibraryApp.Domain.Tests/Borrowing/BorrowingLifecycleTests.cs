@@ -124,7 +124,7 @@ public sealed class BorrowingLifecycleTests
 
         Assert.Equal(ReservationStatus.Waiting, reservation.Status);
         Assert.Equal(1, reservation.QueuePosition);
-        Assert.Null(reservation.ReadyUntilAtUtc);
+        Assert.Null(reservation.ReadyUntilUtc);
         Assert.True(reservation.IsActive);
     }
 
@@ -132,16 +132,16 @@ public sealed class BorrowingLifecycleTests
     public void MarkReady_removes_reservation_from_waiting_queue()
     {
         Reservation reservation = CreateReservation();
-        DateTime readyUntilAtUtc = IssuedAtUtc.AddDays(3);
+        DateTime readyUntilUtc = IssuedAtUtc.AddDays(3);
 
-        reservation.MarkReady(readyUntilAtUtc);
+        reservation.MarkReady(readyUntilUtc);
 
         Assert.Equal(
             ReservationStatus.ReadyForPickup,
             reservation.Status);
 
         Assert.Equal(0, reservation.QueuePosition);
-        Assert.Equal(readyUntilAtUtc, reservation.ReadyUntilAtUtc);
+        Assert.Equal(readyUntilUtc, reservation.ReadyUntilUtc);
     }
 
     [Fact]

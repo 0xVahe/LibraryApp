@@ -1,6 +1,6 @@
-namespace LibraryApp.Domain.Borrowing;
-using System;
 using LibraryApp.Domain.Common;
+
+namespace LibraryApp.Domain.Borrowing;
 
 /// <summary>
 /// Represents penalty points associated with a staff member and a loan.
@@ -8,6 +8,8 @@ using LibraryApp.Domain.Common;
 /// </summary>
 public sealed class PenaltyRecord : Entity
 {
+    public const int ReasonMaxLength = 500;
+
     /// <summary>
     /// Gets the identifier of the staff member receiving the penalty.
     /// </summary>

@@ -1,4 +1,3 @@
-using System;
 using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Domain.Borrowing;
@@ -33,7 +32,7 @@ public sealed class Reservation : Entity
     /// Gets the UTC pickup deadline.
     /// Null until the reservation becomes ready for collection.
     /// </summary>
-    public DateTime? ReadyUntilAtUtc { get; private set; }
+    public DateTime? ReadyUntilUtc { get; private set; }
 
     /// <summary>
     /// Gets the positive queue position while waiting,
@@ -108,7 +107,7 @@ public sealed class Reservation : Entity
             StaffMemberId = staffMemberId,
             CreatedAtUtc = createdAtUtc,
             Status = ReservationStatus.Waiting,
-            ReadyUntilAtUtc = null,
+            ReadyUntilUtc = null,
             QueuePosition = queuePosition
         };
     }
@@ -116,16 +115,16 @@ public sealed class Reservation : Entity
     /// <summary>
     /// Makes a waiting reservation ready for collection.
     /// </summary>
-    /// <param name="readyUntilAtUtc">
+    /// <param name="readyUntilUtc">
     /// The UTC pickup deadline calculated by Application.
     /// </param>
     /// <remarks>
     /// Application verifies queue priority, arranges the copy hold,
     /// and calculates the deadline using the working-day calendar.
     /// </remarks>
-    public void MarkReady(DateTime readyUntilAtUtc)
+    public void MarkReady(DateTime readyUntilUtc)
     {
-        EnsureUtc(readyUntilAtUtc);
+        EnsureUtc(readyUntilUtc);
 
         if (Status != ReservationStatus.Waiting)
         {
@@ -133,13 +132,13 @@ public sealed class Reservation : Entity
                 BorrowingErrors.ReservationNotWaiting);
         }
 
-        if (readyUntilAtUtc <= CreatedAtUtc)
+        if (readyUntilUtc <= CreatedAtUtc)
         {
             throw new DomainException(
                 BorrowingErrors.InvalidPickupDeadline);
         }
 
-        ReadyUntilAtUtc = readyUntilAtUtc;
+        ReadyUntilUtc = readyUntilUtc;
 
         // The member leaves the waiting queue.
         QueuePosition = 0;
@@ -198,7 +197,7 @@ public sealed class Reservation : Entity
         }
 
         // Preserve the guide's boundary: equality is not yet expired.
-        if (ReadyUntilAtUtc is null || nowUtc <= ReadyUntilAtUtc.Value)
+        if (ReadyUntilUtc is null || nowUtc <= ReadyUntilUtc.Value)
         {
             throw new DomainException(
                 BorrowingErrors.PickupDeadlineNotPassed);

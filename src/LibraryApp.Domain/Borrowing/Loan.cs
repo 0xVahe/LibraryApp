@@ -1,4 +1,3 @@
-using System;
 using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Domain.Borrowing;
