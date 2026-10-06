@@ -1,4 +1,5 @@
-/*using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -55,29 +56,17 @@ public sealed class PenaltyRecordConfiguration
             .IsRowVersion()
             .IsConcurrencyToken();
 
-        /*
-         * Loan already exists in the Borrowing module,
-         * so this relationship can be configured now.
-         *
-         * A PenaltyRecord belongs to one Loan.
-         * Deleting a Loan is restricted if a penalty refers to it.
-         #1#
+        // A PenaltyRecord belongs to one Loan.
+        // Deleting a Loan is restricted if a penalty refers to it.
         builder.HasOne<Loan>()
             .WithMany()
             .HasForeignKey(penalty => penalty.LoanId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        /*
-         * StaffMember is not available in the current branch.
-         * Keep this commented until Group 2 merges its entity.
-
-        using LibraryApp.Domain.StaffMembers;
-
         builder.HasOne<StaffMember>()
             .WithMany()
             .HasForeignKey(penalty => penalty.StaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
-        #1#
 
         // Helps retrieve active/expired/waived penalties for one member.
         builder.HasIndex(penalty => new
@@ -100,15 +89,8 @@ public sealed class PenaltyRecordConfiguration
                 "CK_PenaltyRecords_Points",
                 "[Points] BETWEEN 0 AND 10");
 
-            /*
-             * PenaltyRecordStatus values:
-             *
-             * Active  = 1
-             * Expired = 2
-             * Waived  = 3
-             *
-             * A waived penalty must contain a nonblank reason.
-             #1#
+            // PenaltyRecordStatus values: Active = 1, Expired = 2, Waived = 3.
+            // A waived penalty must contain a nonblank reason.
             table.HasCheckConstraint(
                 "CK_PenaltyRecords_WaivedReason",
                 """
@@ -121,4 +103,4 @@ public sealed class PenaltyRecordConfiguration
                 """);
         });
     }
-}*/
+}

@@ -1,4 +1,4 @@
-/*using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Borrowing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -48,13 +48,7 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
             .IsRowVersion()
             .IsConcurrencyToken();
 
-        /*
-         * These relationships require the actual Catalog and Staff entity
-         * types from your repository.
-         *
-         * Replace the namespaces below if your project uses different ones.
-         #2#
-
+        // Replace these namespaces if your project uses different ones.
         builder.HasOne<LibraryApp.Domain.Catalog.BookCopy>()
             .WithMany()
             .HasForeignKey(loan => loan.BookCopyId)
@@ -81,13 +75,8 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
         })
         .HasDatabaseName("IX_Loans_Status_DueAtUtc");
 
-        /*
-         * One physical copy can have only one open loan.
-         *
-         * LoanStatus values:
-         * Active  = 1
-         * Overdue = 2
-         #2#
+        // One physical copy can have only one open loan.
+        // LoanStatus values: Active = 1, Overdue = 2.
         builder.HasIndex(loan => loan.BookCopyId)
             .IsUnique()
             .HasFilter("[Status] IN (1, 2)")
@@ -101,4 +90,4 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
                 "[RenewalCount] >= 0");
         });
     }
-}*/
+}

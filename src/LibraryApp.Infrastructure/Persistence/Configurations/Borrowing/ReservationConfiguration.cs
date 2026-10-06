@@ -1,4 +1,6 @@
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -46,29 +48,15 @@ public sealed class ReservationConfiguration
             .IsRowVersion()
             .IsConcurrencyToken();
 
-        /*
-         * Book is not available in the current branch.
-         * Add this after Group 1 merges its Book entity.
-
-        using LibraryApp.Domain.Catalog;
-
         builder.HasOne<Book>()
             .WithMany()
             .HasForeignKey(reservation => reservation.BookId)
             .OnDelete(DeleteBehavior.Restrict);
-        */
-
-        /*
-         * StaffMember is not available in the current branch.
-         * Add this after Group 2 merges its StaffMember entity.
-
-        using LibraryApp.Domain.StaffMembers;
 
         builder.HasOne<StaffMember>()
             .WithMany()
             .HasForeignKey(reservation => reservation.StaffMemberId)
             .OnDelete(DeleteBehavior.Restrict);
-        */
 
         // Supports FIFO queue queries for one book.
         builder.HasIndex(reservation => new
