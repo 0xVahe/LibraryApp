@@ -53,7 +53,7 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
          * types from your repository.
          *
          * Replace the namespaces below if your project uses different ones.
-         #1#
+         #2#
 
         builder.HasOne<LibraryApp.Domain.Catalog.BookCopy>()
             .WithMany()
@@ -87,7 +87,7 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
          * LoanStatus values:
          * Active  = 1
          * Overdue = 2
-         #1#
+         #2#
         builder.HasIndex(loan => loan.BookCopyId)
             .IsUnique()
             .HasFilter("[Status] IN (1, 2)")

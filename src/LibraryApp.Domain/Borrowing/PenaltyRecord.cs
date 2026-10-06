@@ -12,7 +12,7 @@ public sealed class PenaltyRecord : Entity
     /// Gets the identifier of the staff member receiving the penalty.
     /// </summary>
     public Guid StaffMemberId { get; private set; }
-
+        
     /// <summary>
     /// Gets the identifier of the loan that caused the penalty.
     /// </summary>
