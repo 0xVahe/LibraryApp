@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Seed;
 using LibraryApp.Infrastructure.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,8 @@ public static class PlatformServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IIdGenerator, SequentialGuidGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        
+        services.AddScoped<DatabaseInitializer>();
 
         services.AddHealthChecks()
             .AddDbContextCheck<LibraryDbContext>("sql-server", tags: ["ready"]);
