@@ -8,7 +8,7 @@ public sealed class BookCopy : Entity
     public const int BarcodeMaxLength = 32;
     public const int ShelfLocationMaxLength = 50;
 
-    private BookCopy() { }                                       
+    private BookCopy() { }                           
 
     /// <summary>A new copy always starts as Available.</summary>
     public BookCopy(Guid id, Guid bookId, string barcode, BookCopyCondition condition, string? shelfLocation)
