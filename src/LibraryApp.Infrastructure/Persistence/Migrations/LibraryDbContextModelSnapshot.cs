@@ -22,6 +22,159 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.Loan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BookCopyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("DueAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("IssuedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RenewalCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReturnedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookCopyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Loans_Open_BookCopyId")
+                        .HasFilter("[Status] IN (1, 2)");
+
+                    b.HasIndex("StaffMemberId", "Status")
+                        .HasDatabaseName("IX_Loans_StaffMemberId_Status");
+
+                    b.HasIndex("Status", "DueAtUtc")
+                        .HasDatabaseName("IX_Loans_Status_DueAtUtc");
+
+                    b.ToTable("Loans", t =>
+                        {
+                            t.HasCheckConstraint("CK_Loans_RenewalCount_NonNegative", "[RenewalCount] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.PenaltyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("WaivedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoanId")
+                        .HasDatabaseName("IX_PenaltyRecords_LoanId");
+
+                    b.HasIndex("StaffMemberId", "Status", "ExpiresAtUtc")
+                        .HasDatabaseName("IX_PenaltyRecords_StaffMemberId_Status_ExpiresAtUtc");
+
+                    b.ToTable("PenaltyRecords", t =>
+                        {
+                            t.HasCheckConstraint("CK_PenaltyRecords_Points", "[Points] BETWEEN 0 AND 10");
+
+                            t.HasCheckConstraint("CK_PenaltyRecords_WaivedReason", "[Status] <> 3 OR ([WaivedReason] IS NOT NULL AND LEN(LTRIM(RTRIM([WaivedReason]))) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.Reservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BookId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("QueuePosition")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReadyUntilUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StaffMemberId", "BookId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Reservations_Active_StaffMemberId_BookId")
+                        .HasFilter("[Status] IN (1, 2)");
+
+                    b.HasIndex("StaffMemberId", "Status")
+                        .HasDatabaseName("IX_Reservations_StaffMemberId_Status");
+
+                    b.HasIndex("BookId", "Status", "CreatedAtUtc")
+                        .HasDatabaseName("IX_Reservations_BookId_Status_CreatedAtUtc");
+
+                    b.ToTable("Reservations", t =>
+                        {
+                            t.HasCheckConstraint("CK_Reservations_QueuePosition", "([Status] = 1 AND [QueuePosition] >= 1) OR ([Status] <> 1 AND [QueuePosition] = 0)");
+                        });
+                });
+
             modelBuilder.Entity("LibraryApp.Domain.Catalog.Author", b =>
                 {
                     b.Property<Guid>("Id")
@@ -520,6 +673,51 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.Loan", b =>
+                {
+                    b.HasOne("LibraryApp.Domain.Catalog.BookCopy", null)
+                        .WithMany()
+                        .HasForeignKey("BookCopyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.PenaltyRecord", b =>
+                {
+                    b.HasOne("LibraryApp.Domain.Borrowing.Loan", null)
+                        .WithMany()
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Borrowing.Reservation", b =>
+                {
+                    b.HasOne("LibraryApp.Domain.Catalog.Book", null)
+                        .WithMany()
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LibraryApp.Domain.Catalog.Book", b =>
