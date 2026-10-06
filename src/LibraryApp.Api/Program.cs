@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
+using LibraryApp.Infrastructure.Persistence.Seed;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -57,6 +58,12 @@ app.MapControllers();
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false });                                  // the process is up
 app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") });   // SQL Server answers
+
+// Migrations and seed data at start (settings: Database:MigrateOnStartup, Seed:Enabled; seed only in Development).
+using (var scope = app.Services.CreateScope())
+{
+    await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync();
+}
 
 app.Run();
 
