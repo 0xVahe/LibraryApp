@@ -7,40 +7,80 @@ namespace LibraryApp.Application.Tests.Catalog;
 
 public sealed class BookSearchServiceTests
 {
-    [Fact]
-    public async Task Search_delegates_the_request_and_cancellation_to_the_query()
+    private readonly RecordingQuery _query = new();
+    private readonly BookSearchService _service;
+
+    public BookSearchServiceTests()
     {
-        var query = new RecordingQuery();
-        var service = new BookSearchService(query);
-        using var cancellation = new CancellationTokenSource();
-        var request = new BookSearchRequest(
-            "Risk",
-            "Risk, Compliance & AML",
-            "en",
-            true,
-            new PageRequest(2, 20));
-
-        PagedResult<BookSearchResultDto> result = await service.SearchAsync(request, cancellation.Token);
-
-        Assert.Same(request, query.Request);
-        Assert.Equal(cancellation.Token, query.CancellationToken);
-        Assert.Empty(result.Items);
-        Assert.Equal(0, result.TotalCount);
+        _service = new BookSearchService(_query);
     }
+
+    [Fact]
+    public async Task The_search_text_is_trimmed_and_the_isbn_text_has_no_hyphens_or_spaces()
+    {
+        await _service.SearchAsync(Request(search: "  978-0-13 475759-9 "));
+
+        Assert.Equal("978-0-13 475759-9", _query.Filter!.Text);
+        Assert.Equal("9780134757599", _query.Filter.IsbnText);
+    }
+
+    [Fact]
+    public async Task The_language_is_trimmed_and_lower_case()
+    {
+        await _service.SearchAsync(Request(language: " EN "));
+
+        Assert.Equal("en", _query.Filter!.Language);
+    }
+
+    [Fact]
+    public async Task Empty_values_mean_no_filter()
+    {
+        await _service.SearchAsync(Request(search: "   ", language: ""));
+
+        Assert.Null(_query.Filter!.Text);
+        Assert.Null(_query.Filter.IsbnText);
+        Assert.Null(_query.Filter.Language);
+    }
+
+    [Fact]
+    public async Task Category_availability_paging_and_cancellation_are_passed_unchanged()
+    {
+        var categoryId = Guid.NewGuid();
+        var paging = new PageRequest(2, 50);
+        using var cancellation = new CancellationTokenSource();
+
+        await _service.SearchAsync(new BookSearchRequest(null, categoryId, null, false, paging), cancellation.Token);
+
+        Assert.Equal(categoryId, _query.Filter!.CategoryId);
+        Assert.False(_query.Filter.Available);
+        Assert.Same(paging, _query.Paging);
+        Assert.Equal(cancellation.Token, _query.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_missing_request_is_refused()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _service.SearchAsync(null!));
+    }
+
+    private static BookSearchRequest Request(string? search = null, string? language = null) =>
+        new(search, null, language, null, new PageRequest());
 
     private sealed class RecordingQuery : IBookSearchQuery
     {
-        public BookSearchRequest? Request { get; private set; }
+        public BookSearchFilter? Filter { get; private set; }
+        public PageRequest? Paging { get; private set; }
         public CancellationToken CancellationToken { get; private set; }
 
         public Task<PagedResult<BookSearchResultDto>> SearchAsync(
-            BookSearchRequest request,
+            BookSearchFilter filter,
+            PageRequest paging,
             CancellationToken cancellationToken = default)
         {
-            Request = request;
+            Filter = filter;
+            Paging = paging;
             CancellationToken = cancellationToken;
-            return Task.FromResult(new PagedResult<BookSearchResultDto>(
-                [], 0, request.Page.Page, request.Page.PageSize));
+            return Task.FromResult(new PagedResult<BookSearchResultDto>([], 0, paging.Page, paging.PageSize));
         }
     }
 }

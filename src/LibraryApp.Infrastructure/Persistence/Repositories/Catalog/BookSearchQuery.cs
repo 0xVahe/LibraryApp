@@ -2,7 +2,6 @@ using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Common;
 using LibraryApp.Domain.Catalog;
-using LibraryApp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
@@ -10,44 +9,49 @@ namespace LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
 {
     public async Task<PagedResult<BookSearchResultDto>> SearchAsync(
-        BookSearchRequest request,
+        BookSearchFilter filter,
+        PageRequest paging,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
-        PageRequest paging = request.Page;
-        string? search = Normalize(request.Search);
-        string? category = Normalize(request.Category);
-        string? language = Normalize(request.Language)?.ToLowerInvariant();
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(paging);
 
         IQueryable<Book> books = db.Books
             .AsNoTracking()
             .Where(book => !book.IsDeleted);
 
-        if (search is not null)
+        if (filter.Text is not null)
         {
-            string isbnSearch = search.Replace("-", string.Empty, StringComparison.Ordinal);
+            string text = filter.Text;
+            string isbnText = filter.IsbnText ?? text;
+
             books = books.Where(book =>
-                book.Title.Contains(search) ||
-                book.Isbn.Replace("-", string.Empty).Contains(isbnSearch) ||
+                book.Title.Contains(text) ||
+                book.Isbn.Contains(isbnText) ||              
                 db.BookAuthors.Any(link => link.BookId == book.Id &&
-                    db.Authors.Any(author => author.Id == link.AuthorId && author.FullName.Contains(search))));
+                    db.Authors.Any(author => author.Id == link.AuthorId && author.FullName.Contains(text))));
         }
 
-        if (category is not null)
-            books = books.Where(book => db.Categories.Any(c => c.Id == book.CategoryId && c.Name == category));
+        if (filter.CategoryId is Guid categoryId)
+        {
+            books = books.Where(book =>
+                book.CategoryId == categoryId ||
+                db.Categories.Any(category => category.Id == book.CategoryId && category.ParentCategoryId == categoryId));
+        }
 
-        if (language is not null)
+        if (filter.Language is not null)
+        {
+            string language = filter.Language;
             books = books.Where(book => book.Language == language);
+        }
 
-        if (request.Available is not null)
+        if (filter.Available is bool available)
         {
             IQueryable<Guid> availableBookIds = db.BookCopies
                 .Where(copy => copy.Status == BookCopyStatus.Available)
-                .Select(copy => copy.BookId)
-                .Distinct();
+                .Select(copy => copy.BookId);
 
-            books = request.Available.Value
+            books = available
                 ? books.Where(book => availableBookIds.Contains(book.Id))
                 : books.Where(book => !availableBookIds.Contains(book.Id));
         }
@@ -62,20 +66,21 @@ public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
             .Select(book => new BookSearchResultDto(
                 book.Id,
                 book.Title,
+                book.Isbn,
+                book.PublicationYear,
                 db.BookAuthors
                     .Where(link => link.BookId == book.Id)
                     .Join(db.Authors, link => link.AuthorId, author => author.Id, (_, author) => author.FullName)
                     .OrderBy(name => name)
                     .ToList(),
-                db.Categories.Where(c => c.Id == book.CategoryId).Select(c => c.Name).First(),
+                db.Categories.Where(category => category.Id == book.CategoryId).Select(category => category.Name).First(),
                 book.Language,
                 db.BookCopies.Count(copy => copy.BookId == book.Id && copy.Status == BookCopyStatus.Available),
-                db.BookCopies.Count(copy => copy.BookId == book.Id)))
+                db.BookCopies.Count(copy => copy.BookId == book.Id
+                    && copy.Status != BookCopyStatus.Lost
+                    && copy.Status != BookCopyStatus.Withdrawn)))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<BookSearchResultDto>(items, totalCount, paging.Page, paging.PageSize);
     }
-
-    private static string? Normalize(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
