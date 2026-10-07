@@ -37,7 +37,9 @@ public static class PlatformServiceCollectionExtensions
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IIdGenerator, SequentialGuidGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
-        
+
+        services.AddScoped<IApplicationLock, SqlServerApplicationLock>();
+
         services.AddScoped<DatabaseInitializer>();
 
         services.AddHealthChecks()
