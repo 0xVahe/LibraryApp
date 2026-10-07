@@ -7,6 +7,19 @@ namespace LibraryApp.Domain.Catalog;
 /// </summary>
 public static class CatalogErrors
 {
+    public static readonly Error AuthorNotFound =
+        Error.NotFound("catalog.author_not_found", "Author not found.");
+    public static readonly Error AuthorInUse =
+        Error.Conflict("catalog.author_in_use", "An author linked to a book cannot be deleted.");
+    public static readonly Error BookNotFound =
+        Error.NotFound("catalog.book_not_found", "Book not found.");
+    public static readonly Error BookAuthorsRequired =
+        Error.Validation("catalog.book_authors_required", "A book must have at least one author (BR-CAT-5).");
+    public static readonly Error CategoryNotFound =
+        Error.NotFound("catalog.category_not_found", "Category not found.");
+    public static readonly Error CategoryInUse =
+        Error.Conflict("catalog.category_in_use", "A category referenced by books or subcategories cannot be deleted.");
+
     // ---------- Book ----------
 
     public static readonly Error BookTitleRequired =
