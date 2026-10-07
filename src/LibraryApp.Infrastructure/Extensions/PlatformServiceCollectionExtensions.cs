@@ -1,6 +1,7 @@
 using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
+using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed;
 using LibraryApp.Infrastructure.Time;
@@ -45,10 +46,13 @@ public static class PlatformServiceCollectionExtensions
         // Validators of all modules (SD-15): every AbstractValidator<T> in the Application assembly.
         services.AddValidatorsFromAssembly(typeof(CommonErrors).Assembly, includeInternalTypes: true);
 
+        services.AddEventBus(configuration);
+
         services.AddScoped<DatabaseInitializer>();
 
         services.AddHealthChecks()
-            .AddDbContextCheck<LibraryDbContext>("sql-server", tags: ["ready"]);
+            .AddDbContextCheck<LibraryDbContext>("sql-server", tags: ["ready"])
+            .AddCheck<OutboxHealthCheck>("outbox", tags: ["ready"]);
 
         return services;
     }

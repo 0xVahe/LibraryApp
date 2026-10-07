@@ -29,6 +29,7 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:LibraryDb", _connectionString);
         builder.UseSetting("UseHttpsRedirection", "false");
+        builder.UseSetting("Messaging:DispatcherEnabled", "false");
         builder.ConfigureServices(ConfigureTestServices);
     }
 
