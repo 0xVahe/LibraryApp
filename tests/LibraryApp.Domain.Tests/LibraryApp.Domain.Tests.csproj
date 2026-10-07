@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\LibraryApp.Infrastructure\LibraryApp.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\LibraryApp.Domain\LibraryApp.Domain.csproj" />
   </ItemGroup>
 
