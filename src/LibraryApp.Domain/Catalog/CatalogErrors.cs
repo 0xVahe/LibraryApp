@@ -59,4 +59,31 @@ public static class CatalogErrors
     /// <summary>The code is fixed; the message names the two statuses to help the caller.</summary>
     public static Error CopyStatusChangeNotAllowed(BookCopyStatus from, BookCopyStatus to) =>
         Error.Conflict("catalog.copy_status_change_not_allowed", $"A copy cannot change status from {from} to {to}.");
+
+    // ---------- Book lookups (used by copies; books use them too) ----------
+
+    public static readonly Error BookNotFound =
+        Error.NotFound("catalog.book_not_found", "The book does not exist.");
+
+    public static readonly Error BookDeleted =
+        Error.Conflict("catalog.book_deleted", "The book is deleted, so no copies can be added to it.");
+
+    // ---------- BookCopy management (CAT-04) ----------
+
+    public static readonly Error CopyNotFound =
+        Error.NotFound("catalog.copy_not_found", "The copy does not exist or belongs to another book.");
+
+    public static readonly Error CopyBarcodeDuplicate =
+        Error.Conflict("catalog.copy_barcode_duplicate",
+            "A copy with this barcode already exists, retired copies included (BR-CAT-2).");
+
+    /// <summary>The copy is OnLoan or Reserved: Borrowing changes its status (return, declare lost), not the librarian here.</summary>
+    public static readonly Error CopyInCirculation =
+        Error.Conflict("catalog.copy_in_circulation",
+            "The copy is on loan or reserved, so its status is changed through Borrowing (return or declare lost).");
+
+    /// <summary>BR-CAT-4: a librarian sets only UnderRepair, Lost and Withdrawn, and Available after a repair.</summary>
+    public static Error CopyStatusNotAllowedForLibrarian(BookCopyStatus status) =>
+        Error.BusinessRule("catalog.copy_status_not_allowed",
+            $"A librarian cannot set the status {status} here (BR-CAT-4).");
 }
