@@ -14,7 +14,7 @@ public sealed class LibraryDbContextFactory : IDesignTimeDbContextFactory<Librar
     public const string ConnectionStringVariable = "LIBRARYAPP_DESIGNTIME_DB";
 
     private const string DefaultConnection =
-        @"Server=(localdb)\MSSQLLocalDB;Database=LibraryApp_DesignTime;Trusted_Connection=True;TrustServerCertificate=True";
+        @"Server=(localdb)\MSSQLLocalDB;Database=LibraryApp;Trusted_Connection=True;TrustServerCertificate=True";
 
     public LibraryDbContext CreateDbContext(string[] args)
     {
