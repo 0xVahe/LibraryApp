@@ -12,20 +12,20 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
+// Development only: load the git-ignored .env before the builder, so its values come in through the normal
+// environment-variable source (below command-line arguments and the test host settings). Real variables win.
+var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                      ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+if (string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase))
+    DotNetEnv.Env.TraversePath().NoClobber().Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Development only: read the git-ignored .env (real environment variables win). Other environments take settings from
-// real environment variables only (Jwt__SigningKey), never from a file that happens to lie in a parent folder.
-if (builder.Environment.IsDevelopment())
-{
-    DotNetEnv.Env.TraversePath().NoClobber().Load();
-    builder.Configuration.AddEnvironmentVariables();
-
-    // JWT_SIGNING_KEY is the .env name of Jwt:SigningKey; a key from user-secrets or the test host wins.
-    if (string.IsNullOrEmpty(builder.Configuration["Jwt:SigningKey"])
-        && Environment.GetEnvironmentVariable("JWT_SIGNING_KEY") is { Length: > 0 } jwtSigningKey)
-        builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
-}
+// JWT_SIGNING_KEY is the .env name of Jwt:SigningKey; a key from user-secrets or the test host wins.
+if (builder.Environment.IsDevelopment()
+    && string.IsNullOrEmpty(builder.Configuration["Jwt:SigningKey"])
+    && Environment.GetEnvironmentVariable("JWT_SIGNING_KEY") is { Length: > 0 } jwtSigningKey)
+    builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
 
 // Logging: Serilog to console and file (requirements document). Settings: appsettings "Serilog".
 builder.Host.UseSerilog((context, services, logger) => logger

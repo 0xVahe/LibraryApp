@@ -21,7 +21,11 @@ public static class LoginRateLimiting
 {
     public const string PolicyName = "login";
 
-    /// <summary>Limits POST /api/auth/login per client IP (brute force across many accounts). Over the limit → 429.</summary>
+    /// <summary>
+    /// Limits POST /api/auth/login per client IP (brute force across many accounts). Over the limit → 429.
+    /// Behind a reverse proxy, configure ForwardedHeaders with the known proxies, otherwise every user shares the
+    /// proxy's address and therefore one limit.
+    /// </summary>
     public static IServiceCollection AddLoginRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<LoginRateLimitOptions>().Bind(configuration.GetSection(LoginRateLimitOptions.SectionName));

@@ -19,7 +19,7 @@ public sealed class AuthorizationFactory : ApiHostFactory
 [Route("test-authorization")]
 public sealed class TestAuthorizationController : ControllerBase
 {
-    /// <summary>No attribute: protected by the fallback policy.</summary>
+    /// <summary>No attribute: protected by RequireAuthorization() on MapControllers (NFR-02).</summary>
     [HttpGet("default")]
     public IActionResult Default() => Ok();
 

@@ -59,11 +59,13 @@ public sealed class UserAccountStore(
     {
         var lockout = userManager.Options.Lockout;
         var maxAttempts = lockout.MaxFailedAccessAttempts;
-        DateTimeOffset? lockoutEnd = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero).Add(lockout.DefaultLockoutTimeSpan);
+        var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
+        DateTimeOffset? lockoutEnd = now.Add(lockout.DefaultLockoutTimeSpan);
         var stamp = Guid.NewGuid().ToString();
 
+        // Not while locked out: requests still in flight when the lockout starts must not count toward the next one.
         return db.Users
-            .Where(u => u.Id == userId)
+            .Where(u => u.Id == userId && (u.LockoutEnd == null || u.LockoutEnd <= now))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.LockoutEnd,
                     u => u.LockoutEnabled && u.AccessFailedCount + 1 >= maxAttempts ? lockoutEnd : u.LockoutEnd)

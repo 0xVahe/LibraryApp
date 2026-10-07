@@ -103,6 +103,7 @@ public class UserAccountStoreTests(UserAccountStoreFixture fixture) : IClassFixt
 
         var stored = await ReloadAsync(user.Id);
         Assert.NotNull(stored.LockoutEnd);
+        Assert.Equal(0, stored.AccessFailedCount);  
         Assert.True(stored.LockoutEnd > DateTimeOffset.UtcNow);
         Assert.Null(await VerifyAsync(user.Email!, Password));
     }
