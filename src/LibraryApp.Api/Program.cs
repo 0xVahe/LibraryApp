@@ -49,13 +49,14 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-app.UseExceptionHandler();
-app.UseStatusCodePages();   // empty 401/403/404 answers get a ProblemDetails body as well
-
 // Fail at start, not on the first request, if the clock settings are wrong (Time:TimeZoneId).
 _ = app.Services.GetRequiredService<IClock>();
 
+// Outside the exception handler: the request log shows the status the client gets (409, 422 ...), not 500.
 app.UseSerilogRequestLogging();
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();   // empty 401/403/404 answers get a ProblemDetails body as well
 
 if (app.Environment.IsDevelopment())
 {

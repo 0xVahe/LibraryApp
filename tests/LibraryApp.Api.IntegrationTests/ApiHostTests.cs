@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog.Core;
+using Serilog.Events;
 
 namespace LibraryApp.Api.IntegrationTests;
 
@@ -30,8 +32,15 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:LibraryDb", _connectionString);
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
+        builder.ConfigureServices(services => services.AddSingleton<ILogEventSink>(Logs));
         builder.ConfigureServices(ConfigureTestServices);
     }
+
+    /// <summary>
+    /// Log events of every test host. Shared, because the request logging of Serilog writes through the static
+    /// Log.Logger, which the host built last replaces; every host has this sink, so no event is lost.
+    /// </summary>
+    public static CollectingSink Logs { get; } = new();
 
     /// <summary>Extra services of a test class (test controllers, validators).</summary>
     protected virtual void ConfigureTestServices(IServiceCollection services) { }
@@ -63,4 +72,13 @@ public class ApiHostTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+}
+
+public sealed class CollectingSink : ILogEventSink
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<LogEvent> _events = new();
+
+    public IReadOnlyCollection<LogEvent> Events => _events;
+
+    public void Emit(LogEvent logEvent) => _events.Enqueue(logEvent);
 }

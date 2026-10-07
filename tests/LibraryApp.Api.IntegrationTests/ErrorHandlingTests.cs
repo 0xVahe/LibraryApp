@@ -8,6 +8,7 @@ using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog.Events;
 
 namespace LibraryApp.Api.IntegrationTests;
 
@@ -83,6 +84,17 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task A_domain_error_is_logged_with_its_final_status_not_as_500()
+    {
+        await factory.CreateClient().GetAsync("/test-errors/conflict");
+
+        var completed = await RequestLogAsync("/test-errors/conflict");
+        Assert.Equal("409", completed.Properties["StatusCode"].ToString());
+        Assert.Equal(LogEventLevel.Information, completed.Level);
+        Assert.Null(completed.Exception);
     }
 
     [Fact]
@@ -188,6 +200,23 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>The "HTTP GET ... responded ..." event of the request logging; written right after the response.</summary>
+    private static async Task<LogEvent> RequestLogAsync(string path)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var completed = ApiHostFactory.Logs.Events.LastOrDefault(e =>
+                e.Properties.TryGetValue("RequestPath", out var value) && value.ToString() == $"\"{path}\"" &&
+                e.Properties.ContainsKey("StatusCode"));
+            if (completed is not null)
+                return completed;
+
+            await Task.Delay(20);
+        }
+
+        throw new Xunit.Sdk.XunitException($"No request log event for {path}");
     }
 
     private static async Task<JsonElement> ReadAsync(HttpResponseMessage response) =>
