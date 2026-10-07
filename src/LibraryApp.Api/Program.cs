@@ -1,12 +1,20 @@
+using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
+using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Seed;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
+DotNetEnv.Env.TraversePath().NoClobber().Load();
+
 var builder = WebApplication.CreateBuilder(args);
+
+// JWT_SIGNING_KEY is the .env / docker compose name of Jwt:SigningKey.
+if (Environment.GetEnvironmentVariable("JWT_SIGNING_KEY") is { Length: > 0 } jwtSigningKey)
+    builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
 
 // Logging: Serilog to console and file (requirements document). Settings: appsettings "Serilog".
 builder.Host.UseSerilog((context, services, logger) => logger
@@ -18,9 +26,9 @@ builder.Host.UseSerilog((context, services, logger) => logger
 builder.Services.AddPlatform(builder.Configuration, builder.Environment);
 
 // Modules: each group uncomments or adds ONE line for its module here, in its own pull request. Nothing else.
-// builder.Services.AddLibraryIdentity();                          // Group 2 — Identity (+ JWT authentication later)
-// builder.Services.AddStaffModule(builder.Configuration);         // Group 2
-builder.Services.AddCatalogModule(builder.Configuration);         // Group 1
+builder.Services.AddLibraryIdentity();                          // Group 2 — Identity (+ JWT authentication later)
+builder.Services.AddStaffModule(builder.Configuration);         // Group 2
+builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
 // builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
 // builder.Services.AddNotificationsModule(builder.Configuration); // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
@@ -40,12 +48,31 @@ builder.Services
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = GlobalExceptionHandler.AddTraceId);
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// Authentication schemes (JWT) are added by Group 2; the middleware is already in place.
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    // "Authorize" button (Group 2, MEM-02): paste the accessToken from POST /api/auth/login.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Name = "Authorization",
+        Description = "Log in with POST /api/auth/login, then paste the accessToken here (without \"Bearer \")."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecurityScheme
+        {
+            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+        }] = Array.Empty<string>()
+    });
+}); 
 
 var app = builder.Build();
 
