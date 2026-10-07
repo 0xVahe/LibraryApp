@@ -14,6 +14,10 @@ public static class CatalogRegistrationExtensions
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
+        // Search (CAT-05)
+        services.AddScoped<IBookSearchQuery, BookSearchQuery>();
+        services.AddScoped<IBookSearchService, BookSearchService>();
+
         // Copies (CAT-04)
         services.AddScoped<IBookCopyRepository, BookCopyRepository>();
         services.AddScoped<IBookCopyService, BookCopyService>();
