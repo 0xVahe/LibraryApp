@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -11,6 +14,8 @@ public static class CatalogRegistrationExtensions
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<IBookSearchQuery, BookSearchQuery>();
+        services.AddScoped<IBookSearchService, BookSearchService>();
         return services;
     }
 }
