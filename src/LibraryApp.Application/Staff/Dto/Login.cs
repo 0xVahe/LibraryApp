@@ -1,6 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-using LibraryApp.Domain.Common;
-
 namespace LibraryApp.Application.Staff.Dto;
 
 /// <summary>Credentials for POST /api/auth/login.</summary>
