@@ -1,9 +1,11 @@
 using System.Net;
+using System.Security.Cryptography;
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog.Core;
 using Serilog.Events;
@@ -32,6 +34,8 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:LibraryDb", _connectionString);
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
+        builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+        builder.UseSetting("LoginRateLimit:PermitLimit", "1000");
         builder.ConfigureServices(services => services.AddSingleton<ILogEventSink>(Logs));
         builder.ConfigureServices(ConfigureTestServices);
     }
@@ -48,15 +52,34 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
     public async Task InitializeAsync()
     {
         using var scope = Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Database.MigrateAsync();
+        var database = scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Database;
+        EnsureOwnDatabase(database);
+        await database.MigrateAsync();
     }
 
     public new async Task DisposeAsync()
     {
         using (var scope = Services.CreateScope())
-            await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Database.EnsureDeletedAsync();
+        {
+            var database = scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Database;
+            EnsureOwnDatabase(database);
+            await database.EnsureDeletedAsync();
+        }
 
         await base.DisposeAsync();
+    }
+
+    /// <summary>
+    /// The host must use the throw-away database of this factory. If a setting from the environment won (e.g.
+    /// ConnectionStrings__LibraryDb), stop before a developer database is migrated or dropped.
+    /// </summary>
+    private void EnsureOwnDatabase(DatabaseFacade database)
+    {
+        var expected = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
+        var actual = new SqlConnectionStringBuilder(database.GetConnectionString()).InitialCatalog;
+        if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"The test host uses database '{actual}' instead of its own '{expected}'; refusing to migrate or delete it.");
     }
 }
 
