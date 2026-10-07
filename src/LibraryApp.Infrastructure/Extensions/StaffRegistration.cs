@@ -1,18 +1,30 @@
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
+using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
+using LibraryApp.Infrastructure.Persistence.Seed.Staff;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
 public static class StaffRegistrationExtensions
 {
-    /// <summary>Staff module services. Called from Program.cs.</summary>
-    public static IServiceCollection AddStaffModule(this IServiceCollection services)
+    /// <summary>Staff module services, login and JWT authentication. Called from Program.cs after AddLibraryIdentity.</summary>
+    public static IServiceCollection AddStaffModule(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IStaffMemberRepository, StaffMemberRepository>();
         services.AddScoped<IStaffMemberService, StaffMemberService>();
+
+        services.Configure<CorporateEmailOptions>(configuration.GetSection(CorporateEmailOptions.SectionName));
+        services.AddSingleton<CorporateEmailPolicy>();
+        services.AddScoped<IUserAccountStore, UserAccountStore>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddLibraryJwtAuthentication(configuration);
+
+        services.AddScoped<IModuleSeeder, StaffSeeder>();
 
         return services;
     }

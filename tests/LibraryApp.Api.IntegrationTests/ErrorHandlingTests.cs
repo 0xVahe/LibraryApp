@@ -5,6 +5,7 @@ using FluentValidation;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Notifications;
 using LibraryApp.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,7 @@ public sealed class TestRequestValidator : AbstractValidator<TestRequest>
 }
 
 [ApiController]
+[AllowAnonymous]
 [Route("test-errors")]
 public sealed class TestErrorsController : ControllerBase
 {

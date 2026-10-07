@@ -54,8 +54,9 @@ public static class StaffErrors
         Error.BusinessRule("staff.already_deactivated", "The staff member is already deactivated.");
 
     public static readonly Error DeactivatedCannotChangeStatus =
-        Error.BusinessRule("staff.deactivated_status_locked", "The status of a deactivated staff member cannot be changed.");
-    
+        Error.BusinessRule("staff.deactivated_status_locked",
+            "The status of a deactivated staff member cannot be changed.");
+
     // Lookup and eligibility
     public static readonly Error NotFound =
         Error.NotFound("staff.not_found", "The staff member was not found.");
@@ -69,4 +70,18 @@ public static class StaffErrors
     /// <summary>Used by Borrowing, which owns the loan count, so the message is the same everywhere.</summary>
     public static Error LoanLimitReached(int activeLoans, int maxLoans) =>
         Error.BusinessRule("staff.loan_limit_reached", $"Loan limit reached ({activeLoans}/{maxLoans}).");
+
+    // Login (MEM-02, MEM-03)
+    public static readonly Error EmailNotCorporate =
+        Error.Validation("staff.email_not_corporate", "Only Ameriabank staff can log in.");
+
+    /// <summary>
+    /// Same message for unknown email and wrong password, so accounts cannot be guessed. Never thrown:
+    /// 401 is not an ErrorKind, AuthController answers it with this code.
+    /// </summary>
+    public static readonly Error InvalidCredentials =
+        Error.Validation("staff.invalid_credentials", "Invalid email or password.");
+
+    public static readonly Error AccountDeactivated =
+        Error.Forbidden("staff.account_deactivated", "This account is deactivated.");
 }
