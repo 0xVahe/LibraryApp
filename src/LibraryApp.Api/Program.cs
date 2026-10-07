@@ -1,7 +1,9 @@
 using System.Text.Json.Serialization;
+using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Persistence.Seed;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,8 +26,19 @@ builder.Services.AddCatalogModule(builder.Configuration);         // Group 1
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
 
 builder.Services
-    .AddControllers()
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));   // enums as names (SD-11)
+    .AddControllers(options => options.Filters.Add<ValidationFilter>())                                        // FluentValidation (SD-15)
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))   // enums as names (SD-11)
+    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>             // unreadable input: same shape
+        new BadRequestObjectResult(ValidationFilter.ValidationProblem(context.ModelState
+            .Where(e => e.Value?.Errors.Count > 0)
+            .ToDictionary(e => e.Key, e => e.Value!.Errors.Select(x => x.ErrorMessage).ToArray()), context.HttpContext))
+        {
+            ContentTypes = { "application/problem+json" },
+        });
+
+// Errors → ProblemDetails with code and traceId (NFR-07, SD-05).
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = GlobalExceptionHandler.AddTraceId);
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // Authentication schemes (JWT) are added by Group 2; the middleware is already in place.
 builder.Services.AddAuthentication();
@@ -35,6 +48,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();   // empty 401/403/404 answers get a ProblemDetails body as well
 
 // Fail at start, not on the first request, if the clock settings are wrong (Time:TimeZoneId).
 _ = app.Services.GetRequiredService<IClock>();

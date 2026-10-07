@@ -1,4 +1,6 @@
+using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Common;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed;
 using LibraryApp.Infrastructure.Time;
@@ -39,6 +41,9 @@ public static class PlatformServiceCollectionExtensions
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<IApplicationLock, SqlServerApplicationLock>();
+
+        // Validators of all modules (SD-15): every AbstractValidator<T> in the Application assembly.
+        services.AddValidatorsFromAssembly(typeof(CommonErrors).Assembly, includeInternalTypes: true);
 
         services.AddScoped<DatabaseInitializer>();
 

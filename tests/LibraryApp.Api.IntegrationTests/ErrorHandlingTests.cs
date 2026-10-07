@@ -1,0 +1,133 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using FluentValidation;
+using LibraryApp.Domain.Common;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace LibraryApp.Api.IntegrationTests;
+
+/// <summary>The real API with a test controller: every error becomes ProblemDetails with code and traceId (NFR-07, SD-05, SD-15).</summary>
+public sealed class ErrorHandlingFactory : ApiHostFactory
+{
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.AddControllers().AddApplicationPart(typeof(TestErrorsController).Assembly);
+        services.AddScoped<IValidator<TestRequest>, TestRequestValidator>();
+    }
+}
+
+public sealed record TestRequest(string? Name, int Quantity);
+
+public sealed class TestRequestValidator : AbstractValidator<TestRequest>
+{
+    public TestRequestValidator()
+    {
+        RuleFor(x => x.Name).NotEmpty();
+        RuleFor(x => x.Quantity).InclusiveBetween(1, 10);
+    }
+}
+
+[ApiController]
+[Route("test-errors")]
+public sealed class TestErrorsController : ControllerBase
+{
+    [HttpGet("{kind}")]
+    public IActionResult Throw(string kind) => kind switch
+    {
+        "business" => throw new DomainException(Error.BusinessRule("test.rule", "Maximum renewals reached")),
+        "validation" => throw new DomainException(Error.Validation("test.invalid", "Invalid")),
+        "forbidden" => throw new DomainException(Error.Forbidden("test.forbidden", "Not yours")),
+        "notfound" => throw new DomainException(Error.NotFound("test.not_found", "No such loan")),
+        "conflict" => throw new DomainException(Error.Conflict("test.conflict", "Already returned")),
+        _ => throw new InvalidOperationException("secret internal detail"),
+    };
+
+    [HttpPost]
+    public IActionResult Post(TestRequest request) => Ok(request);
+}
+
+public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<ErrorHandlingFactory>
+{
+    [Theory]
+    [InlineData("business", HttpStatusCode.UnprocessableEntity, "test.rule")]
+    [InlineData("validation", HttpStatusCode.BadRequest, "test.invalid")]
+    [InlineData("forbidden", HttpStatusCode.Forbidden, "test.forbidden")]
+    [InlineData("notfound", HttpStatusCode.NotFound, "test.not_found")]
+    [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
+    public async Task A_domain_error_becomes_ProblemDetails_with_the_status_of_its_kind(string kind, HttpStatusCode status, string code)
+    {
+        var response = await factory.CreateClient().GetAsync($"/test-errors/{kind}");
+        var body = await ReadAsync(response);
+
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task An_acceptance_criteria_message_reaches_the_client_unchanged()
+    {
+        var body = await ReadAsync(await factory.CreateClient().GetAsync("/test-errors/business"));
+
+        Assert.Equal("Maximum renewals reached", body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task An_unexpected_exception_is_500_without_internal_details()
+    {
+        var response = await factory.CreateClient().GetAsync("/test-errors/boom");
+        var text = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Contains("internal_error", text);
+        Assert.DoesNotContain("secret internal detail", text);
+        Assert.DoesNotContain("   at ", text);   // no stack trace
+    }
+
+    [Fact]
+    public async Task Invalid_input_is_400_with_errors_per_field()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/test-errors", new { name = "", quantity = 99 });
+        var body = await ReadAsync(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("validation_failed", body.GetProperty("code").GetString());
+        Assert.True(body.GetProperty("errors").TryGetProperty("Name", out _));
+        Assert.True(body.GetProperty("errors").TryGetProperty("Quantity", out _));
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task Valid_input_reaches_the_action()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync("/test-errors", new { name = "ok", quantity = 3 });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unreadable_input_has_the_same_shape_as_validation_errors()
+    {
+        var response = await factory.CreateClient().PostAsync("/test-errors",
+            new StringContent("{ not json", System.Text.Encoding.UTF8, "application/json"));
+        var body = await ReadAsync(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("validation_failed", body.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task An_unknown_route_is_a_ProblemDetails_404()
+    {
+        var response = await factory.CreateClient().GetAsync("/no-such-endpoint");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    private static async Task<JsonElement> ReadAsync(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+}
