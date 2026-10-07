@@ -3,7 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentValidation;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Notifications;
+using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests;
@@ -41,8 +44,23 @@ public sealed class TestErrorsController : ControllerBase
         "forbidden" => throw new DomainException(Error.Forbidden("test.forbidden", "Not yours")),
         "notfound" => throw new DomainException(Error.NotFound("test.not_found", "No such loan")),
         "conflict" => throw new DomainException(Error.Conflict("test.conflict", "Already returned")),
+        "concurrency" => throw new DbUpdateConcurrencyException("secret internal detail"),
         _ => throw new InvalidOperationException("secret internal detail"),
     };
+
+    [HttpGet("kind/{kind:int}")]
+    public IActionResult ThrowKind(int kind) => throw new DomainException(new Error("test.kind", "Kind", (ErrorKind)kind));
+
+    /// <summary>Two active templates of one type in one save: SQL Server rejects the second (filtered unique index).</summary>
+    [HttpPost("duplicate")]
+    public async Task<IActionResult> Duplicate([FromServices] LibraryDbContext db)
+    {
+        db.NotificationTemplates.AddRange(
+            new NotificationTemplate(Guid.NewGuid(), NotificationType.Welcome, "secret-subject", "Body"),
+            new NotificationTemplate(Guid.NewGuid(), NotificationType.Welcome, "secret-subject", "Body"));
+        await db.SaveChangesAsync();
+        return Ok();
+    }
 
     [HttpPost]
     public IActionResult Post(TestRequest request) => Ok(request);
@@ -65,6 +83,50 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task Every_error_kind_has_an_http_status()
+    {
+        var client = factory.CreateClient();
+
+        foreach (var kind in Enum.GetValues<ErrorKind>())
+        {
+            var response = await client.GetAsync($"/test-errors/kind/{(int)kind}");
+
+            Assert.True(response.StatusCode is >= HttpStatusCode.BadRequest and < HttpStatusCode.InternalServerError,
+                $"ErrorKind.{kind} answers {(int)response.StatusCode}: add its status to GlobalExceptionHandler.Describe");
+        }
+    }
+
+    [Fact]
+    public async Task An_unmapped_error_kind_is_500_not_a_guessed_status()
+    {
+        var response = await factory.CreateClient().GetAsync("/test-errors/kind/999");
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_concurrency_conflict_is_409_without_internal_details()
+    {
+        var response = await factory.CreateClient().GetAsync("/test-errors/concurrency");
+        var text = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("concurrency_conflict", JsonDocument.Parse(text).RootElement.GetProperty("code").GetString());
+        Assert.DoesNotContain("secret internal detail", text);
+    }
+
+    [Fact]
+    public async Task A_unique_index_violation_is_409_without_the_duplicate_value()
+    {
+        var response = await factory.CreateClient().PostAsync("/test-errors/duplicate", null);
+        var text = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("duplicate_value", JsonDocument.Parse(text).RootElement.GetProperty("code").GetString());
+        Assert.DoesNotContain("UX_NotificationTemplates", text);
     }
 
     [Fact]
