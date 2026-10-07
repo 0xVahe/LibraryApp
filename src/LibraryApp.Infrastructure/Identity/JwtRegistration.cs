@@ -41,6 +41,7 @@ public static class JwtRegistration
                     NameClaimType = JwtRegisteredClaimNames.Email,
                     RoleClaimType = LibraryClaimTypes.Role
                 };
+                bearer.IncludeErrorDetails = false; // no "invalid_token" reason in WWW-Authenticate
             });
 
         return services;

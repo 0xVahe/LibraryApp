@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -5,13 +6,38 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Identity;
 
-public sealed class UserAccountStore(UserManager<AppUser> userManager, LibraryDbContext db) : IUserAccountStore
+public sealed class UserAccountStore(
+    UserManager<AppUser> userManager,
+    IPasswordHasher<AppUser> passwordHasher,
+    LibraryDbContext db,
+    IClock clock) : IUserAccountStore
 {
-    public async Task<LoginAccount?> FindByEmailAsync(string email, CancellationToken ct)
+    // Hash of a random password, checked when the email is unknown: that path then costs as much as a wrong password.
+    private static string? _dummyPasswordHash;
+
+    public async Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct)
     {
         var user = await userManager.FindByEmailAsync(email);
         if (user is null)
+        {
+            VerifyDummyPassword(password);
             return null;
+        }
+
+        // The password is checked for a locked-out account too, so the answer time does not reveal the lockout.
+        var lockedOut = await userManager.IsLockedOutAsync(user);
+        var valid = await userManager.CheckPasswordAsync(user, password);
+        if (lockedOut)
+            return null;
+
+        if (!valid)
+        {
+            await RegisterFailedAttemptAsync(user.Id, ct);
+            return null;
+        }
+
+        if (user.AccessFailedCount > 0)
+            await ResetFailedAttemptsAsync(user.Id, ct);
 
         var roles = await userManager.GetRolesAsync(user);
         var staff = await db.StaffMembers
@@ -23,18 +49,43 @@ public sealed class UserAccountStore(UserManager<AppUser> userManager, LibraryDb
         return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList());
     }
 
-    public async Task<bool> CheckPasswordAsync(Guid userId, string password, CancellationToken ct)
+    /// <summary>
+    /// One UPDATE, so parallel wrong passwords are all counted (UserManager.AccessFailedAsync loses them on a
+    /// concurrency conflict). SQL Server evaluates every SET with the values from before the update, so the count and
+    /// LockoutEnd always agree. Same rule as Identity: MaxFailedAccessAttempts failures → locked for
+    /// DefaultLockoutTimeSpan (defaults: 5 failures, 5 minutes) and the count goes back to 0.
+    /// </summary>
+    private Task RegisterFailedAttemptAsync(Guid userId, CancellationToken ct)
     {
-        var user = await userManager.FindByIdAsync(userId.ToString());
-        if (user is null || await userManager.IsLockedOutAsync(user))
-            return false;
+        var lockout = userManager.Options.Lockout;
+        var maxAttempts = lockout.MaxFailedAccessAttempts;
+        DateTimeOffset? lockoutEnd = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero).Add(lockout.DefaultLockoutTimeSpan);
+        var stamp = Guid.NewGuid().ToString();
 
-        var valid = await userManager.CheckPasswordAsync(user, password);
-        if (valid)
-            await userManager.ResetAccessFailedCountAsync(user);
-        else
-            await userManager.AccessFailedAsync(user);   // Identity default: 5 failures → 5-minute lockout
+        return db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.LockoutEnd,
+                    u => u.LockoutEnabled && u.AccessFailedCount + 1 >= maxAttempts ? lockoutEnd : u.LockoutEnd)
+                .SetProperty(u => u.AccessFailedCount,
+                    u => u.LockoutEnabled && u.AccessFailedCount + 1 >= maxAttempts ? 0 : u.AccessFailedCount + 1)
+                .SetProperty(u => u.ConcurrencyStamp, stamp), ct);
+    }
 
-        return valid;
+    private Task ResetFailedAttemptsAsync(Guid userId, CancellationToken ct)
+    {
+        var stamp = Guid.NewGuid().ToString();
+
+        return db.Users
+            .Where(u => u.Id == userId && u.AccessFailedCount > 0)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.AccessFailedCount, 0)
+                .SetProperty(u => u.ConcurrencyStamp, stamp), ct);
+    }
+
+    private void VerifyDummyPassword(string password)
+    {
+        var hash = _dummyPasswordHash ??= passwordHasher.HashPassword(new AppUser(), Guid.NewGuid().ToString("N"));
+        passwordHasher.VerifyHashedPassword(new AppUser(), hash, password);
     }
 }

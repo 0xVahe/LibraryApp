@@ -13,8 +13,10 @@ public sealed record LoginAccount(
 /// <summary>Hides ASP.NET Core Identity from the Application layer.</summary>
 public interface IUserAccountStore
 {
-    Task<LoginAccount?> FindByEmailAsync(string email, CancellationToken ct);
-
-    /// <summary>Counts failed attempts; a locked-out account always returns false.</summary>
-    Task<bool> CheckPasswordAsync(Guid userId, string password, CancellationToken ct);
+    /// <summary>
+    /// The account when the email exists, the account is not locked out and the password is right; otherwise null.
+    /// Counts failed attempts (lockout). Every path checks one password hash, so the answer time does not reveal
+    /// whether the email exists.
+    /// </summary>
+    Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct);
 }

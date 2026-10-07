@@ -18,8 +18,8 @@ public sealed class AuthService(
         if (!emailPolicy.IsCorporate(email))
             throw new DomainException(StaffErrors.EmailNotCorporate);
 
-        var account = await accounts.FindByEmailAsync(email, ct);
-        if (account is null || !await accounts.CheckPasswordAsync(account.UserId, request.Password ?? string.Empty, ct))
+        var account = await accounts.VerifyCredentialsAsync(email, request.Password ?? string.Empty, ct);
+        if (account is null)
             return null;
 
         // Restricted and Suspended members may still log in to see their standing (MEM-08).

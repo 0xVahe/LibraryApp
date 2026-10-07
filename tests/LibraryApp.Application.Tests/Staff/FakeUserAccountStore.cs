@@ -21,12 +21,9 @@ internal sealed class FakeUserAccountStore : IUserAccountStore
         return account;
     }
 
-    public Task<LoginAccount?> FindByEmailAsync(string email, CancellationToken ct)
+    public Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct)
     {
         LookedUpEmails.Add(email);
-        return Task.FromResult(_accounts.GetValueOrDefault(email));
+        return Task.FromResult(password == Password ? _accounts.GetValueOrDefault(email) : null);
     }
-
-    public Task<bool> CheckPasswordAsync(Guid userId, string password, CancellationToken ct) =>
-        Task.FromResult(_accounts.Values.Any(a => a.UserId == userId) && password == Password);
 }

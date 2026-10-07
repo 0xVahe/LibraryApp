@@ -1,20 +1,31 @@
-using Microsoft.OpenApi.Models;
+using System.Globalization;
 using System.Text.Json.Serialization;
+using FluentValidation;
+using LibraryApp.Api.Auth;
 using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Seed;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi.Models;
 using Serilog;
-
-DotNetEnv.Env.TraversePath().NoClobber().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// JWT_SIGNING_KEY is the .env / docker compose name of Jwt:SigningKey.
-if (Environment.GetEnvironmentVariable("JWT_SIGNING_KEY") is { Length: > 0 } jwtSigningKey)
-    builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
+// Development only: read the git-ignored .env (real environment variables win). Other environments take settings from
+// real environment variables only (Jwt__SigningKey), never from a file that happens to lie in a parent folder.
+if (builder.Environment.IsDevelopment())
+{
+    DotNetEnv.Env.TraversePath().NoClobber().Load();
+    builder.Configuration.AddEnvironmentVariables();
+
+    // JWT_SIGNING_KEY is the .env name of Jwt:SigningKey; a key from user-secrets or the test host wins.
+    if (string.IsNullOrEmpty(builder.Configuration["Jwt:SigningKey"])
+        && Environment.GetEnvironmentVariable("JWT_SIGNING_KEY") is { Length: > 0 } jwtSigningKey)
+        builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
+}
 
 // Logging: Serilog to console and file (requirements document). Settings: appsettings "Serilog".
 builder.Host.UseSerilog((context, services, logger) => logger
@@ -33,6 +44,9 @@ builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
 // builder.Services.AddNotificationsModule(builder.Configuration); // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
 
+// Validation messages in English whatever the culture of the server.
+ValidatorOptions.Global.LanguageManager.Culture = CultureInfo.InvariantCulture;
+
 builder.Services
     .AddControllers(options => options.Filters.Add<ValidationFilter>())                                        // FluentValidation (SD-15)
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))   // enums as names (SD-11)
@@ -50,6 +64,8 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
+
+builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — POST /api/auth/login per client IP
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -72,12 +88,14 @@ builder.Services.AddSwaggerGen(options =>
             Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
         }] = Array.Empty<string>()
     });
-}); 
+});
 
 var app = builder.Build();
 
-// Fail at start, not on the first request, if the clock settings are wrong (Time:TimeZoneId).
+// Fail at start, not on the first request, if the clock settings are wrong (Time:TimeZoneId)
+// or the JWT settings are (Jwt:SigningKey) — before migrations and seed touch the database.
 _ = app.Services.GetRequiredService<IClock>();
+_ = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
 // Outside the exception handler: the request log shows the status the client gets (409, 422 ...), not 500.
 app.UseSerilogRequestLogging();
@@ -95,13 +113,17 @@ if (app.Environment.IsDevelopment())
 if (app.Configuration.GetValue("UseHttpsRedirection", true))
     app.UseHttpsRedirection();
 
+app.UseRateLimiter();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+// NFR-02: every controller endpoint needs a valid JWT unless it is marked [AllowAnonymous] (login).
+// Not a fallback policy: that would also answer 401 instead of 404 for unknown routes.
+app.MapControllers().RequireAuthorization();
 
-app.MapHealthChecks("/health/live", new() { Predicate = _ => false });                                  // the process is up
-app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") });   // SQL Server answers
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();                                  // the process is up
+app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();   // SQL Server answers
 
 // Migrations and seed data at start (settings: Database:MigrateOnStartup, Seed:Enabled; seed only in Development).
 using (var scope = app.Services.CreateScope())

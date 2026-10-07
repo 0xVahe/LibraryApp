@@ -34,6 +34,7 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
         builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+        builder.UseSetting("LoginRateLimit:PermitLimit", "1000");
         builder.ConfigureServices(services => services.AddSingleton<ILogEventSink>(Logs));
         builder.ConfigureServices(ConfigureTestServices);
     }
