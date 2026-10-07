@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Notifications;
     
 namespace LibraryApp.Infrastructure.Persistence;
 
@@ -50,6 +51,9 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
     public DbSet<PenaltyRecord> PenaltyRecords => Set<PenaltyRecord>();
 
     // Notifications (Group 4)
+
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
 
     // Platform (Integration Owner)
 

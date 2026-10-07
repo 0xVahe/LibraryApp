@@ -334,6 +334,125 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.ToTable("Publishers");
                 });
 
+            modelBuilder.Entity("LibraryApp.Domain.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(-1)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CcEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("LoanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("LocalDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RecipientEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc")
+                        .HasDatabaseName("IX_Notifications_Status_NextAttemptAtUtc");
+
+                    b.HasIndex("EventId", "Type", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Notifications_EventId_Type_Channel")
+                        .HasFilter("[EventId] IS NOT NULL");
+
+                    b.HasIndex("StaffMemberId", "Channel", "ReadAtUtc")
+                        .HasDatabaseName("IX_Notifications_StaffMemberId_Channel_ReadAtUtc");
+
+                    b.HasIndex("LoanId", "Type", "Channel", "LocalDate")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Notifications_LoanId_Type_Channel_LocalDate")
+                        .HasFilter("[LoanId] IS NOT NULL");
+
+                    b.ToTable("Notifications", t =>
+                        {
+                            t.HasCheckConstraint("CK_Notifications_Attempts_NonNegative", "[Attempts] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Notifications.NotificationTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BodyTemplate")
+                        .IsRequired()
+                        .HasMaxLength(-1)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type")
+                        .IsUnique()
+                        .HasDatabaseName("UX_NotificationTemplates_Type_Active")
+                        .HasFilter("[IsActive] = 1");
+
+                    b.ToTable("NotificationTemplates");
+                });
+
             modelBuilder.Entity("LibraryApp.Domain.Staff.Department", b =>
                 {
                     b.Property<Guid>("Id")
@@ -766,6 +885,20 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Notifications.Notification", b =>
+                {
+                    b.HasOne("LibraryApp.Domain.Borrowing.Loan", null)
+                        .WithMany()
+                        .HasForeignKey("LoanId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("LibraryApp.Domain.Staff.StaffMember", b =>
