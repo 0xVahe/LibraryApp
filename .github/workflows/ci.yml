@@ -144,4 +144,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: gitleaks
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner
+        env:
+          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
