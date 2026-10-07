@@ -19,11 +19,12 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.HasOne<StaffMember>().WithMany().HasForeignKey(x => x.StaffMemberId);
         builder.HasOne<Loan>().WithMany().HasForeignKey(x => x.LoanId);
 
-        // G4-09: an event delivered twice creates nothing new (one row per channel, G4-05).
-        builder.HasIndex(x => new { x.EventId, x.Channel })
+        // G4-09: an event delivered twice creates nothing new; one event may create several types
+        // (e.g. LoanIssued -> LoanConfirmation + DueDateCalendarItem), one row per channel (G4-05).
+        builder.HasIndex(x => new { x.EventId, x.Type, x.Channel })
             .IsUnique()
             .HasFilter("[EventId] IS NOT NULL")
-            .HasDatabaseName("UX_Notifications_EventId_Channel");
+            .HasDatabaseName("UX_Notifications_EventId_Type_Channel");
 
         // NOT-06 / G4-02: never the same type for the same loan twice on one (Yerevan) day.
         builder.HasIndex(x => new { x.LoanId, x.Type, x.Channel, x.LocalDate })
