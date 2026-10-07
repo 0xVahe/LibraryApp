@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -32,6 +33,7 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:LibraryDb", _connectionString);
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
+        builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         builder.ConfigureServices(services => services.AddSingleton<ILogEventSink>(Logs));
         builder.ConfigureServices(ConfigureTestServices);
     }
