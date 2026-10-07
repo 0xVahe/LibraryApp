@@ -1,4 +1,5 @@
 using LibraryApp.Infrastructure.Identity;
+using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -56,6 +57,9 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
     public DbSet<NotificationTemplate> NotificationTemplates => Set<NotificationTemplate>();
 
     // Platform (Integration Owner)
+
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
         LibraryModelConventions.Configure(configurationBuilder);
