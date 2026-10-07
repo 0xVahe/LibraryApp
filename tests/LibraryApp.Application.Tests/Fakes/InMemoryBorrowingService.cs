@@ -4,22 +4,13 @@ using LibraryApp.Domain.Borrowing;
 
 namespace LibraryApp.Application.Tests.Fakes;
 
-/// <summary>
-/// In-memory stand-in for Group 2's Borrowing read service. It tracks active and historical loans in memory
-/// and follows the read rules agreed for Group 2 queries. Used in unit tests.
-/// </summary>
 public sealed class InMemoryBorrowingReadService : IBorrowingReadService
 {
     private readonly Dictionary<Guid, OpenLoanInfo> _openLoans = new();
     private readonly List<LoanRecord> _historicalLoans = new();
 
-    /// <summary>Test switch: when set, the next read operation throws it once.
-    /// Used to test error handling when the Borrowing service call fails.</summary>
     public Exception? ThrowOnNextCall { get; set; }
 
-    // ---------- Test Helpers (Not part of IBorrowingReadService) ----------
-
-    /// <summary>Adds an active/open loan directly into the fake store.</summary>
     public OpenLoanInfo AddOpenLoan(
         Guid staffMemberId,
         Guid bookCopyId,
@@ -30,12 +21,10 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         var loan = new OpenLoanInfo(Guid.NewGuid(), bookCopyId, bookId, dueAtUtc, status);
         _openLoans[loan.LoanId] = loan;
 
-        // Keep track in history for summary calculations
         _historicalLoans.Add(new LoanRecord(loan.LoanId, staffMemberId, bookCopyId, bookId, dueAtUtc, status, IsClosed: false));
         return loan;
     }
 
-    /// <summary>Adds a closed/returned loan to test summary statistics and history filters.</summary>
     public void AddClosedLoan(Guid staffMemberId, Guid bookCopyId, Guid bookId, DateTime dueAtUtc)
     {
         _historicalLoans.Add(new LoanRecord(
@@ -48,7 +37,6 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
             IsClosed: true));
     }
 
-    /// <summary>Simulates closing/returning a loan in the fake store.</summary>
     public bool CloseLoan(Guid loanId)
     {
         if (!_openLoans.Remove(loanId)) return false;
@@ -63,16 +51,12 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         return true;
     }
 
-    /// <summary>Clears all in-memory loans.</summary>
     public void Clear()
     {
         _openLoans.Clear();
         _historicalLoans.Clear();
     }
 
-    // ---------- IBorrowingReadService Implementation ----------
-
-    // BR-MEM-4: Returns all active/open loans for a specific staff member.
     public Task<IReadOnlyList<OpenLoanInfo>> GetOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default)
     {
         CheckThrowOnNextCall();
@@ -85,7 +69,6 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         return Task.FromResult<IReadOnlyList<OpenLoanInfo>>(openLoansForStaff);
     }
 
-    // MEM-08: Computes staff borrowing metrics for "My library" view.
     public Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default)
     {
         CheckThrowOnNextCall();
@@ -104,7 +87,6 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         return Task.FromResult(summary);
     }
 
-    // CAT-08: Finds the earliest upcoming due date among the provided book copy IDs.
     public Task<DateTime?> GetNextDueDateAsync(IReadOnlyCollection<Guid> copyIds, CancellationToken ct = default)
     {
         CheckThrowOnNextCall();
@@ -123,14 +105,12 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         return Task.FromResult(earliestDueDate);
     }
 
-    // ---------- Private Helpers ----------
-
     private void CheckThrowOnNextCall()
     {
         if (ThrowOnNextCall is not null)
         {
             var failure = ThrowOnNextCall;
-            ThrowOnNextCall = null; // Throws only once
+            ThrowOnNextCall = null;
             throw failure;
         }
     }
