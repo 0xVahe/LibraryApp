@@ -55,4 +55,18 @@ public static class StaffErrors
 
     public static readonly Error DeactivatedCannotChangeStatus =
         Error.BusinessRule("staff.deactivated_status_locked", "The status of a deactivated staff member cannot be changed.");
+    
+    // Lookup and eligibility
+    public static readonly Error NotFound =
+        Error.NotFound("staff.not_found", "The staff member was not found.");
+
+    public static readonly Error Suspended =
+        Error.BusinessRule("staff.suspended", "The staff member is suspended and cannot borrow.");
+
+    public static readonly Error Deactivated =
+        Error.BusinessRule("staff.deactivated", "The staff member is deactivated and cannot borrow.");
+
+    /// <summary>Used by Borrowing, which owns the loan count, so the message is the same everywhere.</summary>
+    public static Error LoanLimitReached(int activeLoans, int maxLoans) =>
+        Error.BusinessRule("staff.loan_limit_reached", $"Loan limit reached ({activeLoans}/{maxLoans}).");
 }
