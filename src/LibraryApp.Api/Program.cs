@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using LibraryApp.Api.Auth;
 using LibraryApp.Api.ErrorHandling;
+using LibraryApp.Api.OpenApi;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Identity;
@@ -70,6 +71,8 @@ builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — P
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Api.xml"));
+    options.SchemaFilter<StaffMemberExamples>();
     // "Authorize" button (Group 2, MEM-02): paste the accessToken from POST /api/auth/login.
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
