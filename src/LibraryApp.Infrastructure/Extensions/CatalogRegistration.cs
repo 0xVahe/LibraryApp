@@ -32,7 +32,7 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
 
-        // Reference seed: the eight categories (S1-04)
+        // Reference seed: categories, authors and publishers (S1-04, S1-05)
         services.AddScoped<IModuleSeeder, CatalogSeeder>();
 
         return services;
