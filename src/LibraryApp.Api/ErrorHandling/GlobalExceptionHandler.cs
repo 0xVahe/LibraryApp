@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -69,12 +70,20 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         }
 
         httpContext.Response.StatusCode = body.Status!.Value;
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
+        var context = new ProblemDetailsContext
         {
             HttpContext = httpContext,
             ProblemDetails = body,
             Exception = exception,
-        });
+        };
+        if (await problemDetails.TryWriteAsync(context))
+            return true;
+
+        // No writer took it (the client accepts neither JSON nor */*, e.g. Swagger UI sends Accept: text/plain).
+        // Returning false would let the middleware write its own "status: 500" body under our status: write ours.
+        AddTraceId(context);
+        await httpContext.Response.WriteAsJsonAsync(body, (JsonSerializerOptions?)null, "application/problem+json", ct);
+        return true;
     }
 
     public static ProblemDetails Problem(int status, string title, string detail, string code) => new()

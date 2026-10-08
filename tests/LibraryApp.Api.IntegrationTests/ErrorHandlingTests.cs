@@ -88,6 +88,28 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 
+    /// <summary>
+    /// Swagger UI sends Accept: text/plain. No ProblemDetails writer accepts it; the answer must still be our body,
+    /// not the default "status: 500" body of the exception handler middleware under a 409 status.
+    /// </summary>
+    [Theory]
+    [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
+    [InlineData("boom", HttpStatusCode.InternalServerError, "internal_error")]
+    public async Task An_error_is_ProblemDetails_whatever_the_client_accepts(string kind, HttpStatusCode status, string code)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/test-errors/{kind}");
+        request.Headers.Accept.ParseAdd("text/plain");
+
+        var response = await factory.CreateClient().SendAsync(request);
+        var body = await ReadAsync(response);
+
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal((int)status, body.GetProperty("status").GetInt32());
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
     [Fact]
     public async Task A_domain_error_is_logged_with_its_final_status_not_as_500()
     {
