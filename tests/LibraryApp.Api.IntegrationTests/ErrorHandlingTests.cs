@@ -121,6 +121,23 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Null(completed.Exception);
     }
 
+    /// <summary>
+    /// Test classes run in parallel, each with its own host. A host that stops calls Log.CloseAndFlush, which makes
+    /// the static Log.Logger silent; the request log of the hosts still running must not depend on it.
+    /// </summary>
+    [Fact]
+    public async Task The_request_log_survives_another_host_stopping()
+    {
+        var other = new ApiHostFactory();
+        await other.InitializeAsync();
+        await other.DisposeAsync();
+
+        await factory.CreateClient().GetAsync("/test-errors/notfound");
+
+        var completed = await RequestLogAsync("/test-errors/notfound");
+        Assert.Equal("404", completed.Properties["StatusCode"].ToString());
+    }
+
     [Fact]
     public async Task Every_error_kind_has_an_http_status()
     {

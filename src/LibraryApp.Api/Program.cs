@@ -98,7 +98,9 @@ _ = app.Services.GetRequiredService<IClock>();
 _ = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
 // Outside the exception handler: the request log shows the status the client gets (409, 422 ...), not 500.
-app.UseSerilogRequestLogging();
+// The logger of this host, not the static Log.Logger: another host in the same process (integration tests)
+// closes the static one when it stops.
+app.UseSerilogRequestLogging(options => options.Logger = app.Services.GetRequiredService<Serilog.ILogger>());
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();   // empty 401/403/404 answers get a ProblemDetails body as well
