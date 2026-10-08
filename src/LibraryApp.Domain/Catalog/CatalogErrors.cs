@@ -86,4 +86,24 @@ public static class CatalogErrors
     public static Error CopyStatusNotAllowedForLibrarian(BookCopyStatus status) =>
         Error.BusinessRule("catalog.copy_status_not_allowed",
             $"A librarian cannot set the status {status} here (BR-CAT-4).");
+
+    // ---------- Author management (CAT-02) ----------
+
+    public static readonly Error AuthorNotFound =
+        Error.NotFound("catalog.author_not_found", "The author does not exist.");
+
+    /// <summary>The author is linked to a book, a deleted book included: its row stays and the foreign key keeps it.</summary>
+    public static readonly Error AuthorInUse =
+        Error.Conflict("catalog.author_in_use", "An author linked to a book cannot be deleted.");
+
+    public static readonly Error BookAuthorsRequired =
+        Error.Validation("catalog.book_authors_required", "A book must have at least one author (BR-CAT-5).");
+
+    // ---------- Category management (CAT-03) ----------
+
+    public static readonly Error CategoryNotFound =
+        Error.NotFound("catalog.category_not_found", "The category does not exist.");
+
+    public static readonly Error CategoryInUse =
+        Error.Conflict("catalog.category_in_use", "A category referenced by books or subcategories cannot be deleted.");
 }
