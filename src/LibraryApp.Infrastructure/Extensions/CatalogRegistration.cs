@@ -11,15 +11,22 @@ namespace LibraryApp.Infrastructure.Extensions;
 public static class CatalogRegistrationExtensions
 {
     /// <summary>
-    /// Catalog module services. Called from Program.cs.
+    /// Catalog module services. Called from Program.cs. Each member adds the registrations of their own part here
+    /// (repositories, services, seeder), one line per class, in their own pull request. Validators are registered automatically.
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
+        // Authors and book-author links (CAT-02)
         services.AddScoped<IAuthorRepository, AuthorRepository>();
         services.AddScoped<IAuthorService, AuthorService>();
+
+        // Categories (CAT-03)
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
+
+        // Reference seed: the eight categories (S1-04)
         services.AddScoped<IModuleSeeder, CatalogSeeder>();
+
         return services;
     }
 }

@@ -17,6 +17,7 @@ public sealed class AuthorRepository(LibraryDbContext db) : IAuthorRepository
     public void Add(Author author) => db.Authors.Add(author);
     public void Remove(Author author) => db.Authors.Remove(author);
 
+    /// <summary>Links of soft-deleted books count too: their rows stay in the table and the foreign key would block the delete.</summary>
     public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) =>
         db.BookAuthors.AnyAsync(x => x.AuthorId == id, ct);
 

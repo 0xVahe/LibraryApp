@@ -14,8 +14,9 @@ public sealed class CategoryRepository(LibraryDbContext db) : ICategoryRepositor
     public Task<Category?> FindAsync(Guid id, CancellationToken ct) =>
         db.Categories.Include(x => x.Parent).Include(x => x.Children).SingleOrDefaultAsync(x => x.Id == id, ct);
 
+    /// <summary>Soft-deleted books count too: their rows stay in the table and the foreign key would block the delete.</summary>
     public Task<bool> HasBooksAsync(Guid id, CancellationToken ct) =>
-        db.Books.IgnoreQueryFilters().AnyAsync(x => x.CategoryId == id, ct);
+        db.Books.AnyAsync(x => x.CategoryId == id, ct);
 
     public void Add(Category category) => db.Categories.Add(category);
     public void Remove(Category category) => db.Categories.Remove(category);

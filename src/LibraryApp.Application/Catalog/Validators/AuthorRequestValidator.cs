@@ -6,15 +6,8 @@ namespace LibraryApp.Application.Catalog.Validators;
 
 public sealed class AuthorRequestValidator : AbstractValidator<AuthorRequest>
 {
-    public AuthorRequestValidator() =>
-        RuleFor(x => x.FullName).NotEmpty().MaximumLength(Author.FullNameMaxLength);
-}
-
-public sealed class BookAuthorsRequestValidator : AbstractValidator<BookAuthorsRequest>
-{
-    public BookAuthorsRequestValidator()
+    public AuthorRequestValidator()
     {
-        RuleFor(x => x.AuthorIds).NotEmpty();
-        RuleForEach(x => x.AuthorIds).NotEmpty();
+        RuleFor(x => x.FullName).NotEmpty().MaximumLength(Author.FullNameMaxLength);
     }
 }
