@@ -1,18 +1,23 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Domain.Staff;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryApp.Api.Controllers.Catalog;
 
 /// <summary>
-/// Physical copies of a book (CAT-04). Roles (Library Administrator, Librarian) are added when the JWT
-/// authentication of Group 2 is merged.
+/// Physical copies of a book (CAT-04). Reads: any signed-in user; writes: Librarian or Administrator (NFR-03).
 /// </summary>
 [ApiController]
 [Route("api/books/{bookId:guid}/copies")]
+[Authorize]
+[ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
 public sealed class BookCopiesController(IBookCopyService copies) : ControllerBase
 {
+    private const string Writers = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
+
     /// <summary>All copies of the book, retired ones included, ordered by barcode.</summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<BookCopyDto>>(StatusCodes.Status200OK)]
@@ -33,8 +38,10 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
 
     /// <summary>Registers a new copy; it starts as Available. The barcode must be unique across all copies (BR-CAT-2).</summary>
     [HttpPost]
+    [Authorize(Roles = Writers)]
     [ProducesResponseType<BookCopyDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookCopyDto>> Add(Guid bookId, AddCopyRequest request, CancellationToken ct)
@@ -45,8 +52,10 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
 
     /// <summary>Changes the condition and the shelf location of a copy.</summary>
     [HttpPut("{copyId:guid}")]
+    [Authorize(Roles = Writers)]
     [ProducesResponseType<BookCopyDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<BookCopyDto>> Update(Guid bookId, Guid copyId, UpdateCopyRequest request, CancellationToken ct)
@@ -59,8 +68,10 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
     /// A copy that is OnLoan or Reserved is changed only through Borrowing.
     /// </summary>
     [HttpPost("{copyId:guid}/status")]
+    [Authorize(Roles = Writers)]
     [ProducesResponseType<BookCopyDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
