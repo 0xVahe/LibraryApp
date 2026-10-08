@@ -22,8 +22,14 @@ jobs:
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          pattern='^(feat|fix|hotfix|test|docs|refactor|perf|build|ci|chore|revert)[(](catalog|staff|borrowing|notifications|reporting|shared|db|api|infra|docs|ci)[)]!? :[[:space:]].{5,}$'
+          pattern='^(feat|fix|hotfix|test|docs|refactor|perf|build|ci|chore|revert)\((catalog|staff|borrowing|notifications|reporting|shared|db|api|infra|docs|ci)\)!?: .{5,}$'
           if ! printf '%s' "$TITLE" | grep -Eq "$pattern"; then
             echo "::error::Title must look like: type(scope): summary (REQ-ID), for example: feat(staff): add CanBorrowAsync (MEM-05)"
             exit 1
+          fi
+          if printf '%s' "$TITLE" | grep -Eq '^(feat|fix|test)'; then
+            if ! printf '%s\n%s' "$TITLE" "$BODY" | grep -Eq '\b(CAT|MEM|BOR|NOT|REP|NFR|INT)-[0-9]{2}\b|\bBR-[A-Z]+-[0-9]+\b'; then
+              echo "::error::feat, fix and test pull requests must name a requirement ID (for example BOR-04) in the title or description"
+              exit 1
+            fi
           fi
