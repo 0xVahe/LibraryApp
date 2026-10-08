@@ -1,6 +1,7 @@
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Staff;
@@ -10,20 +11,25 @@ public sealed class StaffManagementRepository(LibraryDbContext db) : IStaffManag
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct);
 
-    public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) =>
-        (from member in db.StaffMembers.AsNoTracking()
-         join department in db.Departments on member.DepartmentId equals department.Id
-         join category in db.StaffCategories on member.StaffCategoryId equals category.Id
-         where member.Id == id
-         select new StaffMemberDto(member.Id, member.EmployeeId, member.FirstName, member.LastName,
-             member.CorporateEmail, member.DepartmentId, department.Name, member.Position, member.LineManagerEmail,
-             member.StaffCategoryId, category.Name, member.Status.ToString(), member.JoinedLibraryAtUtc,
-             (from userRole in db.UserRoles
-              join role in db.Roles on userRole.RoleId equals role.Id
-              where userRole.UserId == member.UserId
-              orderby role.Name
-              select role.Name!).FirstOrDefault()!))
-        .SingleOrDefaultAsync(ct);
+    public async Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct)
+    {
+        var profile = await (from member in db.StaffMembers.AsNoTracking()
+            join department in db.Departments on member.DepartmentId equals department.Id
+            join category in db.StaffCategories on member.StaffCategoryId equals category.Id
+            where member.Id == id
+            select new
+            {
+                member.UserId,
+                Dto = new StaffMemberDto(member.Id, member.EmployeeId, member.FirstName, member.LastName,
+                 member.CorporateEmail, member.DepartmentId, department.Name, member.Position, member.LineManagerEmail,
+                 member.StaffCategoryId, category.Name, member.Status.ToString(), member.JoinedLibraryAtUtc, string.Empty)
+            }).SingleOrDefaultAsync(ct);
+
+        if (profile is null)
+            return null;
+
+        return profile.Dto with { Role = await StaffAccountRoles.GetAsync(db, profile.UserId, ct) };
+    }
 
     public Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct) =>
         db.StaffMembers.AnyAsync(x => x.EmployeeId == employeeId, ct);

@@ -1,7 +1,5 @@
-using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
-using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
@@ -17,8 +15,7 @@ public class StaffManagementServiceTests
 {
     private readonly ManagementFake _fake = new();
     private StaffManagementService Service => new(_fake, _fake, _fake, _fake, _fake, _fake,
-        new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions())),
-        new EnrolStaffMemberRequestValidator(), new UpdateStaffMemberRequestValidator());
+        new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions())));
     private EnrolStaffMemberRequest Request => new("EMP-100", "Demo", "Employee", "demo@ameriabank.am",
         _fake.DepartmentId, "Engineer", null, _fake.CategoryId, "DemoPass1");
 
@@ -40,8 +37,7 @@ public class StaffManagementServiceTests
     public async Task Corporate_email_policy_is_configurable_for_enrolment()
     {
         var service = new StaffManagementService(_fake, _fake, _fake, _fake, _fake, _fake,
-            new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions { Domain = "example.org" })),
-            new EnrolStaffMemberRequestValidator(), new UpdateStaffMemberRequestValidator());
+            new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions { Domain = "example.org" })));
         Assert.Equal("demo@example.org", (await service.EnrolAsync(Request with { CorporateEmail = "demo@example.org" }, false)).CorporateEmail);
     }
 
@@ -124,7 +120,7 @@ public class StaffManagementServiceTests
         _fake.Members[dto.Id].Deactivate();
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(dto.Id,
             new("Demo", "Employee", "new@ameriabank.am", _fake.DepartmentId, "Engineer", null, _fake.CategoryId)));
-        Assert.Equal("staff.already_deactivated", error.Error.Code);
+        Assert.Equal("staff.deactivated_profile_locked", error.Error.Code);
         Assert.Equal(ErrorKind.Conflict, error.Error.Kind);
         Assert.Equal(Request.CorporateEmail, Assert.Single(_fake.Accounts).Value.Email);
     }
@@ -134,11 +130,11 @@ public class StaffManagementServiceTests
     [InlineData("abcdefgh")]
     [InlineData("12345678")]
     [InlineData("abcdefgh١")]
-    public async Task Invalid_password_is_rejected_before_account_creation(string password)
+    public async Task Validator_identifies_invalid_password_field(string password)
     {
-        var error = await Assert.ThrowsAsync<DomainException>(() => Service.EnrolAsync(Request with { Password = password }, false));
-        Assert.Equal(CommonErrors.ValidationFailed, error.Error);
-        Assert.Empty(_fake.Accounts);
+        var result = await new EnrolStaffMemberRequestValidator().ValidateAsync(Request with { Password = password });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, x => x.PropertyName == nameof(EnrolStaffMemberRequest.Password));
     }
 
     [Fact]

@@ -1,7 +1,5 @@
-using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
-using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
@@ -18,17 +16,13 @@ public sealed class StaffManagementService(
     IEventBus events,
     IClock clock,
     IIdGenerator ids,
-    CorporateEmailPolicy emailPolicy,
-    IValidator<EnrolStaffMemberRequest> enrolValidator,
-    IValidator<UpdateStaffMemberRequest> updateValidator)
+    CorporateEmailPolicy emailPolicy)
     : IStaffManagementService
 {
     public async Task<StaffMemberDto> EnrolAsync(
         EnrolStaffMemberRequest request, bool callerIsAdministrator, CancellationToken ct = default)
     {
         RequireCorporateEmail(request.CorporateEmail);
-        if (!(await enrolValidator.ValidateAsync(request, ct)).IsValid)
-            throw new DomainException(CommonErrors.ValidationFailed);
 
         var role = request.Role ?? StaffRoles.StaffMember;
         if (role != StaffRoles.StaffMember && !callerIsAdministrator)
@@ -61,14 +55,12 @@ public sealed class StaffManagementService(
     public async Task<StaffMemberDto> UpdateAsync(Guid id, UpdateStaffMemberRequest request, CancellationToken ct = default)
     {
         RequireCorporateEmail(request.CorporateEmail);
-        if (!(await updateValidator.ValidateAsync(request, ct)).IsValid)
-            throw new DomainException(CommonErrors.ValidationFailed);
 
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             var member = await members.GetByIdAsync(id, token) ?? throw new DomainException(StaffErrors.NotFound);
             if (member.Status == StaffMemberStatus.Deactivated)
-                throw new DomainException(StaffErrors.UpdateDeactivated);
+                throw new DomainException(StaffErrors.DeactivatedProfileLocked);
 
             var email = request.CorporateEmail.Trim().ToLowerInvariant();
             await RequireUniqueEmailAsync(email, id, member.UserId, token);

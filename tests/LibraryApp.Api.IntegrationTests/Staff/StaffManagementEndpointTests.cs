@@ -31,7 +31,7 @@ public sealed class StaffManagementFactory : ApiHostFactory, IAsyncLifetime
     {
         await base.InitializeAsync();
         using var scope = Services.CreateScope();
-        var seeder = scope.ServiceProvider.GetRequiredService<IModuleSeeder>();
+        var seeder = scope.ServiceProvider.GetServices<IModuleSeeder>().OfType<StaffSeeder>().Single();
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(seeder.SeedAsync);
     }
 }
@@ -88,7 +88,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         member.FirstName, member.LastName, member.CorporateEmail, member.DepartmentId,
         member.Position, member.LineManagerEmail, member.StaffCategoryId);
 
-    private static async Task AssertError(HttpResponseMessage response, HttpStatusCode status, string code, string? detail = null)
+    private static async Task<JsonElement> AssertError(HttpResponseMessage response, HttpStatusCode status, string code, string? detail = null)
     {
         Assert.Equal(status, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
@@ -97,6 +97,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         Assert.True(body.TryGetProperty("traceId", out _));
         if (detail is not null)
             Assert.Equal(detail, body.GetProperty("detail").GetString());
+        return body;
     }
 
     [Fact]
@@ -151,9 +152,70 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
     [InlineData("Short1")]
     [InlineData("abcdefgh")]
     [InlineData("12345678")]
-    public async Task Weak_password_returns_400(string password) =>
-        await AssertError(await Client().PostAsJsonAsync(Route, Request() with { Password = password }),
-            HttpStatusCode.BadRequest, "validation_failed");
+    public async Task Weak_password_returns_400(string password)
+    {
+        var response = await Client().PostAsJsonAsync(Route, Request() with { Password = password });
+        var problem = await AssertError(response, HttpStatusCode.BadRequest, "validation_failed");
+        Assert.NotEmpty(problem.GetProperty("errors").GetProperty("Password").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Invalid_update_keeps_field_errors_and_does_not_change_profile()
+    {
+        var member = await Enrol(Request());
+        var response = await Client().PutAsJsonAsync($"{Route}/{member.Id}", UpdateRequest(member) with
+        {
+            FirstName = "", DepartmentId = Guid.Empty, LineManagerEmail = "invalid"
+        });
+        var problem = await AssertError(response, HttpStatusCode.BadRequest, "validation_failed");
+        var errors = problem.GetProperty("errors");
+        Assert.True(errors.TryGetProperty("FirstName", out _));
+        Assert.True(errors.TryGetProperty("DepartmentId", out _));
+        Assert.True(errors.TryGetProperty("LineManagerEmail", out _));
+        Assert.Equal(member, await Client().GetFromJsonAsync<StaffMemberDto>($"{Route}/{member.Id}"));
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("multiple")]
+    [InlineData("unsupported")]
+    public async Task Invalid_account_roles_return_the_same_clear_conflict_for_read_and_update(string scenario)
+    {
+        var member = await Enrol(Request());
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = (await users.FindByEmailAsync(member.CorporateEmail))!;
+            if (scenario == "multiple")
+                Assert.True((await users.AddToRoleAsync(user, StaffRoles.Librarian)).Succeeded);
+            else
+            {
+                Assert.True((await users.RemoveFromRoleAsync(user, StaffRoles.StaffMember)).Succeeded);
+                if (scenario == "unsupported")
+                {
+                    var roleName = $"Unsupported-{Guid.NewGuid():N}";
+                    var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+                    Assert.True((await roles.CreateAsync(new IdentityRole<Guid>(roleName) { Id = Guid.NewGuid() })).Succeeded);
+                    Assert.True((await users.AddToRoleAsync(user, roleName)).Succeeded);
+                }
+            }
+        }
+
+        const string code = "staff.account_role_invalid";
+        const string detail = "The staff account must have exactly one supported role.";
+        await AssertError(await Client().GetAsync($"{Route}/{member.Id}"), HttpStatusCode.Conflict, code, detail);
+        var update = UpdateRequest(member) with { CorporateEmail = $"new.{Guid.NewGuid():N}@ameriabank.am", FirstName = "Changed" };
+        await AssertError(await Client().PutAsJsonAsync($"{Route}/{member.Id}", update), HttpStatusCode.Conflict, code, detail);
+
+        using var verification = factory.Services.CreateScope();
+        var db = verification.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        var stored = await db.StaffMembers.AsNoTracking().SingleAsync(x => x.Id == member.Id);
+        Assert.Equal(member.FirstName, stored.FirstName);
+        Assert.Equal(member.CorporateEmail, stored.CorporateEmail);
+        var account = await db.Users.AsNoTracking().SingleAsync(x => x.Id == stored.UserId);
+        Assert.Equal(member.CorporateEmail, account.Email);
+        Assert.Equal(member.CorporateEmail, account.UserName);
+    }
 
     [Theory]
     [InlineData(StaffRoles.LibraryAdministrator)]
@@ -282,6 +344,8 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         var example = spec.GetProperty("components").GetProperty("schemas")
             .GetProperty(nameof(EnrolStaffMemberRequest)).GetProperty("example");
         Assert.Equal("demo.employee@ameriabank.am", example.GetProperty("corporateEmail").GetString());
+        Assert.Equal(StaffSeedIds.Departments.InformationTechnology, example.GetProperty("departmentId").GetGuid());
+        Assert.Equal(StaffSeedIds.Categories.Employee, example.GetProperty("staffCategoryId").GetGuid());
     }
 
     [Fact]
@@ -337,7 +401,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         var id = StaffSeedIds.StaffMembers.HaykManukyan;
         var member = (await Client().GetFromJsonAsync<StaffMemberDto>($"{Route}/{id}"))!;
         await AssertError(await Client().PutAsJsonAsync($"{Route}/{id}", UpdateRequest(member)),
-            HttpStatusCode.Conflict, "staff.already_deactivated");
+            HttpStatusCode.Conflict, "staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
     }
 
     [Fact]

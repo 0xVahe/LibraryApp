@@ -20,6 +20,8 @@ public static class StaffErrors
         Error.Forbidden("staff.role_assignment_forbidden", "Only a Library Administrator may assign a privileged role.");
     public static readonly Error AccountWriteFailed =
         Error.Validation("staff.account_write_failed", "The user account could not be saved.");
+    public static readonly Error AccountRoleInvalid =
+        Error.Conflict("staff.account_role_invalid", "The staff account must have exactly one supported role.");
 
     // Department
     public static readonly Error DepartmentNameRequired =
@@ -69,8 +71,8 @@ public static class StaffErrors
     public static readonly Error AlreadyDeactivated =
         Error.BusinessRule("staff.already_deactivated", "The staff member is already deactivated.");
 
-    /// <summary>S1-04.1 requires 409 for profile updates; preserve the existing domain error for other operations.</summary>
-    public static readonly Error UpdateDeactivated = AlreadyDeactivated with { Kind = ErrorKind.Conflict };
+    public static readonly Error DeactivatedProfileLocked =
+        Error.Conflict("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
 
     public static readonly Error DeactivatedCannotChangeStatus =
         Error.BusinessRule("staff.deactivated_status_locked",

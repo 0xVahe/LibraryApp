@@ -1,4 +1,5 @@
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -18,10 +19,10 @@ public sealed class StaffMemberExamples : ISchemaFilter
             ["firstName"] = new OpenApiString("Demo"),
             ["lastName"] = new OpenApiString("Employee"),
             ["corporateEmail"] = new OpenApiString("demo.employee@ameriabank.am"),
-            ["departmentId"] = new OpenApiString("20000000-0000-0000-0001-000000000004"),
+            ["departmentId"] = new OpenApiString(StaffSeedIds.Departments.InformationTechnology.ToString()),
             ["position"] = new OpenApiString("Engineer"),
             ["lineManagerEmail"] = new OpenApiNull(),
-            ["staffCategoryId"] = new OpenApiString("20000000-0000-0000-0002-000000000002"),
+            ["staffCategoryId"] = new OpenApiString(StaffSeedIds.Categories.Employee.ToString()),
         };
         if (context.Type == typeof(EnrolStaffMemberRequest))
         {

@@ -36,13 +36,8 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
         Ensure(await users.UpdateAsync(user));
     }
 
-    public async Task<string> GetRoleAsync(Guid userId, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-        var user = await users.FindByIdAsync(userId.ToString())
-                   ?? throw new InvalidOperationException("The staff member's account is missing.");
-        return (await users.GetRolesAsync(user)).Single();
-    }
+    public Task<string> GetRoleAsync(Guid userId, CancellationToken ct) =>
+        StaffAccountRoles.GetAsync(db, userId, ct);
 
     private void RequireTransaction(CancellationToken ct)
     {
