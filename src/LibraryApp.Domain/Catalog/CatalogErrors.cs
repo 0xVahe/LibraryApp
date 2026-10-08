@@ -32,6 +32,9 @@ public static class CatalogErrors
     public static readonly Error PublisherNameRequired =
         Error.Validation("catalog.publisher_name_required", "Publisher name is required.");
 
+    public static readonly Error PublisherNotFound =
+        Error.NotFound("catalog.publisher_not_found", "The publisher does not exist.");
+    
     // ---------- Category (two levels at most, CAT-03) ----------
 
     public static readonly Error CategoryNameRequired =
