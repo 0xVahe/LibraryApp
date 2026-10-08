@@ -26,6 +26,9 @@ public static class StaffRegistrationExtensions
 
         services.AddScoped<IModuleSeeder, StaffSeeder>();
 
+        services.AddScoped<IStaffCategoryRepository, StaffCategoryRepository>();
+        services.AddScoped<IStaffCategoryService, StaffCategoryService>();        
+        
         return services;
     }
 }

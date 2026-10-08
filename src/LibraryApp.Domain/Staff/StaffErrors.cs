@@ -21,6 +21,9 @@ public static class StaffErrors
 
     public static readonly Error MaxRenewalsInvalid =
         Error.Validation("staff.max_renewals_invalid", "Maximum renewals must not be negative.");
+    
+    public static readonly Error CategoryNotFound =
+        Error.NotFound("staff.category_not_found", "Staff category was not found.");
 
     // Staff member
     public static readonly Error EmployeeIdRequired =
