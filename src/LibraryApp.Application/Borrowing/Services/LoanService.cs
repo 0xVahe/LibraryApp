@@ -25,7 +25,7 @@ public sealed class LoanService(
 {
     /// <inheritdoc />
 
-    public async Task<LoanDto> IssueAsync(
+    public async Task<LoanDto> IssueAsync(  
         IssueLoanRequest request,
         CancellationToken ct = default)
     {
