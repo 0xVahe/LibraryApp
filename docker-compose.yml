@@ -1,3 +1,12 @@
+# One command starts the system (NFR-13):  docker compose up --build
+#   API + Swagger   http://localhost:8080/swagger
+#   SQL Server      localhost,${MSSQL_PORT:-1433}  (user sa, password from .env)
+# First copy .env.sample to .env and set MSSQL_SA_PASSWORD and JWT_SIGNING_KEY. .env is ignored by git.
+# Only the database (API from the IDE):  docker compose up -d sqlserver
+
+# Fixed project name: the same containers and data volume whatever the folder of the clone is called.
+name: libraryapp
+
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -11,6 +20,31 @@ services:
       - "${MSSQL_PORT:-1433}:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/LibraryApp.Api/Dockerfile
+    container_name: libraryapp-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development   # Swagger and seed data are enabled only in Development
+      UseHttpsRedirection: "false"          # the container listens on plain HTTP
+      # Inside the compose network the database host is "sqlserver" on its container port, not localhost.
+      ConnectionStrings__LibraryDb: "Server=sqlserver,1433;Database=LibraryApp;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}   # the API refuses to start without it
+      Database__MigrateOnStartup: "true"
+      Seed__Enabled: "true"
+    ports:
+      - "8080:8080"
 
 volumes:
   sqlserver-data:
