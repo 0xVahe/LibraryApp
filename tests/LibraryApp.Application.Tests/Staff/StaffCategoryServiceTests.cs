@@ -85,7 +85,7 @@ public class StaffCategoryServiceTests
             }
         });
 
-        Assert.Equal(StaffErrors.CategoryNotFound, error.Error);
+        Assert.Equal(StaffErrors.CategoryResourceNotFound, error.Error);
         Assert.Empty(_repository.Categories);
     }
 

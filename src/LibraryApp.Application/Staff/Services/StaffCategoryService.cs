@@ -65,7 +65,7 @@ public sealed class StaffCategoryService(
     private async Task<StaffCategory> FindAsync(Guid id, CancellationToken ct)
     {
         return await repository.GetByIdAsync(id, ct)
-            ?? throw new DomainException(StaffErrors.CategoryNotFound);
+            ?? throw new DomainException(StaffErrors.CategoryResourceNotFound);
     }
 
     private static StaffCategoryDto ToDto(StaffCategory category)
