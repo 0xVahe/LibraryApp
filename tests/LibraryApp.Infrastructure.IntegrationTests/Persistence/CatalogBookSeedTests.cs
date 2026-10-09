@@ -17,6 +17,8 @@ public sealed class CatalogBookSeedTests(CatalogReferenceFixture fixture) : ICla
         var bookIds = CatalogSeedData.Books.Select(book => CatalogSeedIds.Book(book.Number)).ToArray();
 
         Assert.Equal(CatalogSeedData.Books.Count, await verify.Books.CountAsync(book => bookIds.Contains(book.Id)));
+        Assert.Equal(CatalogSeedData.Authors.Count, await verify.Authors.CountAsync());
+        Assert.Equal(CatalogSeedData.Publishers.Count, await verify.Publishers.CountAsync());
         Assert.Equal(bookIds.Length, bookIds.Distinct().Count());
         Assert.Equal(8, await verify.Books.Where(book => bookIds.Contains(book.Id)).Select(book => book.CategoryId).Distinct().CountAsync());
         Assert.Empty(await verify.BookCopies.Where(copy => bookIds.Contains(copy.BookId)).ToListAsync());

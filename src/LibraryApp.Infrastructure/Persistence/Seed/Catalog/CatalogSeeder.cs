@@ -34,45 +34,10 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
     private async Task SeedBooksAsync(CancellationToken ct)
     {
         var existingBookIds = (await db.Books.Select(x => x.Id).ToListAsync(ct)).ToHashSet();
-        var existingAuthors = await db.Authors.ToDictionaryAsync(x => x.FullName, x => x.Id, ct);
-        var existingPublishers = await db.Publishers.ToDictionaryAsync(x => x.Name, x => x.Id, ct);
-
-        var authorIds = CatalogSeedData.Books
-            .SelectMany(book => book.Authors)
-            .Distinct(StringComparer.Ordinal)
-            .Select((name, index) => (name, id: CatalogSeedIds.Author(index + 1)))
-            .ToDictionary(x => x.name, x => x.id, StringComparer.Ordinal);
-
-        var publisherIds = CatalogSeedData.Books
-            .Where(book => book.Publisher is not null)
-            .Select(book => book.Publisher!)
-            .Distinct(StringComparer.Ordinal)
-            .Select((name, index) => (name, id: CatalogSeedIds.Publisher(index + 1)))
-            .ToDictionary(x => x.name, x => x.id, StringComparer.Ordinal);
-
-        foreach (var (name, id) in authorIds)
-        {
-            if (existingAuthors.ContainsKey(name))
-            {
-                authorIds[name] = existingAuthors[name];
-                continue;
-            }
-
-            db.Authors.Add(new Author(id, name));
-            existingAuthors[name] = id;
-        }
-
-        foreach (var (name, id) in publisherIds)
-        {
-            if (existingPublishers.ContainsKey(name))
-            {
-                publisherIds[name] = existingPublishers[name];
-                continue;
-            }
-
-            db.Publishers.Add(new Publisher(id, name));
-            existingPublishers[name] = id;
-        }
+        var authorIds = CatalogSeedData.Authors
+            .ToDictionary(x => x.Name, x => x.Id, StringComparer.Ordinal);
+        var publisherIds = CatalogSeedData.Publishers
+            .ToDictionary(x => x.Name, x => x.Id, StringComparer.Ordinal);
 
         foreach (var seedBook in CatalogSeedData.Books)
         {
@@ -80,7 +45,7 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
             if (existingBookIds.Contains(bookId))
                 continue;
 
-            Guid categoryId = CatalogSeedData.Categories[seedBook.CategoryNumber - 1].Id;
+            Guid categoryId = CatalogSeedIds.Category(seedBook.CategoryNumber);
             Guid? publisherId = seedBook.Publisher is null ? null : publisherIds[seedBook.Publisher];
             var book = new Book(
                 bookId,
