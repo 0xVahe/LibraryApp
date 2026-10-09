@@ -9,6 +9,16 @@ public static class CatalogErrors
 {
     // ---------- Book ----------
 
+    public static readonly Error BookIsbnDuplicate =
+        Error.Conflict(
+            "catalog.book_isbn_duplicate",
+            "A book with this ISBN already exists.");
+
+    public static readonly Error BookHasCopiesInCirculation =
+        Error.Conflict(
+            "catalog.book_has_copies_in_circulation",
+            "A book cannot be deleted while copies are on loan or reserved.");
+
     public static readonly Error BookTitleRequired =
         Error.Validation("catalog.book_title_required", "Book title is required.");
 
