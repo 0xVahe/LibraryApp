@@ -71,6 +71,9 @@ public static class StaffErrors
     public static readonly Error AlreadyDeactivated =
         Error.BusinessRule("staff.already_deactivated", "The staff member is already deactivated.");
 
+    public static readonly Error HasActiveLoans =
+        Error.Conflict("staff.has_active_loans", "Return all outstanding books before deactivating the staff member.");
+
     public static readonly Error DeactivatedProfileLocked =
         Error.Conflict("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
 

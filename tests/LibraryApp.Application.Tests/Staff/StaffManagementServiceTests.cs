@@ -153,6 +153,7 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public bool InTransaction { get; private set; }
     public int TransactionCalls { get; private set; }
     public bool FailCreate { get; set; }
+    public List<Guid> DeactivatedAccounts { get; } = [];
 
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(Members.GetValueOrDefault(id));
     public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) => Task.FromResult(Members.TryGetValue(id, out var m)
@@ -181,6 +182,12 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
         return Task.CompletedTask;
     }
     public Task<string> GetRoleAsync(Guid userId, CancellationToken ct) => Task.FromResult(Accounts[userId].Role);
+    public Task DeactivateAsync(Guid userId, CancellationToken ct)
+    {
+        Assert.True(InTransaction);
+        DeactivatedAccounts.Add(userId);
+        return Task.CompletedTask;
+    }
     public Task PublishAsync<TEvent>(TEvent domainEvent, CancellationToken ct = default) where TEvent : class, IDomainEvent
     {
         Assert.True(InTransaction);

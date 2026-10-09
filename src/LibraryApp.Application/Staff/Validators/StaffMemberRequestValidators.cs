@@ -4,6 +4,11 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Staff.Validators;
 
+public sealed class DeactivateStaffMemberRequestValidator : AbstractValidator<DeactivateStaffMemberRequest>
+{
+    public DeactivateStaffMemberRequestValidator() => RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000);
+}
+
 public sealed class EnrolStaffMemberRequestValidator : AbstractValidator<EnrolStaffMemberRequest>
 {
     public EnrolStaffMemberRequestValidator()
