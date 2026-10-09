@@ -4,7 +4,7 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 public static class CatalogSeedIds
 {
     public static Guid Category(int number) =>
-        new($"10000000-0000-0000-0001-{number:000000000000}");
+        new($"10000000-0000-0000-0001-{number:D12}");
 
     public static Guid Book(int number) =>
         new($"b0000000-0000-0000-0000-{number:D12}");

@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 
-/// <summary>Runs inside the seed runner's transaction; existing reference rows are preserved.</summary>
+/// <summary>Seeds categories, authors, publishers and books (D3). Runs inside the seed runner's transaction; rows that already exist, edited ones included, are kept.</summary>
 public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
 {
     public int Order => 10;
