@@ -25,9 +25,9 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 ### Development without the API container
 
-1. Start only the database: `docker compose up -d sqlserver`.
+1. Start only the database: `docker compose up -d sqlserver`. It starts again by itself with Docker Desktop (until you stop it with `docker compose stop`).
 2. Run `LibraryApp.Api` from the IDE (profile `http`, http://localhost:5055/swagger). In Development the API reads `.env`: `ConnectionStrings__LibraryDb` points it to the SQL Server in Docker. Without that line it uses LocalDB from `appsettings.Development.json`.
-3. Tests: every test class creates its own throw-away database on the server in `LIBRARYAPP_TEST_DB` and deletes it at the end. The infrastructure tests read it from `.env`; for the API tests set it as an environment variable (user variable or the test runner settings of the IDE). Without it the tests use LocalDB.
+3. Tests: see [Tests](#tests).
 4. `dotnet ef database update` uses `LIBRARYAPP_DESIGNTIME_DB` from `.env`.
 
 | Problem | Cause | Fix |
@@ -39,6 +39,34 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 | `api` exits or stays unhealthy | Migration failed or the database is not reachable | `docker compose logs api` |
 | Port 1433 is in use | Local SQL Server or another app | Set `MSSQL_PORT` in `.env`, or stop the other app |
 | Port 8080 is in use | Another app | Set `API_PORT` in `.env`, or stop the other app |
+
+## Tests
+
+```bash
+dotnet test
+```
+
+Integration tests need a SQL Server. Every test class creates its own throw-away database on it and deletes it at the end. The server is decided in one place for all test projects and CI, in this order:
+
+1. the environment variable `LIBRARYAPP_TEST_DB` (CI sets it; also a shell or the test runner settings of the IDE);
+2. `LIBRARYAPP_TEST_DB` in `.env` (local development with `docker compose up -d sqlserver`);
+3. LocalDB, when it is set nowhere (Windows only).
+
+Only `LIBRARYAPP_TEST_DB` is read from `.env`; the API host of the tests gets its own database and a random JWT key, never the values of `.env`.
+
+### Tests fail all at once
+
+When the server does not answer, the run stops early and every database test fails with the same message: the server, where the setting came from (environment, `.env` or LocalDB) and what to do. Usually:
+
+1. Docker Desktop is not running, or the container is stopped: start Docker Desktop, then `docker compose up -d sqlserver`.
+2. An old environment variable `LIBRARYAPP_TEST_DB` points to another server: it wins over `.env`; remove it (and restart the IDE, which reads environment variables at start).
+3. No `.env` and LocalDB is not installed or not running: create `.env` from `.env.sample`.
+
+Databases left by an interrupted run (for example after stopping the test process) are deleted by the next run after two hours.
+
+### Writing tests that need a database
+
+Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
 
 ## Test accounts
 

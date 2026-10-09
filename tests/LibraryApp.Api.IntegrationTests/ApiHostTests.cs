@@ -14,19 +14,11 @@ namespace LibraryApp.Api.IntegrationTests;
 
 /// <summary>
 /// Starts the real API host against a throw-away database with all migrations applied.
-/// CI sets LIBRARYAPP_TEST_DB (SQL Server container); on a Windows developer machine LocalDB is used.
+/// The server comes from <see cref="TestSqlServer"/>, the same as for the infrastructure tests.
 /// </summary>
 public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string LocalDb = @"Server=(localdb)\MSSQLLocalDB;Trusted_Connection=True;TrustServerCertificate=True";
-
-    private readonly string _connectionString = new SqlConnectionStringBuilder(
-        string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LIBRARYAPP_TEST_DB"))
-            ? LocalDb
-            : Environment.GetEnvironmentVariable("LIBRARYAPP_TEST_DB"))
-    {
-        InitialCatalog = $"LibraryApp_ApiTests_{Guid.NewGuid():N}",
-    }.ConnectionString;
+    private readonly string _connectionString = TestSqlServer.NewConnectionString("LibraryApp_ApiTests");
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
