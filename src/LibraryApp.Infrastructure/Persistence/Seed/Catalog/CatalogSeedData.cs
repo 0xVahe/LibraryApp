@@ -1,5 +1,15 @@
 namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 
+public sealed record SeedBook(
+    int Number,
+    string Title,
+    IReadOnlyList<string> Authors,
+    string? Publisher,
+    int PublicationYear,
+    string Language,
+    string Isbn,
+    int CategoryNumber);
+
 /// <summary>Stable reference IDs for the eight required categories (S1-04, G1-10).</summary>
 public static class CatalogSeedData
 {
