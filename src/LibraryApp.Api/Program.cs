@@ -60,6 +60,7 @@ builder.Services
 
 // Errors → ProblemDetails with code and traceId (NFR-07, SD-05).
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = GlobalExceptionHandler.AddTraceId);
+builder.Services.AddSingleton<IProblemDetailsWriter, AnyClientProblemDetailsWriter>();   // after AddProblemDetails: the last writer
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddAuthentication();
