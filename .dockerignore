@@ -1,0 +1,13 @@
+# Only src/ is needed to build the API image.
+**/bin/
+**/obj/
+**/logs/
+**/.vs/
+**/.idea/
+**/*.user
+.git/
+.github/
+.config/
+.env
+tests/
+docs/

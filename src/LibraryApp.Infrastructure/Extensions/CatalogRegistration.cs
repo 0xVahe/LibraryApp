@@ -20,6 +20,10 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<IBookSearchQuery, BookSearchQuery>();
         services.AddScoped<IBookSearchService, BookSearchService>();
 
+        // Book details (CAT-06)
+        services.AddScoped<IBookDetailsQuery, BookDetailsQuery>();
+        services.AddScoped<IBookDetailsService, BookDetailsService>();
+
         // Copies (CAT-04)
         services.AddScoped<IBookCopyRepository, BookCopyRepository>();
         services.AddScoped<IBookCopyService, BookCopyService>();
