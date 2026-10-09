@@ -3,8 +3,6 @@ using static LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds;
 
 namespace LibraryApp.Infrastructure.Persistence.Seed.Staff;
 
-public sealed record SeedRole(Guid Id, string Name);
-
 public sealed record SeedDepartment(Guid Id, string Name);
 
 public sealed record SeedCategory(Guid Id, string Name, int MaxLoans, int LoanDays, int MaxRenewals);
@@ -32,13 +30,6 @@ public static class StaffSeedData
 
     private const string ManagerEmail = "mariam.avetisyan@ameriabank.am";
     private const string AdminEmail = "lilit.grigoryan@ameriabank.am";
-
-    public static readonly IReadOnlyList<SeedRole> Roles =
-    [
-        new(new Guid("20000000-0000-0000-0005-000000000001"), StaffRoles.LibraryAdministrator),
-        new(new Guid("20000000-0000-0000-0005-000000000002"), StaffRoles.Librarian),
-        new(new Guid("20000000-0000-0000-0005-000000000003"), StaffRoles.StaffMember),
-    ];
 
     /// <summary>MEM-06: six departments.</summary>
     public static readonly IReadOnlyList<SeedDepartment> DepartmentList =
