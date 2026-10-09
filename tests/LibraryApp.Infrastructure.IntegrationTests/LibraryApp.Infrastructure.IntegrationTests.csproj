@@ -18,6 +18,12 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="LibraryApp.Tests.Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The one place that decides the SQL Server of the integration tests. -->
+    <Compile Include="..\Shared\TestSqlServer.cs" Link="Shared\TestSqlServer.cs" />
   </ItemGroup>
 
   <ItemGroup>

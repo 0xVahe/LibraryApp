@@ -3,6 +3,7 @@ using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Conventions;
 using LibraryApp.Infrastructure.Persistence.Converters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
@@ -126,6 +127,19 @@ public class ModelConventionsTests
         // overrides it. Without either EF would use the class name ("Loan").
         foreach (var entity in RealEntities().Where(e => !e.IsOwned() && !e.HasSharedClrType))
             Assert.True(entity.GetTableName() != entity.ClrType.Name, $"{entity.DisplayName()}: table name must be plural (DbSet name or ToTable)");
+    }
+
+    [Fact]
+    public void Real_model_no_relationship_cascades_unless_configured_explicitly()
+    {
+        using var context = new LibraryDbContext(new DbContextOptionsBuilder<LibraryDbContext>().UseSqlServer(NoDatabase).Options);
+        var model = (IConventionModel)context.GetService<IDesignTimeModel>().Model;
+
+        foreach (var foreignKey in model.GetEntityTypes().SelectMany(e => e.GetDeclaredForeignKeys())
+                     .Where(fk => fk.DeleteBehavior == DeleteBehavior.Cascade && !fk.IsOwnership))
+            Assert.True(
+                foreignKey.GetDeleteBehaviorConfigurationSource() is ConfigurationSource.Explicit or ConfigurationSource.DataAnnotation,
+                $"{foreignKey.DeclaringEntityType.DisplayName()} -> {foreignKey.PrincipalEntityType.DisplayName()}: cascade was not configured explicitly (SD-12: Restrict by default)");
     }
 
     private static IReadOnlyList<IEntityType> RealEntities()

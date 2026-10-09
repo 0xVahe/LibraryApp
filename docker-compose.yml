@@ -12,6 +12,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: libraryapp-sqlserver
     platform: linux/amd64
+    restart: unless-stopped   # back by itself when Docker Desktop starts, unless stopped with `docker compose stop`
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer

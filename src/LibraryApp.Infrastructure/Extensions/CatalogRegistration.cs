@@ -20,6 +20,10 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<IBookSearchQuery, BookSearchQuery>();
         services.AddScoped<IBookSearchService, BookSearchService>();
 
+        // Book details (CAT-06)
+        services.AddScoped<IBookDetailsQuery, BookDetailsQuery>();
+        services.AddScoped<IBookDetailsService, BookDetailsService>();
+
         // Copies (CAT-04)
         services.AddScoped<IBookCopyRepository, BookCopyRepository>();
         services.AddScoped<IBookCopyService, BookCopyService>();
@@ -32,7 +36,7 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
 
-        // Reference seed: the eight categories (S1-04)
+        // Reference seed: categories, authors and publishers (S1-04, S1-05)
         services.AddScoped<IModuleSeeder, CatalogSeeder>();
 
         return services;
