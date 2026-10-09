@@ -31,9 +31,13 @@ public sealed class StaffSeeder(
             await SeedPersonAsync(person, ct);
     }
 
+    /// <summary>
+    /// The migration already creates the roles (<see cref="StaffRoleIds"/>); kept for a database migrated before that,
+    /// and skipped when the role exists.
+    /// </summary>
     private async Task SeedRolesAsync()
     {
-        foreach (var (id, name) in StaffSeedData.Roles)
+        foreach (var (id, name) in StaffRoleIds.All)
         {
             if (!await roleManager.RoleExistsAsync(name))
                 Ensure(await roleManager.CreateAsync(new IdentityRole<Guid>(name) { Id = id }), $"role {name}");

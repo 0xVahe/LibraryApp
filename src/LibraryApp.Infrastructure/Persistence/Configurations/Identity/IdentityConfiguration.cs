@@ -9,6 +9,7 @@ namespace LibraryApp.Infrastructure.Persistence.Configurations.Identity;
 /// Overrides two platform defaults for the Identity tables:
 /// cascade inside the account (a user's or role's claims, logins, tokens and role links go with it), and
 /// 128-character key columns, because two 256-character nvarchar columns exceed SQL Server's 900-byte key limit.
+/// The three account roles are model data (<see cref="StaffRoleIds"/>), so they exist in every environment.
 /// </summary>
 public sealed class IdentityConfiguration :
     IEntityTypeConfiguration<AppUser>,
@@ -30,6 +31,16 @@ public sealed class IdentityConfiguration :
     {
         builder.HasMany<IdentityUserRole<Guid>>().WithOne().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany<IdentityRoleClaim<Guid>>().WithOne().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+
+        // Fixed values only: a generated ConcurrencyStamp would change the model on every build (model-sync).
+        // NormalizedName as Identity's default normalizer writes it (upper invariant), so FindByNameAsync finds them.
+        builder.HasData(StaffRoleIds.All.Select(role => new IdentityRole<Guid>
+        {
+            Id = role.Id,
+            Name = role.Name,
+            NormalizedName = role.Name.ToUpperInvariant(),
+            ConcurrencyStamp = role.Id.ToString(),
+        }));
     }
 
     public void Configure(EntityTypeBuilder<IdentityUserLogin<Guid>> builder)
