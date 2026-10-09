@@ -69,6 +69,15 @@ public sealed class TestErrorsController : ControllerBase
     public IActionResult Post(TestRequest request) => Ok(request);
 }
 
+/// <summary>Needs a token like every real endpoint: without one the answer is an empty 401 from authentication.</summary>
+[ApiController]
+[Route("test-secured")]
+public sealed class TestSecuredController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}
+
 public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<ErrorHandlingFactory>
 {
     [Theory]
@@ -88,15 +97,56 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 
+    /// <summary>
+    /// Swagger UI sends Accept: text/plain. No ProblemDetails writer accepts it; the answer must still be our body,
+    /// not the default "status: 500" body of the exception handler middleware under a 409 status.
+    /// </summary>
+    [Theory]
+    [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
+    [InlineData("boom", HttpStatusCode.InternalServerError, "internal_error")]
+    public async Task An_error_is_ProblemDetails_whatever_the_client_accepts(string kind, HttpStatusCode status, string code)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/test-errors/{kind}");
+        request.Headers.Accept.ParseAdd("text/plain");
+
+        var response = await factory.CreateClient().SendAsync(request);
+        var body = await ReadAsync(response);
+
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal((int)status, body.GetProperty("status").GetInt32());
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
     [Fact]
     public async Task A_domain_error_is_logged_with_its_final_status_not_as_500()
     {
+        var before = ApiHostFactory.Logs.Events.Count;
         await factory.CreateClient().GetAsync("/test-errors/conflict");
 
-        var completed = await RequestLogAsync("/test-errors/conflict");
+        var completed = await RequestLogAsync("/test-errors/conflict", before);
         Assert.Equal("409", completed.Properties["StatusCode"].ToString());
         Assert.Equal(LogEventLevel.Information, completed.Level);
         Assert.Null(completed.Exception);
+    }
+
+    /// <summary>
+    /// Test classes run in parallel, each with its own host. A host that stops calls Log.CloseAndFlush, which makes
+    /// the static Log.Logger silent; the request log of the hosts still running must not depend on it.
+    /// </summary>
+    [Fact]
+    public async Task The_request_log_survives_another_host_stopping()
+    {
+        var other = new ApiHostFactory();
+        await other.InitializeAsync();
+        await other.DisposeAsync();
+
+        var before = ApiHostFactory.Logs.Events.Count;
+        await factory.CreateClient().GetAsync("/test-errors/notfound");
+
+        var completed = await RequestLogAsync("/test-errors/notfound", before);
+        Assert.Equal("404", completed.Properties["StatusCode"].ToString());
     }
 
     [Fact]
@@ -204,12 +254,37 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
     }
 
-    /// <summary>The "HTTP GET ... responded ..." event of the request logging; written right after the response.</summary>
-    private static async Task<LogEvent> RequestLogAsync(string path)
+    /// <summary>
+    /// Empty answers (no route, no token) get their body from the status code pages. With Accept: text/plain no
+    /// ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
+    /// </summary>
+    [Theory]
+    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound)]
+    [InlineData("/test-secured", HttpStatusCode.Unauthorized)]
+    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Accept.ParseAdd("text/plain");
+
+        var response = await factory.CreateClient().SendAsync(request);
+        var body = await ReadAsync(response);
+
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal((int)status, body.GetProperty("status").GetInt32());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("title").GetString()));
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    /// <summary>
+    /// The "HTTP GET ... responded ..." event of the request logging; written right after the response. Only events
+    /// after <paramref name="after"/> count: the shared sink still holds the events of earlier tests on the same path.
+    /// </summary>
+    private static async Task<LogEvent> RequestLogAsync(string path, int after)
     {
         for (var attempt = 0; attempt < 50; attempt++)
         {
-            var completed = ApiHostFactory.Logs.Events.LastOrDefault(e =>
+            var completed = ApiHostFactory.Logs.Events.Skip(after).LastOrDefault(e =>
                 e.Properties.TryGetValue("RequestPath", out var value) && value.ToString() == $"\"{path}\"" &&
                 e.Properties.ContainsKey("StatusCode"));
             if (completed is not null)
