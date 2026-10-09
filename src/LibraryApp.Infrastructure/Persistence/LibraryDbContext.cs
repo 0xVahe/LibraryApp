@@ -73,5 +73,8 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
 
         // After the configurations: the rule must win over anything a configuration says about entity ids.
         LibraryModelConventions.ApplyApplicationGeneratedIds(modelBuilder);
+
+        // After the configurations: Restrict wherever EF Core itself chose cascade (SD-12).
+        LibraryModelConventions.ApplyRestrictDeleteDefault(modelBuilder);
     }
 }

@@ -5,6 +5,24 @@ namespace LibraryApp.Domain.Staff;
 /// <summary>Errors of the Staff module. Codes never change; messages may be reworded.</summary>
 public static class StaffErrors
 {
+    // Enrollment and profile management (MEM-01, MEM-03, BR-MEM-1).
+    public static readonly Error EnrolEmailNotCorporate =
+        Error.Validation("staff.enrol_email_not_corporate", "Only Ameriabank staff can be enrolled");
+    public static readonly Error EmployeeIdTaken =
+        Error.Conflict("staff.employee_id_taken", "Employee ID is already enrolled.");
+    public static readonly Error EmailTaken =
+        Error.Conflict("staff.email_taken", "Corporate email is already in use.");
+    public static readonly Error DepartmentNotFound =
+        Error.Validation("staff.department_not_found", "Department was not found.");
+    public static readonly Error CategoryNotFound =
+        Error.Validation("staff.category_not_found", "Staff category was not found.");
+    public static readonly Error RoleAssignmentForbidden =
+        Error.Forbidden("staff.role_assignment_forbidden", "Only a Library Administrator may assign a privileged role.");
+    public static readonly Error AccountWriteFailed =
+        Error.Validation("staff.account_write_failed", "The user account could not be saved.");
+    public static readonly Error AccountRoleInvalid =
+        Error.Conflict("staff.account_role_invalid", "The staff account must have exactly one supported role.");
+
     // Department
     public static readonly Error DepartmentNameRequired =
         Error.Validation("staff.department_name_required", "Department name is required.");
@@ -52,6 +70,9 @@ public static class StaffErrors
 
     public static readonly Error AlreadyDeactivated =
         Error.BusinessRule("staff.already_deactivated", "The staff member is already deactivated.");
+
+    public static readonly Error DeactivatedProfileLocked =
+        Error.Conflict("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
 
     public static readonly Error DeactivatedCannotChangeStatus =
         Error.BusinessRule("staff.deactivated_status_locked",
