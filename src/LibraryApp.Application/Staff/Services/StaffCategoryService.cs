@@ -24,7 +24,7 @@ public sealed class StaffCategoryService(
 
     public Task<StaffCategoryDto> CreateAsync(UpsertStaffCategoryRequest request, CancellationToken ct = default)
     {
-        return unitOfWork.ExecuteInTransactionAsync(token =>
+        return unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             var category = new StaffCategory(
                 ids.NewId(),
@@ -33,9 +33,11 @@ public sealed class StaffCategoryService(
                 request.LoanDays,
                 request.MaxRenewals);
 
+            await RequireUniqueNameAsync(category.Name, null, token);
+
             repository.Add(category);
 
-            return Task.FromResult(ToDto(category));
+            return ToDto(category);
         }, ct);
     }
 
@@ -52,7 +54,10 @@ public sealed class StaffCategoryService(
         {
             var category = await FindAsync(id, token);
 
-            category.Rename(request.Name);
+            var name = request.Name?.Trim() ?? string.Empty;
+            await RequireUniqueNameAsync(name, id, token);
+
+            category.Rename(name);
             category.SetLimits(
                 request.MaxLoans,
                 request.LoanDays,
@@ -76,5 +81,11 @@ public sealed class StaffCategoryService(
             category.MaxLoans,
             category.LoanDays,
             category.MaxRenewals);
+    }
+    
+    private async Task RequireUniqueNameAsync(string name, Guid? exceptId, CancellationToken ct)
+    {
+        if (await repository.NameExistsAsync(name, exceptId, ct))
+            throw new DomainException(StaffErrors.CategoryNameTaken);
     }
 }

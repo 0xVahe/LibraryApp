@@ -41,7 +41,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
 
     private static string UniqueName() => $"Category-{Guid.NewGuid():N}";
 
-    private static async Task AssertError(
+    private static async Task<JsonElement> AssertError(
         HttpResponseMessage response, HttpStatusCode status, string code)
     {
         Assert.Equal(status, response.StatusCode);
@@ -55,6 +55,20 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(
             body.GetProperty("traceId").GetString()));
+        
+        return body;
+    }
+    
+    private static async Task AssertValidationError(
+        HttpResponseMessage response, string field)
+    {
+        var body = await AssertError(
+            response, HttpStatusCode.BadRequest, "validation_failed");
+
+        var messages = body.GetProperty("errors").GetProperty(field);
+
+        Assert.Equal(JsonValueKind.Array, messages.ValueKind);
+        Assert.NotEmpty(messages.EnumerateArray());
     }
 
     [Fact]
@@ -103,15 +117,15 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
     }
 
     [Theory]
-    [InlineData(false, 0, 14, 1, "staff.max_loans_invalid")]
-    [InlineData(true, 0, 14, 1, "staff.max_loans_invalid")]
-    [InlineData(false, 2, 0, 1, "staff.loan_days_invalid")]
-    [InlineData(true, 2, 0, 1, "staff.loan_days_invalid")]
-    [InlineData(false, 2, 14, -1, "staff.max_renewals_invalid")]
-    [InlineData(true, 2, 14, -1, "staff.max_renewals_invalid")]
-    public async Task Invalid_limits_return_400_with_staff_code(
+    [InlineData(false, 0, 14, 1, "MaxLoans")]
+    [InlineData(true, 0, 14, 1, "MaxLoans")]
+    [InlineData(false, 2, 0, 1, "LoanDays")]
+    [InlineData(true, 2, 0, 1, "LoanDays")]
+    [InlineData(false, 2, 14, -1, "MaxRenewals")]
+    [InlineData(true, 2, 14, -1, "MaxRenewals")]
+    public async Task Invalid_limits_return_400_with_errors_per_field(
         bool update, int maxLoans, int loanDays, int maxRenewals,
-        string code)
+        string field)
     {
         using var client = Client();
         var request = new UpsertStaffCategoryRequest(
@@ -121,7 +135,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
             ? await client.PutAsJsonAsync($"{Route}/{Guid.NewGuid()}", request)
             : await client.PostAsJsonAsync(Route, request);
 
-        await AssertError(response, HttpStatusCode.BadRequest, code);
+        await AssertValidationError(response, field);
     }
 
     [Fact]
@@ -131,8 +145,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         using var response = await client.PostAsJsonAsync(
             Route, new UpsertStaffCategoryRequest("", 2, 14, 1));
 
-        await AssertError(response, HttpStatusCode.BadRequest,
-            "staff.category_name_required");
+        await AssertValidationError(response, "Name");
     }
 
     [Fact]
@@ -143,12 +156,12 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
 
         using var get = await client.GetAsync(path);
         await AssertError(get, HttpStatusCode.NotFound,
-            "staff.category_not_found");
+            "staff.category_resource_not_found");
 
         using var update = await client.PutAsJsonAsync(
             path, new UpsertStaffCategoryRequest(UniqueName(), 2, 14, 1));
         await AssertError(update, HttpStatusCode.NotFound,
-            "staff.category_not_found");
+            "staff.category_resource_not_found");
     }
 
     [Fact]
@@ -162,9 +175,9 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
 
         using var duplicate = await client.PostAsJsonAsync(Route, request);
         await AssertError(duplicate, HttpStatusCode.Conflict,
-            "unique_violation");
+            "staff.category_name_taken");
     }
-
+    
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData(StaffRoles.Librarian, HttpStatusCode.Forbidden)]
@@ -185,6 +198,35 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         Assert.Equal(expected, get.StatusCode);
         Assert.Equal(expected, post.StatusCode);
         Assert.Equal(expected, put.StatusCode);
+    }
+    
+    [Fact]
+    public async Task Updating_limits_with_own_trimmed_name_succeeds()
+    {
+        using var client = Client();
+
+        using var create = await client.PostAsJsonAsync(
+            Route, new UpsertStaffCategoryRequest(UniqueName(), 2, 14, 1));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+
+        var created = await create.Content.ReadFromJsonAsync<StaffCategoryDto>();
+        Assert.NotNull(created);
+
+        using var update = await client.PutAsJsonAsync(
+            $"{Route}/{created.Id}",
+            new UpsertStaffCategoryRequest($"  {created.Name}  ", 6, 28, 2));
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        var expected = new StaffCategoryDto(
+            created.Id, created.Name, 6, 28, 2);
+
+        Assert.Equal(expected,
+            await update.Content.ReadFromJsonAsync<StaffCategoryDto>());
+
+        using var readBack = await client.GetAsync($"{Route}/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, readBack.StatusCode);
+        Assert.Equal(expected,
+            await readBack.Content.ReadFromJsonAsync<StaffCategoryDto>());
     }
     
     [Fact]
@@ -252,7 +294,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
             $"{Route}/{second.Id}",
             new UpsertStaffCategoryRequest(first.Name, 6, 28, 2));
 
-        await AssertError(update, HttpStatusCode.Conflict, "unique_violation");
+        await AssertError(update, HttpStatusCode.Conflict, "staff.category_name_taken");
 
         using var readBack = await client.GetAsync($"{Route}/{second.Id}");
         Assert.Equal(HttpStatusCode.OK, readBack.StatusCode);

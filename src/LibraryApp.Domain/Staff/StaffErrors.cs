@@ -22,7 +22,9 @@ public static class StaffErrors
         Error.Validation("staff.account_write_failed", "The user account could not be saved.");
     public static readonly Error AccountRoleInvalid =
         Error.Conflict("staff.account_role_invalid", "The staff account must have exactly one supported role.");
-
+    public static readonly Error CategoryNameTaken =
+        Error.Conflict("staff.category_name_taken", "Staff category name is already in use.");
+    
     // Department
     public static readonly Error DepartmentNameRequired =
         Error.Validation("staff.department_name_required", "Department name is required.");
@@ -41,8 +43,8 @@ public static class StaffErrors
         Error.Validation("staff.max_renewals_invalid", "Maximum renewals must not be negative.");
     
     public static readonly Error CategoryResourceNotFound =
-        Error.NotFound("staff.category_not_found", "Staff category was not found.");
-
+        Error.NotFound("staff.category_resource_not_found", "Staff category was not found.");
+    
     // Staff member
     public static readonly Error EmployeeIdRequired =
         Error.Validation("staff.employee_id_required", "Employee ID is required.");

@@ -66,6 +66,56 @@ public class StaffCategoryServiceTests
     }
 
     [Theory]
+    [InlineData(false, "Employee")]
+    [InlineData(false, "  Employee  ")]
+    [InlineData(true, "Employee")]
+    [InlineData(true, "  Employee  ")]
+    public async Task Duplicate_name_is_rejected_without_changing_categories(
+        bool update, string name)
+    {
+        var existing = new StaffCategory(
+            Guid.NewGuid(), "Employee", 3, 21, 1);
+        var target = new StaffCategory(
+            Guid.NewGuid(), "Contractors", 2, 14, 1);
+
+        _repository.Categories.AddRange([existing, target]);
+
+        var before = await Service.GetAsync(target.Id);
+        var request = new UpsertStaffCategoryRequest(name, 6, 28, 2);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            update
+                ? Service.UpdateAsync(target.Id, request)
+                : Service.CreateAsync(request));
+
+        Assert.Equal(StaffErrors.CategoryNameTaken, error.Error);
+        Assert.Equal(2, _repository.Categories.Count);
+        Assert.Equal(before, await Service.GetAsync(target.Id));
+        Assert.Equal(1, _unitOfWork.Transactions);
+    }
+    
+    [Theory]
+    [InlineData("Employee")]
+    [InlineData("  Employee  ")]
+    public async Task Update_can_keep_its_own_name_and_change_limits(string name)
+    {
+        var category = new StaffCategory(
+            Guid.NewGuid(), "Employee", 3, 21, 1);
+        _repository.Categories.Add(category);
+
+        var result = await Service.UpdateAsync(
+            category.Id,
+            new UpsertStaffCategoryRequest(name, 6, 28, 2));
+
+        var expected = new StaffCategoryDto(
+            category.Id, "Employee", 6, 28, 2);
+
+        Assert.Equal(expected, result);
+        Assert.Equal(expected, await Service.GetAsync(category.Id));
+        Assert.Same(category, Assert.Single(_repository.Categories));
+    }
+    
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Missing_category_throws_category_not_found(bool update)
@@ -141,6 +191,13 @@ public class StaffCategoryServiceTests
             Guid id, CancellationToken ct = default) =>
             Task.FromResult(Categories.SingleOrDefault(x => x.Id == id));
 
+        public Task<bool> NameExistsAsync(
+            string name, Guid? exceptId = null, CancellationToken ct = default)
+        {
+            return Task.FromResult(
+                Categories.Any(category => category.Name == name && (!exceptId.HasValue || category.Id != exceptId.Value)));
+        }
+        
         public void Add(StaffCategory category) => Categories.Add(category);
     }
 }
