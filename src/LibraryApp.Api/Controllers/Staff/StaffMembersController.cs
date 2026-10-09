@@ -3,6 +3,7 @@ using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Api.Controllers.Staff;
 
@@ -12,6 +13,35 @@ namespace LibraryApp.Api.Controllers.Staff;
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
 public sealed class StaffMembersController(IStaffManagementService staff) : ControllerBase
 {
+    /// <summary>Searches staff with pagination (MEM-07).</summary>
+    /// <remarks>
+    /// Results are ordered by last name, first name, then ID.
+    /// Filters combine using AND.
+    /// </remarks>
+    /// <param name="search">Prefix of first name, last name, full name or employee ID.</param>
+    /// <param name="departmentId">Department to filter by.</param>
+    /// <param name="status">Active, Restricted, Suspended or Deactivated; case insensitive.</param>
+    /// <param name="page">Page number, starting from 1.</param>
+    /// <param name="pageSize">Items per page: default 20, maximum 100.</param>
+    /// <param name="ct">Cancelled when the client disconnects.</param>
+    [HttpGet]
+    [ProducesResponseType<PagedResult<StaffMemberListItemDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<StaffMemberListItemDto>>> Search(
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? departmentId = null,
+        [FromQuery] string? status = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = PageRequest.DefaultPageSize,
+        CancellationToken ct = default)
+    {
+        var request = new StaffMemberSearchRequest(search, departmentId, status, new PageRequest(page, pageSize));
+        var result = await staff.SearchAsync(request, ct);
+        return Ok(result);
+    }
+
     /// <summary>Enrolls an employee and creates their login account (MEM-01, MEM-03, BR-MEM-1, BR-MEM-5).</summary>
     /// <remarks>Role defaults to StaffMember. Only LibraryAdministrator may assign Librarian or LibraryAdministrator.</remarks>
     [HttpPost]

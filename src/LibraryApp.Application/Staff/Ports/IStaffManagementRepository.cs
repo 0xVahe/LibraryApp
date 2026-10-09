@@ -1,5 +1,6 @@
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Staff.Ports;
 
@@ -12,5 +13,6 @@ public interface IStaffManagementRepository
     Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct);
     Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct);
     Task<string?> GetCategoryNameAsync(Guid id, CancellationToken ct);
+    Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchFilter filter, PageRequest paging, CancellationToken ct);
     void Add(StaffMember member);
 }
