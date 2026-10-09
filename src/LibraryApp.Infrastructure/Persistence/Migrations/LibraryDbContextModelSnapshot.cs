@@ -746,6 +746,29 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0005-000000000001"),
+                            ConcurrencyStamp = "20000000-0000-0000-0005-000000000001",
+                            Name = "LibraryAdministrator",
+                            NormalizedName = "LIBRARYADMINISTRATOR"
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0005-000000000002"),
+                            ConcurrencyStamp = "20000000-0000-0000-0005-000000000002",
+                            Name = "Librarian",
+                            NormalizedName = "LIBRARIAN"
+                        },
+                        new
+                        {
+                            Id = new Guid("20000000-0000-0000-0005-000000000003"),
+                            ConcurrencyStamp = "20000000-0000-0000-0005-000000000003",
+                            Name = "StaffMember",
+                            NormalizedName = "STAFFMEMBER"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
