@@ -4,12 +4,14 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LibraryApp.Application.Abstractions.Borrowing;
+using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
@@ -17,15 +19,34 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
+using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog.Events;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
-public sealed class StaffDeactivationFactory : ApiHostFactory
+public sealed class StaffDeactivationFactory : ApiHostFactory, IAsyncLifetime
 {
     public DeactivationLoanQueries Loans { get; } = new();
+    public Guid BookId { get; } = CatalogSeedIds.Book(15);
+    public Guid CopyId { get; } = Guid.NewGuid();
+    public ConcurrentDictionary<Guid, string> OriginalStamps { get; } = new();
+
+    public new async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(ct =>
+        {
+            var copy = new BookCopy(CopyId, BookId, "BK-DEMO-000123", BookCopyCondition.Good, null);
+            copy.ChangeStatus(BookCopyStatus.OnLoan);
+            db.BookCopies.Add(copy);
+            return Task.CompletedTask;
+        });
+    }
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddSingleton<IBorrowingReadService>(Loans);
@@ -96,7 +117,11 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
             "Engineer", null, StaffSeedIds.Categories.Employee, Password);
         var response = await Client().PostAsJsonAsync("/api/staff-members", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<StaffMemberDto>())!;
+        var member = (await response.Content.ReadFromJsonAsync<StaffMemberDto>())!;
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        factory.OriginalStamps[member.Id] = (await db.Users.SingleAsync(x => x.Email == member.CorporateEmail)).SecurityStamp!;
+        return member;
     }
 
     private async Task<JsonElement> Error(HttpResponseMessage response, HttpStatusCode status, string code)
@@ -118,6 +143,8 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
         var account = await db.Users.AsNoTracking().SingleAsync(x => x.Id == stored.UserId);
         Assert.Equal(deactivated ? DateTimeOffset.MaxValue : null, account.LockoutEnd);
         if (deactivated) Assert.True(account.LockoutEnabled);
+        if (deactivated) Assert.NotEqual(factory.OriginalStamps[member.Id], account.SecurityStamp);
+        else Assert.Equal(factory.OriginalStamps[member.Id], account.SecurityStamp);
         var events = (await db.Set<OutboxMessage>().Where(x => x.Type == nameof(StaffStatusChanged)).ToListAsync())
             .Select(x => JsonSerializer.Deserialize<StaffStatusChanged>(x.Payload, new JsonSerializerOptions(JsonSerializerDefaults.Web))!)
             .Where(x => x.StaffMemberId == member.Id).ToList();
@@ -150,7 +177,7 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
-    public async Task Unauthorized_callers_cannot_change_profile(string? role, HttpStatusCode expected)
+    public async Task Unauthorized_callers_cannot_deactivate(string? role, HttpStatusCode expected)
     {
         var member = await Enrol();
         Assert.Equal(expected, (await Client(role).PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest(Reason))).StatusCode);
@@ -189,14 +216,14 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
     {
         var member = await Enrol();
         factory.Loans.Items[member.Id] = [new(Guid.NewGuid(), member.Id,
-            CatalogServiceStub.OnLoanCopyId,
-            CatalogServiceStub.AvailableBookId,
+            factory.CopyId,
+            factory.BookId,
             new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), status)];
         var problem = await Error(await Client().PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest(Reason)),
             HttpStatusCode.Conflict, "staff.has_active_loans");
         var book = Assert.Single(problem.GetProperty("outstandingBooks").EnumerateArray());
-        Assert.Equal("Risk Management Basics", book.GetProperty("title").GetString());
-        Assert.Equal("BK-0001-03", book.GetProperty("barcode").GetString());
+        Assert.Equal("Clean Code", book.GetProperty("title").GetString());
+        Assert.Equal("BK-DEMO-000123", book.GetProperty("barcode").GetString());
         await AssertStoredState(member, false);
         Assert.Equal(HttpStatusCode.OK, (await factory.CreateClient().PostAsJsonAsync("/api/auth/login",
             new LoginRequest(member.CorporateEmail, Password))).StatusCode);
@@ -242,11 +269,48 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
         await attempted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(request.IsCompleted);
         factory.Loans.Items[member.Id] = [new(Guid.NewGuid(), member.Id,
-            CatalogServiceStub.OnLoanCopyId,
-            CatalogServiceStub.AvailableBookId,
+            factory.CopyId,
+            factory.BookId,
             new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active)];
         await transaction.CommitAsync();
         await Error(await request, HttpStatusCode.Conflict, "staff.has_active_loans");
+        await AssertStoredState(member, false);
+    }
+
+    [Fact]
+    public void Application_uses_the_real_catalog_provider()
+    {
+        using var scope = factory.Services.CreateScope();
+        Assert.IsType<CatalogService>(scope.ServiceProvider.GetRequiredService<ICatalogService>());
+    }
+
+    [Theory]
+    [InlineData(1000, HttpStatusCode.NoContent)]
+    [InlineData(1001, HttpStatusCode.BadRequest)]
+    public async Task Reason_length_is_checked_after_trimming(int length, HttpStatusCode expected)
+    {
+        var member = await Enrol();
+        var response = await Client().PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest("  " + new string('x', length) + "  "));
+        Assert.Equal(expected, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var stored = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.SingleAsync(x => x.Id == member.Id);
+        Assert.Equal(expected == HttpStatusCode.NoContent ? StaffMemberStatus.Deactivated : StaffMemberStatus.Active, stored.Status);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Unresolvable_catalog_reference_logs_loan_id_and_preserves_account(bool missingBook)
+    {
+        var member = await Enrol();
+        var loan = new OpenLoanInfo(Guid.NewGuid(), member.Id,
+            missingBook ? factory.CopyId : Guid.NewGuid(), missingBook ? Guid.NewGuid() : factory.BookId,
+            new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active);
+        factory.Loans.Items[member.Id] = [loan];
+        await Error(await Client().PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest(Reason)),
+            HttpStatusCode.InternalServerError, "internal_error");
+        Assert.Contains(ApiHostFactory.Logs.Events, log => log.Properties.TryGetValue("LoanId", out var value)
+            && value is ScalarValue { Value: Guid loanId } && loanId == loan.LoanId);
         await AssertStoredState(member, false);
     }
 

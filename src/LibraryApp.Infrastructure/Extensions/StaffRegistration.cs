@@ -1,9 +1,5 @@
-using LibraryApp.Application.Abstractions.Borrowing;
-using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
-using LibraryApp.Application.Borrowing.Services;
-using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Infrastructure.Identity;
@@ -11,7 +7,6 @@ using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -27,9 +22,6 @@ public static class StaffRegistrationExtensions
         services.AddScoped<IStaffAccountStore, StaffAccountStore>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
         services.AddScoped<IStaffDeactivationService, StaffDeactivationService>();
-        // Temporary providers for S1-04.2; real module registrations replace these when merged.
-        services.TryAddScoped<IBorrowingReadService, BorrowingReadServiceStub>();
-        services.TryAddScoped<ICatalogService, CatalogServiceStub>();
 
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IDepartmentService, DepartmentService>();

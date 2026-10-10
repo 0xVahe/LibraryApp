@@ -7,6 +7,7 @@ using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Logging;
 
 namespace LibraryApp.Application.Staff.Services;
 
@@ -19,7 +20,8 @@ public sealed class StaffDeactivationService(
     IUnitOfWork unitOfWork,
     IEventBus events,
     IClock clock,
-    IIdGenerator ids) : IStaffDeactivationService
+    IIdGenerator ids,
+    ILogger<StaffDeactivationService> logger) : IStaffDeactivationService
 {
     public Task DeactivateAsync(Guid id, DeactivateStaffMemberRequest request, CancellationToken ct = default) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
@@ -52,15 +54,23 @@ public sealed class StaffDeactivationService(
         var titles = new Dictionary<Guid, string>();
         foreach (var bookId in loans.Select(x => x.BookId).Distinct())
         {
-            var book = await catalog.GetBookAsync(bookId, ct)
-                ?? throw new InvalidOperationException("An outstanding loan's book could not be resolved.");
+            var book = await catalog.GetBookAsync(bookId, ct);
+            if (book is null)
+            {
+                logger.LogError("Cannot resolve book {BookId} for outstanding loan {LoanId}",
+                    bookId, loans.First(x => x.BookId == bookId).LoanId);
+                throw new InvalidOperationException("An outstanding loan's book could not be resolved.");
+            }
             titles.Add(bookId, book.Title);
         }
 
         return loans.Select(loan =>
         {
             if (!copies.TryGetValue(loan.BookCopyId, out var copy) || copy.BookId != loan.BookId)
+            {
+                logger.LogError("Cannot resolve copy {BookCopyId} for outstanding loan {LoanId}", loan.BookCopyId, loan.LoanId);
                 throw new InvalidOperationException("An outstanding loan's copy could not be resolved.");
+            }
             return new OutstandingBookDto(titles[loan.BookId], copy.Barcode);
         }).ToArray();
     }

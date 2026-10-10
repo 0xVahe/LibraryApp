@@ -6,7 +6,9 @@ namespace LibraryApp.Application.Staff.Validators;
 
 public sealed class DeactivateStaffMemberRequestValidator : AbstractValidator<DeactivateStaffMemberRequest>
 {
-    public DeactivateStaffMemberRequestValidator() => RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000);
+    public DeactivateStaffMemberRequestValidator() => RuleFor(x => x.Reason).NotEmpty()
+        .Must(reason => reason is null || reason.Trim().Length <= 1000)
+        .WithMessage("Reason must be 1000 characters or fewer after trimming.");
 }
 
 public sealed class EnrolStaffMemberRequestValidator : AbstractValidator<EnrolStaffMemberRequest>

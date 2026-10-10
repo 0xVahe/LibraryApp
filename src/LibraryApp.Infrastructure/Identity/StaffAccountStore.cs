@@ -46,6 +46,7 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
                    ?? throw new InvalidOperationException("The staff member's account is missing.");
         user.LockoutEnabled = true;
         user.LockoutEnd = DateTimeOffset.MaxValue;
+        user.SecurityStamp = Guid.NewGuid().ToString();
         Ensure(await users.UpdateAsync(user));
     }
 

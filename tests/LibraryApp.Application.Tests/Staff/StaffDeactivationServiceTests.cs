@@ -7,6 +7,7 @@ using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LibraryApp.Application.Tests.Staff;
 
@@ -15,7 +16,7 @@ public class StaffDeactivationServiceTests
     private readonly ManagementFake _store = new();
     private readonly LoanQueries _loans = new();
     private StaffDeactivationService Service => new(_store, _store, _loans, new CatalogServiceStub(),
-        new StaffLock(_store, _loans), _store, _store, _store, _store);
+        new StaffLock(_store, _loans), _store, _store, _store, _store, NullLogger<StaffDeactivationService>.Instance);
 
     private StaffMember Member(StaffMemberStatus status = StaffMemberStatus.Active)
     {
