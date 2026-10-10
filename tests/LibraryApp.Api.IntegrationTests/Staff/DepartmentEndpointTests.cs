@@ -114,6 +114,18 @@ public class DepartmentEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         var longest = Guid.NewGuid().ToString("N").PadRight(100, 'x');
         Assert.Equal(longest, (await Create($"  {longest}  ")).Name);
     }
+    
+    [Fact]
+    public async Task Concurrent_creates_with_the_same_name_give_one_201_and_name_taken_for_the_rest()
+    {
+        var request = new UpsertDepartmentRequest(NewName());
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Client().PostAsJsonAsync(Route, request)));
+
+        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Created);
+        foreach (var response in responses.Where(x => x.StatusCode != HttpStatusCode.Created))
+            await AssertError(response, HttpStatusCode.Conflict, "staff.department_name_taken");
+    }
 
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]

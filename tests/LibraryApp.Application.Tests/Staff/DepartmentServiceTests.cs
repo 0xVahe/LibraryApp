@@ -1,4 +1,5 @@
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
@@ -29,12 +30,12 @@ public class DepartmentServiceTests
         var dto = await Service.CreateAsync(new("Test"));
 
         var updated = await Service.UpdateAsync(dto.Id, new("Marketing"));
-        
+
         Assert.Equal("Marketing", updated.Name);
         Assert.Equal(new DepartmentDto(dto.Id, "Marketing"), updated);
         Assert.Equal("Marketing", _fake.Departments[dto.Id].Name);
     }
-    
+
     [Fact]
     public async Task Update_may_keep_its_own_name_in_another_case()
     {
@@ -42,7 +43,7 @@ public class DepartmentServiceTests
 
         Assert.Equal("TREASURY", (await Service.UpdateAsync(dto.Id, new("TREASURY"))).Name);
     }
-    
+
     [Fact]
     public async Task Create_with_a_taken_name_throws_conflict_and_adds_nothing()
     {
@@ -54,7 +55,7 @@ public class DepartmentServiceTests
         Assert.Equal(ErrorKind.Conflict, error.Error.Kind);
         Assert.Single(_fake.Departments);
     }
-    
+
     [Fact]
     public async Task Update_to_a_taken_name_throws_conflict_and_keeps_the_old_name()
     {
@@ -66,7 +67,7 @@ public class DepartmentServiceTests
         Assert.Equal(StaffErrors.DepartmentNameTaken, error.Error);
         Assert.Equal("Finance", _fake.Departments[other.Id].Name);
     }
-    
+
     [Fact]
     public async Task Unknown_id_is_not_found_for_get_and_update()
     {
@@ -80,7 +81,7 @@ public class DepartmentServiceTests
         Assert.Equal(ErrorKind.NotFound, get.Error.Kind);
         Assert.Empty(_fake.Departments);
     }
-    
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("   ", false)]
@@ -96,12 +97,26 @@ public class DepartmentServiceTests
         Assert.True(validator.Validate(new UpsertDepartmentRequest($"  {new string('a', 100)}  ")).IsValid);
         Assert.False(validator.Validate(new UpsertDepartmentRequest(new string('a', 101))).IsValid);
     }
+
+    [Fact]
+    public async Task Unique_index_violation_from_a_concurrent_write_is_reported_as_name_taken()
+    {
+        var existing = await Service.CreateAsync(new("Treasury"));
+        _fake.FailSaveWithUniqueViolation = true;
+
+        var create = await Assert.ThrowsAsync<DomainException>(() => Service.CreateAsync(new("Markets")));
+        var update = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(existing.Id, new("Markets")));
+
+        Assert.Equal(StaffErrors.DepartmentNameTaken, create.Error);
+        Assert.Equal(StaffErrors.DepartmentNameTaken, update.Error);
+    }
 }
 
 internal sealed class DepartmentFake : IDepartmentRepository, IUnitOfWork, IIdGenerator
 {
     public Dictionary<Guid, Department> Departments { get; } = [];
     public bool InTransaction { get; private set; }
+    public bool FailSaveWithUniqueViolation { get; set; }
 
     public Task<IReadOnlyList<DepartmentDto>> ListAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<DepartmentDto>>(Departments.Values.Select(x => new DepartmentDto(x.Id, x.Name))
@@ -128,7 +143,10 @@ internal sealed class DepartmentFake : IDepartmentRepository, IUnitOfWork, IIdGe
         InTransaction = true;
         try
         {
-            return await operation(ct);
+            var result = await operation(ct);
+            if (FailSaveWithUniqueViolation)
+                throw new DomainException(CommonErrors.UniqueViolation);
+            return result;
         }
         finally
         {

@@ -26,17 +26,18 @@ public class DepartmentsController(IDepartmentService departmentService) : Contr
     /// Gets a department (MEM-06)
     /// </summary>
     [HttpGet("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<DepartmentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DepartmentDto>> Get(Guid id, CancellationToken ct) =>
         Ok(await departmentService.GetAsync(id, ct));
 
     /// <summary>
-    /// Create a department (MEM-06)
+    /// Create a department with a unique name (MEM-06)
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<DepartmentDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<DepartmentDto>> Create(UpsertDepartmentRequest data, CancellationToken ct)
     {
         var department = await departmentService.CreateAsync(data, ct);
@@ -44,11 +45,13 @@ public class DepartmentsController(IDepartmentService departmentService) : Contr
     }
 
     /// <summary>
-    /// Update a department (MEM-06)
+    /// Rename a department and return it (MEM-06)
     /// </summary>
     [HttpPut("{id:guid}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Update(Guid id, UpsertDepartmentRequest data, CancellationToken ct) =>
+    [ProducesResponseType<DepartmentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<DepartmentDto>> Update(Guid id, UpsertDepartmentRequest data, CancellationToken ct) =>
         Ok(await departmentService.UpdateAsync(id, data, ct));
 }

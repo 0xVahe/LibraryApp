@@ -1,4 +1,5 @@
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
@@ -6,7 +7,11 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Staff.Services;
 
-public class DepartmentService(IDepartmentRepository departments, IUnitOfWork unitOfWork, IIdGenerator idGenerator)
+/// <summary>
+/// Department list (MEM-06). The name check gives a clear 409; when two requests pass it at the same time,
+/// UX_Departments_Name rejects the second one and that is reported with the same error.
+/// </summary>
+public sealed class DepartmentService(IDepartmentRepository departments, IUnitOfWork unitOfWork, IIdGenerator idGenerator)
     : IDepartmentService
 {
     public Task<IReadOnlyList<DepartmentDto>> ListAsync(CancellationToken ct = default) => departments.ListAsync(ct);
@@ -15,7 +20,7 @@ public class DepartmentService(IDepartmentRepository departments, IUnitOfWork un
         ToDto(await FindAsync(id, ct));
 
     public Task<DepartmentDto> CreateAsync(UpsertDepartmentRequest request, CancellationToken ct = default) =>
-        unitOfWork.ExecuteInTransactionAsync(async token =>
+        SaveAsync(async token =>
         {
             var name = request.Name!.Trim();
             await RequireUniqueNameAsync(name, null, token);
@@ -25,7 +30,7 @@ public class DepartmentService(IDepartmentRepository departments, IUnitOfWork un
         }, ct);
 
     public Task<DepartmentDto> UpdateAsync(Guid id, UpsertDepartmentRequest request, CancellationToken ct = default) =>
-        unitOfWork.ExecuteInTransactionAsync(async token =>
+        SaveAsync(async token =>
         {
             var department = await FindAsync(id, token);
             var name = request.Name!.Trim();
@@ -35,6 +40,19 @@ public class DepartmentService(IDepartmentRepository departments, IUnitOfWork un
         }, ct);
 
     // ---------------------------------------- Private helpers ---------------------------------------------
+    /// <summary>The name index is the only unique index a department write can break.</summary>
+    private async Task<DepartmentDto> SaveAsync(Func<CancellationToken, Task<DepartmentDto>> operation, CancellationToken ct)
+    {
+        try
+        {
+            return await unitOfWork.ExecuteInTransactionAsync(operation, ct);
+        }
+        catch (DomainException ex) when (ex.Error == CommonErrors.UniqueViolation)
+        {
+            throw new DomainException(StaffErrors.DepartmentNameTaken, ex);
+        }
+    }
+
     private async Task RequireUniqueNameAsync(string name, Guid? exceptId, CancellationToken ct)
     {
         if (await departments.NameExistsAsync(name, exceptId, ct))

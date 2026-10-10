@@ -10,6 +10,9 @@ public sealed class UpsertDepartmentRequestValidator : AbstractValidator<UpsertD
     public UpsertDepartmentRequestValidator()
     {
         // Checked after trimming, the way Department stores it: spaces only is empty, padding does not count.
-        Transform(x => x.Name, name => name?.Trim()).NotEmpty().MaximumLength(NameMaxLength);
+        RuleFor(x => x.Name).Cascade(CascadeMode.Stop)
+            .Must(name => !string.IsNullOrWhiteSpace(name)).WithMessage("Name is required.")
+            .Must(name => name!.Trim().Length <= NameMaxLength)
+            .WithMessage($"Name must be {NameMaxLength} characters or fewer.");
     }
 }
