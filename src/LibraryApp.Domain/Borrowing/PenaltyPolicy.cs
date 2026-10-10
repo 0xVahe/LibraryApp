@@ -1,4 +1,6 @@
-﻿namespace LibraryApp.Domain.Borrowing;
+﻿using LibraryApp.Domain.Staff;
+
+namespace LibraryApp.Domain.Borrowing;
 
 public class PenaltyPolicy
 {
@@ -7,6 +9,9 @@ public class PenaltyPolicy
 
     public const int LostPoints = 10;
     public const int DamagedPoints = 5;
+
+    public const int RestrictedFromPoints = 5;
+    public const int SuspendedFromPoints = 10;
 
     public int CalculateLatePoints(int lateWorkingDays)
     {
@@ -30,18 +35,19 @@ public class PenaltyPolicy
         return DamagedPoints;
     }
 
-    public string GetStatus(int activePoints)
+    /// <summary>The status the active penalty points give: 5 or more Restricted, 10 or more Suspended (BR-BOR-6).</summary>
+    public StaffMemberStatus GetStatus(int activePoints)
     {
-        if (activePoints < 5)
+        if (activePoints < RestrictedFromPoints)
         {
-            return "Active";
+            return StaffMemberStatus.Active;
         }
 
-        if (activePoints < 10)
+        if (activePoints < SuspendedFromPoints)
         {
-            return "Restricted";
+            return StaffMemberStatus.Restricted;
         }
 
-        return "Suspended";
+        return StaffMemberStatus.Suspended;
     }
 }
