@@ -1,0 +1,14 @@
+using LibraryApp.Application.Abstractions.Messaging;
+using LibraryApp.Domain.Events;
+
+namespace LibraryApp.Application.Notifications.EventHandlers;
+
+/// <summary>Subscribes the Notifications module to loan-overdue events (NOT-01).</summary>
+public sealed class LoanOverdueEventHandler : IEventHandler<LoanOverdue>
+{
+    public Task HandleAsync(LoanOverdue domainEvent, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+}
