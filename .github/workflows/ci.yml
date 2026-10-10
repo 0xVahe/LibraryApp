@@ -101,9 +101,10 @@ jobs:
           fi
 
           dotnet tool restore
-          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure; then
+          dotnet build src/LibraryApp.Infrastructure --configuration Debug
+          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure --no-build; then
             echo "pending=true" >> "$GITHUB_OUTPUT"
-            echo "::error::The model changed but there is no migration. Label the pull request needs-migration; the Integration Owner adds the migration as the last commit. Do not add migration files yourself."
+            echo "::error::The model changed but there is no migration. The pull request is labelled needs-migration; the Integration Owner adds the migration as the last commit. Do not add migration files yourself."
             exit 1
           fi
           echo "pending=false" >> "$GITHUB_OUTPUT"
