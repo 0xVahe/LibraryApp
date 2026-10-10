@@ -9,6 +9,13 @@ namespace LibraryApp.Domain.Borrowing;
 public sealed class Reservation : Entity
 {
     /// <summary>
+    /// Gets the identifier of the copy assigned for collection.
+    /// Null until the reservation becomes ready.
+    /// Retained after completion for historical reference.
+    /// </summary>
+    public Guid? CopyId { get; private set; }
+    
+    /// <summary>
     /// Gets the identifier of the reserved book.
     /// </summary>
     public Guid BookId { get; private set; }
@@ -113,16 +120,19 @@ public sealed class Reservation : Entity
     }
 
     /// <summary>
-    /// Makes a waiting reservation ready for collection.
+    /// Assigns a copy and makes a waiting reservation ready for collection.
     /// </summary>
+    /// <param name="copyId">The copy assigned to this reservation.</param>
     /// <param name="readyUntilUtc">
     /// The UTC pickup deadline calculated by Application.
     /// </param>
     /// <remarks>
-    /// Application verifies queue priority, arranges the copy hold,
+    /// Application verifies that the copy belongs to the reserved book,
+    /// checks queue priority, arranges the copy hold,
     /// and calculates the deadline using the working-day calendar.
+    /// The copy hold and reservation update must commit together.
     /// </remarks>
-    public void MarkReady(DateTime readyUntilUtc)
+    public void MarkReady(Guid copyId, DateTime readyUntilUtc)
     {
         EnsureUtc(readyUntilUtc);
 
@@ -132,12 +142,19 @@ public sealed class Reservation : Entity
                 BorrowingErrors.ReservationNotWaiting);
         }
 
+        if (copyId == Guid.Empty)
+        {
+            throw new DomainException(
+                BorrowingErrors.InvalidReferenceId);
+        }
+
         if (readyUntilUtc <= CreatedAtUtc)
         {
             throw new DomainException(
                 BorrowingErrors.InvalidPickupDeadline);
         }
 
+        CopyId = copyId;
         ReadyUntilUtc = readyUntilUtc;
 
         // The member leaves the waiting queue.

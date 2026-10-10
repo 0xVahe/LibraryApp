@@ -11,6 +11,11 @@ public sealed class StaffMemberExamples : ISchemaFilter
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
+        if (context.Type == typeof(DeactivateStaffMemberRequest))
+        {
+            schema.Example = new OpenApiObject { ["reason"] = new OpenApiString("Left the bank") };
+            return;
+        }
         if (context.Type != typeof(EnrolStaffMemberRequest) && context.Type != typeof(UpdateStaffMemberRequest))
             return;
 

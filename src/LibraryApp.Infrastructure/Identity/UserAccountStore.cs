@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -27,17 +28,12 @@ public sealed class UserAccountStore(
         // The password is checked for a locked-out account too, so the answer time does not reveal the lockout.
         var lockedOut = await userManager.IsLockedOutAsync(user);
         var valid = await userManager.CheckPasswordAsync(user, password);
-        if (lockedOut)
-            return null;
-
         if (!valid)
         {
-            await RegisterFailedAttemptAsync(user.Id, ct);
+            if (!lockedOut)
+                await RegisterFailedAttemptAsync(user.Id, ct);
             return null;
         }
-
-        if (user.AccessFailedCount > 0)
-            await ResetFailedAttemptsAsync(user.Id, ct);
 
         var roles = await userManager.GetRolesAsync(user);
         var staff = await db.StaffMembers
@@ -45,6 +41,14 @@ public sealed class UserAccountStore(
             .Where(x => x.UserId == user.Id)
             .Select(x => new { x.Id, x.Status })
             .SingleOrDefaultAsync(ct);
+
+        // Correct credentials for a deactivated member reach AuthService's AccountDeactivated error,
+        // even with permanent Identity lockout. Temporary lockouts still reject all sign-ins.
+        if (lockedOut && staff?.Status != StaffMemberStatus.Deactivated)
+            return null;
+
+        if (!lockedOut && user.AccessFailedCount > 0)
+            await ResetFailedAttemptsAsync(user.Id, ct);
 
         return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList());
     }

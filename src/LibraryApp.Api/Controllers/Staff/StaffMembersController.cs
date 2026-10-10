@@ -11,8 +11,25 @@ namespace LibraryApp.Api.Controllers.Staff;
 [Tags("Staff Members")]
 [Route("api/staff-members")]
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
-public sealed class StaffMembersController(IStaffManagementService staff) : ControllerBase
+public sealed class StaffMembersController(IStaffManagementService staff, IStaffDeactivationService deactivation) : ControllerBase
 {
+    /// <summary>Deactivates an employee who has no outstanding loans (MEM-01, BR-MEM-4).</summary>
+    /// <remarks>A 409 staff.has_active_loans response lists titles and barcodes in outstandingBooks.
+    /// Success locks the login account and publishes StaffStatusChanged. Repeating deactivation returns 422.</remarks>
+    [HttpPost("{id:guid}/deactivate")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Deactivate(Guid id, DeactivateStaffMemberRequest request, CancellationToken ct)
+    {
+        await deactivation.DeactivateAsync(id, request, ct);
+        return NoContent();
+    }
+
     /// <summary>Searches staff with pagination (MEM-07).</summary>
     /// <remarks>
     /// Results are ordered by last name, first name, then ID.
