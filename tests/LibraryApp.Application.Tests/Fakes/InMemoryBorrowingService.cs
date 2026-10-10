@@ -68,24 +68,6 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         return Task.FromResult<IReadOnlyList<OpenLoanInfo>>(openLoansForStaff);
     }
 
-    public Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default)
-    {
-        CheckThrowOnNextCall();
-
-        var staffLoans = _historicalLoans.Where(l => l.StaffMemberId == staffMemberId).ToList();
-        var activeLoansCount = staffLoans.Count(l => !l.IsClosed);
-        var overdueLoansCount = staffLoans.Count(l => !l.IsClosed && l.DueAtUtc < DateTime.UtcNow);
-        var totalBorrowedCount = staffLoans.Count;
-
-        var summary = new StaffBorrowingSummary(
-            staffMemberId,
-            activeLoansCount,
-            overdueLoansCount,
-            totalBorrowedCount);
-
-        return Task.FromResult(summary);
-    }
-
     public Task<DateTime?> GetNextDueDateAsync(IReadOnlyCollection<Guid> copyIds, CancellationToken ct = default)
     {
         CheckThrowOnNextCall();

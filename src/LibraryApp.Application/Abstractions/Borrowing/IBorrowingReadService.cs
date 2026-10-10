@@ -7,9 +7,6 @@ public interface IBorrowingReadService
 {
     /// <summary>All Active and Overdue loans; Returned and Lost loans are excluded. No Catalog calls or paging.</summary>
     Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default);
-
-    /// <summary>MEM-08 "My library" (BQ-G2-11, the shape waits for Group 2's answer).</summary>
-    Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default);
 }
 
 public sealed record OpenLoanInfo(
