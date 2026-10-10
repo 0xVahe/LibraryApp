@@ -14,6 +14,8 @@ public static class BorrowingRegistrationExtensions
     {
         services.AddScoped<ILoanRepository, LoanRepository>();
         services.AddScoped<ILoanService, LoanService>();
+        services.AddScoped<IReservationRepository, ReservationRepository>();
+        services.AddScoped<IReservationService, ReservationService>();
 
         return services;
     }

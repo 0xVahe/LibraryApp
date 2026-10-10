@@ -18,4 +18,7 @@ public interface ILoanRepository
     /// Used to compare against MaxLoans, because Staff does not know our loans.
     /// </summary>
     Task<int> CountOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default);
+
+    /// <summary>Gets copy ids for the employee's Active or Overdue loans (BOR-07).</summary>
+    Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default);
 }

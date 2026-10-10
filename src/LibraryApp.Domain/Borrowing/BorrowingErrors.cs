@@ -81,6 +81,31 @@ public static class BorrowingErrors
     
     // Reservation errors
 
+    /// <summary>An available copy exists, so this book does not need to be reserved.</summary>
+    public static readonly Error ReservationCopyAvailable = Error.BusinessRule(
+        "borrowing.reservation_copy_available",
+        "A copy of this book is available; reservation is not required.");
+
+    /// <summary>The employee already has the maximum number of active reservations.</summary>
+    public static readonly Error ReservationLimitReached = Error.BusinessRule(
+        "borrowing.reservation_limit_reached",
+        "The employee already has the maximum of three active reservations.");
+
+    /// <summary>The employee already has an active reservation for this book.</summary>
+    public static readonly Error DuplicateActiveReservation = Error.BusinessRule(
+        "borrowing.duplicate_active_reservation",
+        "The employee already has an active reservation for this book.");
+
+    /// <summary>The employee already holds an open loan for this book.</summary>
+    public static readonly Error BookAlreadyOnLoan = Error.BusinessRule(
+        "borrowing.book_already_on_loan",
+        "The employee already holds this book through an open loan.");
+
+    /// <summary>Restricted employees cannot make reservations.</summary>
+    public static readonly Error RestrictedReservationForbidden = Error.BusinessRule(
+        "borrowing.restricted_reservation_forbidden",
+        "Restricted employees cannot make reservations.");
+
     /// <summary>
     /// A waiting reservation requires a positive queue position.
     /// </summary>
