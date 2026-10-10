@@ -1,5 +1,10 @@
 namespace LibraryApp.Application.Staff.Dto;
 
+public sealed record DeactivateStaffMemberRequest(string Reason);
+
+/// <summary>BR-MEM-4: books to return before the employee can be deactivated.</summary>
+public sealed record OutstandingBookDto(string Title, string Barcode);
+
 /// <summary>Employee and account details for enrollment (MEM-01, MEM-03).</summary>
 public sealed record EnrolStaffMemberRequest(
     string EmployeeId,

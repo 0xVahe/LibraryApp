@@ -47,6 +47,13 @@ public sealed class TestErrorsController : ControllerBase
         "forbidden" => throw new DomainException(Error.Forbidden("test.forbidden", "Not yours")),
         "notfound" => throw new DomainException(Error.NotFound("test.not_found", "No such loan")),
         "conflict" => throw new DomainException(Error.Conflict("test.conflict", "Already returned")),
+        "extensions" => throw new DomainException(Error.Conflict("test.conflict", "Already returned"),
+            extensions: new Dictionary<string, object?>
+            {
+                ["outstandingBooks"] = new[] { new { title = "Clean Code", barcode = "BK-001" } },
+                ["code"] = "replacement_code",
+                ["traceId"] = "replacement_trace",
+            }),
         "concurrency" => throw new DbUpdateConcurrencyException("secret internal detail"),
         _ => throw new InvalidOperationException("secret internal detail"),
     };
@@ -95,6 +102,23 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+    }
+
+    [Fact]
+    public async Task Domain_error_details_are_forwarded_without_replacing_code_or_trace_id()
+    {
+        var response = await factory.CreateClient().GetAsync("/test-errors/extensions");
+        var body = await ReadAsync(response);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("test.conflict", body.GetProperty("code").GetString());
+        var traceId = body.GetProperty("traceId").GetString();
+        Assert.False(string.IsNullOrEmpty(traceId));
+        Assert.NotEqual("replacement_trace", traceId);
+        var book = Assert.Single(body.GetProperty("outstandingBooks").EnumerateArray());
+        Assert.Equal("Clean Code", book.GetProperty("title").GetString());
+        Assert.Equal("BK-001", book.GetProperty("barcode").GetString());
     }
 
     /// <summary>

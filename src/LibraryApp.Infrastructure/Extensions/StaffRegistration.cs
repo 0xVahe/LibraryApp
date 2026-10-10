@@ -21,6 +21,7 @@ public static class StaffRegistrationExtensions
         services.AddScoped<IStaffManagementRepository, StaffManagementRepository>();
         services.AddScoped<IStaffAccountStore, StaffAccountStore>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
+        services.AddScoped<IStaffDeactivationService, StaffDeactivationService>();
 
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IDepartmentService, DepartmentService>();
