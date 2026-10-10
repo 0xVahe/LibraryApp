@@ -178,7 +178,8 @@ public class OutboxTests(OutboxFixture fixture) : IClassFixture<OutboxFixture>
 
         Assert.Equal(1, HandlerLog.CallsOf(nameof(SteadyHandler), loanIssued.EventId));
         Assert.Equal(1, HandlerLog.CallsOf(nameof(FlakyHandler), loanIssued.EventId));
-        Assert.Equal(2, await fixture.InboxCountAsync(loanIssued.EventId));
+        // The event is handled by the two test handlers and the discovered LoanIssued notification handler.
+        Assert.Equal(3, await fixture.InboxCountAsync(loanIssued.EventId));
         Assert.NotNull((await fixture.MessageAsync(loanIssued.EventId))!.ProcessedAtUtc);
     }
 

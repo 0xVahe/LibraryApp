@@ -24,6 +24,7 @@ public sealed class StaffEnrolledEventHandlerTests
             .Build();
 
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddEventBus(configuration);
 
         using var provider = services.BuildServiceProvider();
@@ -51,6 +52,7 @@ public sealed class StaffEnrolledEventHandlerTests
             .Build();
 
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddEventBus(configuration);
 
         var invocations = new HandlerInvocationRecorder();
