@@ -37,6 +37,8 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
                 }
 
                 body = Problem(mapped.Status, mapped.Title, domain.Error.Message, domain.Error.Code);
+                foreach (var extension in domain.Extensions)
+                    body.Extensions.TryAdd(extension.Key, extension.Value);
                 logger.LogInformation("Request failed with {Code}: {Message}", domain.Error.Code, domain.Error.Message);
                 break;
 

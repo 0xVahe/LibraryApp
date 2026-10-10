@@ -5,8 +5,12 @@ namespace LibraryApp.Domain.Common;
 /// response with the status that matches <see cref="Error.Kind"/>.
 /// </summary>
 public sealed class DomainException(
-        Error error, Exception?
-        innerException = null) : Exception(error.Message, innerException)
+    Error error,
+    Exception? innerException = null,
+    IReadOnlyDictionary<string, object?>? extensions = null) : Exception(error.Message, innerException)
 {
     public Error Error { get; } = error;
+
+    /// <summary>Structured rule details for the API; never includes exception internals.</summary>
+    public IReadOnlyDictionary<string, object?> Extensions { get; } = extensions ?? new Dictionary<string, object?>();
 }
