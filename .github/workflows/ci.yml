@@ -67,12 +67,16 @@ jobs:
   model-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
       - name: No pending model changes
+        id: model
         run: |
           set -eu
           # -z reads each file as one record, so a declaration split over several lines is still found.
@@ -98,9 +102,22 @@ jobs:
 
           dotnet tool restore
           if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
             echo "::error::The model changed but there is no migration. Label the pull request needs-migration; the Integration Owner adds the migration as the last commit. Do not add migration files yourself."
             exit 1
           fi
+          echo "pending=false" >> "$GITHUB_OUTPUT"
+
+      - name: Label needs-migration
+        if: always() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels" -f "labels[]=needs-migration"
+      - name: Remove needs-migration
+        if: github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels/needs-migration"
 
   integration-tests:
     runs-on: ubuntu-latest
