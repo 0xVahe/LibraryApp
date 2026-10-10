@@ -61,3 +61,63 @@ internal sealed class FakeCategories : ICategoryRepository
     public void Add(Category category) => Categories.Add(category);
     public void Remove(Category category) => Categories.Remove(category);
 }
+
+internal sealed class FakeBooks : IBookRepository
+{
+    public List<Book> Books { get; } = [];
+    public HashSet<Guid> CategoryIds { get; } = [];
+    public HashSet<Guid> PublisherIds { get; } = [];
+    public HashSet<Guid> BooksWithCopiesInCirculation { get; } = [];
+
+    public Dictionary<Guid, BookDetailsDto> BookDetails { get; } = [];
+
+    public Task<Book?> FindAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Books.SingleOrDefault(x => x.Id == id));
+
+    public Task<BookDetailsDto?> GetDetailsAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(BookDetails.GetValueOrDefault(id));
+
+    public Task<bool> CategoryExistsAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(CategoryIds.Contains(id));
+
+    public Task<bool> PublisherExistsAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(PublisherIds.Contains(id));
+
+    public Task<bool> IsbnExistsAsync(
+        string isbn,
+        Guid? excludeBookId,
+        CancellationToken ct) =>
+        Task.FromResult(Books.Any(x =>
+            !x.IsDeleted &&
+            x.Isbn == isbn &&
+            (!excludeBookId.HasValue || x.Id != excludeBookId.Value)));
+
+    public Task<bool> HasCopiesInCirculationAsync(Guid bookId, CancellationToken ct) =>
+        Task.FromResult(BooksWithCopiesInCirculation.Contains(bookId));
+
+    public void Add(Book book) => Books.Add(book);
+}
+
+internal sealed class FakeClock : IClock
+{
+    public DateTime UtcNow { get; set; } =
+        new(2026, 10, 9, 8, 0, 0, DateTimeKind.Utc);
+
+    public DateOnly LocalToday => DateOnly.FromDateTime(ToLocal(UtcNow));
+
+    public DateTime ToLocal(DateTime utc) =>
+        TimeZoneInfo.ConvertTimeFromUtc(
+            DateTime.SpecifyKind(utc, DateTimeKind.Utc),
+            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan"));
+
+    public DateOnly ToLocalDate(DateTime utc) =>
+        DateOnly.FromDateTime(ToLocal(utc));
+
+    public DateTime StartOfLocalDayUtc(DateOnly localDate) =>
+        TimeZoneInfo.ConvertTimeToUtc(
+            localDate.ToDateTime(TimeOnly.MinValue),
+            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan"));
+
+    public DateTime EndOfLocalDayUtc(DateOnly localDate) =>
+        StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
+}

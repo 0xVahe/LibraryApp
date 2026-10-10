@@ -3,13 +3,18 @@ using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
 using Microsoft.AspNetCore.Mvc;
+using LibraryApp.Domain.Staff;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LibraryApp.Api.Controllers.Catalog;
 
 [ApiController]
 [Route("api/books")]
-public sealed class BooksController(IBookSearchService searchService, IBookDetailsService detailsService) : ControllerBase
+public sealed class BooksController(IBookSearchService searchService, IBookDetailsService detailsService, IBookService bookService) : ControllerBase
 {
+    private const string Writers =
+        StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
+
     /// <summary>Searches the catalog (CAT-05). Deleted books are never returned; results are ordered by title.</summary>
     /// <param name="search">Part of the title, an author name or an ISBN (hyphens allowed).</param>
     /// <param name="categoryId">A category; a top-level category also returns the books of its subcategories.</param>
@@ -49,5 +54,56 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
     {
         BookDetailsDto book = await detailsService.GetBookDetailsAsync(id, cancellationToken);
         return Ok(book);
+    }
+
+    /// <summary>Creates a book (CAT-01).</summary>
+    [HttpPost]
+    [Authorize(Roles = Writers)]
+    [ProducesResponseType<Guid>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<Guid>> Create(
+        CreateBookRequest request,
+        CancellationToken cancellationToken)
+    {
+        var id = await bookService.CreateAsync(request, cancellationToken);
+
+        return CreatedAtAction(nameof(GetById), new { id }, id);
+    }
+
+    /// <summary>Updates a book (CAT-01).</summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = Writers)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Update(
+        Guid id,
+        UpdateBookRequest request,
+        CancellationToken cancellationToken)
+    {
+        await bookService.UpdateAsync(id, request, cancellationToken);
+
+        return NoContent();
+    }
+
+    /// <summary>Soft-deletes a book (CAT-01).</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = Writers)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        await bookService.DeleteAsync(id, cancellationToken);
+
+        return NoContent();
     }
 }

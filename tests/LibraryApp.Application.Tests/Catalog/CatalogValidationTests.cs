@@ -1,6 +1,7 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Application.Abstractions.Common;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -43,5 +44,28 @@ public class CatalogValidationTests
         var validator = new CategoryRequestValidator();
         Assert.True(validator.Validate(new CategoryRequest("Root", null)).IsValid);
         Assert.False(validator.Validate(new CategoryRequest("Child", Guid.Empty)).IsValid);
+    }
+
+    [Fact]
+    public void Create_book_requires_at_least_one_author()
+    {
+        var validator = new CreateBookRequestValidator(
+            new FakeClock());
+
+        var request = new CreateBookRequest(
+            "Test book",
+            "9780306406157",
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            null!);
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.AuthorIds));
     }
 }
