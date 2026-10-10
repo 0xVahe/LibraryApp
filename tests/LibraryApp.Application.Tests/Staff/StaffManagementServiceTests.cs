@@ -8,6 +8,7 @@ using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 using Microsoft.Extensions.Options;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Tests.Staff;
 
@@ -31,6 +32,65 @@ public class StaffManagementServiceTests
         Assert.Equal(_fake.UtcNow, enrolled.OccurredAtUtc);
         Assert.Single(_fake.Accounts);
         Assert.False(_fake.InTransaction);
+    }
+
+    [Fact]
+    public async Task Search_normalizes_filters_preserves_paging_and_returns_repository_result()
+    {
+        var departmentId = Guid.NewGuid();
+        var paging = new PageRequest(2, 20);
+        var expected = new PagedResult<StaffMemberListItemDto>(
+            [new StaffMemberListItemDto(
+                Guid.NewGuid(), "EMP-100", "Aram", "Petrosyan",
+                "aram@ameriabank.am", departmentId, "IT", "Active")],
+            21, 2, 20);
+
+        _fake.SearchResult = expected;
+
+        var result = await Service.SearchAsync(new StaffMemberSearchRequest("  Aram  ", departmentId, "  active  ", paging));
+
+        Assert.Equal(
+            new StaffMemberSearchFilter("Aram", departmentId, StaffMemberStatus.Active),
+            _fake.LastSearchFilter);
+        Assert.Same(paging, _fake.LastSearchPaging);
+        Assert.Same(expected, result);
+        Assert.Equal(0, _fake.TransactionCalls);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Search_treats_blank_filters_as_absent(string? value)
+    {
+        await Service.SearchAsync(new StaffMemberSearchRequest(value, null, value, new PageRequest()));
+
+        Assert.Equal(new StaffMemberSearchFilter(null, null, null), _fake.LastSearchFilter);
+    }
+
+    [Theory]
+    [InlineData("Active", StaffMemberStatus.Active)]
+    [InlineData("Restricted", StaffMemberStatus.Restricted)]
+    [InlineData("Suspended", StaffMemberStatus.Suspended)]
+    [InlineData("Deactivated", StaffMemberStatus.Deactivated)]
+    public async Task Search_accepts_each_named_status(string input, StaffMemberStatus expected)
+    {
+        await Service.SearchAsync(new StaffMemberSearchRequest(null, null, input, new PageRequest()));
+        Assert.Equal(expected, _fake.LastSearchFilter!.Status);
+    }
+
+    [Theory]
+    [InlineData("Banana")]
+    [InlineData("1")]
+    [InlineData("999")]
+    [InlineData("Active, Restricted")]
+    public async Task Search_rejects_invalid_status_before_calling_repository(string status)
+    {
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            Service.SearchAsync(new StaffMemberSearchRequest(null, null, status, new PageRequest())));
+
+        Assert.Equal(StaffErrors.StatusInvalid, error.Error);
+        Assert.Null(_fake.LastSearchFilter);
     }
 
     [Fact]
@@ -82,7 +142,7 @@ public class StaffManagementServiceTests
     {
         var request = department ? Request with { DepartmentId = Guid.NewGuid() } : Request with { StaffCategoryId = Guid.NewGuid() };
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.EnrolAsync(request, false));
-        Assert.Equal(department ? StaffErrors.DepartmentNotFound : StaffErrors.CategoryNotFound, error.Error);
+        Assert.Equal(department ? StaffErrors.DepartmentInvalid : StaffErrors.CategoryNotFound, error.Error);
         Assert.Empty(_fake.Accounts);
     }
 
@@ -153,6 +213,20 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public bool InTransaction { get; private set; }
     public int TransactionCalls { get; private set; }
     public bool FailCreate { get; set; }
+    public StaffMemberSearchFilter? LastSearchFilter { get; private set; }
+    public PageRequest? LastSearchPaging { get; private set; }
+    public PagedResult<StaffMemberListItemDto>? SearchResult { get; set; }
+
+    public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(
+        StaffMemberSearchFilter filter,
+        PageRequest paging,
+        CancellationToken ct)
+    {
+        LastSearchFilter = filter;
+        LastSearchPaging = paging;
+
+        return Task.FromResult(SearchResult ?? PagedResult<StaffMemberListItemDto>.Empty(paging));
+    }
 
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult(Members.GetValueOrDefault(id));
     public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) => Task.FromResult(Members.TryGetValue(id, out var m)

@@ -5,6 +5,7 @@ using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Staff.Services;
 
@@ -91,7 +92,7 @@ public sealed class StaffManagementService(
     private async Task<(string Department, string Category)> ReferenceNamesAsync(Guid departmentId, Guid categoryId, CancellationToken ct)
     {
         var department = await members.GetDepartmentNameAsync(departmentId, ct)
-                         ?? throw new DomainException(StaffErrors.DepartmentNotFound);
+                         ?? throw new DomainException(StaffErrors.DepartmentInvalid);
         var category = await members.GetCategoryNameAsync(categoryId, ct)
                        ?? throw new DomainException(StaffErrors.CategoryNotFound);
         return (department, category);
@@ -101,4 +102,32 @@ public sealed class StaffManagementService(
         new(member.Id, member.EmployeeId, member.FirstName, member.LastName, member.CorporateEmail,
             member.DepartmentId, department, member.Position, member.LineManagerEmail,
             member.StaffCategoryId, category, member.Status.ToString(), member.JoinedLibraryAtUtc, role);
+
+    public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Paging);
+
+        string? text = Normalize(request.Search);
+        string? statusText = Normalize(request.Status);
+        StaffMemberStatus? status = null;
+
+        if (statusText is not null)
+        {
+            if (!Enum.TryParse<StaffMemberStatus>(statusText, ignoreCase: true, out var parsedStatus) ||
+                !Enum.IsDefined(typeof(StaffMemberStatus), parsedStatus) ||
+                !string.Equals(statusText, parsedStatus.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new DomainException(StaffErrors.StatusInvalid);
+            }
+
+            status = parsedStatus;
+        }
+
+        var filter = new StaffMemberSearchFilter(text, request.DepartmentId, status);
+
+        return members.SearchAsync(filter, request.Paging, ct);
+    }
+
+    private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
