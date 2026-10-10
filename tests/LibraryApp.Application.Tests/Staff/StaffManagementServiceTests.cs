@@ -142,7 +142,7 @@ public class StaffManagementServiceTests
     {
         var request = department ? Request with { DepartmentId = Guid.NewGuid() } : Request with { StaffCategoryId = Guid.NewGuid() };
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.EnrolAsync(request, false));
-        Assert.Equal(department ? StaffErrors.DepartmentNotFound : StaffErrors.CategoryNotFound, error.Error);
+        Assert.Equal(department ? StaffErrors.DepartmentInvalid : StaffErrors.CategoryNotFound, error.Error);
         Assert.Empty(_fake.Accounts);
     }
 

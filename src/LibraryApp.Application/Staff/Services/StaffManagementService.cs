@@ -92,7 +92,7 @@ public sealed class StaffManagementService(
     private async Task<(string Department, string Category)> ReferenceNamesAsync(Guid departmentId, Guid categoryId, CancellationToken ct)
     {
         var department = await members.GetDepartmentNameAsync(departmentId, ct)
-                         ?? throw new DomainException(StaffErrors.DepartmentNotFound);
+                         ?? throw new DomainException(StaffErrors.DepartmentInvalid);
         var category = await members.GetCategoryNameAsync(categoryId, ct)
                        ?? throw new DomainException(StaffErrors.CategoryNotFound);
         return (department, category);
