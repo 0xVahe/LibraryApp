@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -38,6 +39,12 @@ public static class PlatformServiceCollectionExtensions
         services.Configure<TimeZoneOptions>(configuration.GetSection(TimeZoneOptions.SectionName));
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<IClock, SystemClock>();
+
+        // Working days for every module (BR-BOR-5, BQ-G4-05); the holiday list is checked at start.
+        services.AddOptions<HolidayOptions>().Bind(configuration.GetSection(HolidayOptions.SectionName)).ValidateOnStart();
+        services.AddSingleton<IValidateOptions<HolidayOptions>, HolidayOptionsValidator>();
+        services.AddSingleton<IWorkingDayCalendar, WorkingDayCalendar>();
+
         services.AddSingleton<IIdGenerator, SequentialGuidGenerator>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 

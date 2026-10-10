@@ -135,6 +135,9 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("BookId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("CopyId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -158,6 +161,11 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CopyId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Reservations_ReadyForPickup_CopyId")
+                        .HasFilter("[Status] = 2");
+
                     b.HasIndex("StaffMemberId", "BookId")
                         .IsUnique()
                         .HasDatabaseName("UX_Reservations_Active_StaffMemberId_BookId")
@@ -172,6 +180,8 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.ToTable("Reservations", t =>
                         {
                             t.HasCheckConstraint("CK_Reservations_QueuePosition", "([Status] = 1 AND [QueuePosition] >= 1) OR ([Status] <> 1 AND [QueuePosition] = 0)");
+
+                            t.HasCheckConstraint("CK_Reservations_ReadyForPickup_CopyId", "[Status] <> 2 OR [CopyId] IS NOT NULL");
                         });
                 });
 
@@ -921,6 +931,11 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BookId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("LibraryApp.Domain.Catalog.BookCopy", null)
+                        .WithMany()
+                        .HasForeignKey("CopyId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
                         .WithMany()
