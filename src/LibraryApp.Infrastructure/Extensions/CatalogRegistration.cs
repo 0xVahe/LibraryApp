@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
@@ -28,6 +29,11 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<IBookCopyRepository, BookCopyRepository>();
         services.AddScoped<IBookCopyService, BookCopyService>();
 
+        // Contract for other modules: available copy, copy status, book lookup (CAT-07, INT-01, INT-02).
+        // Scoped: SetCopyStatusAsync changes the copy in the caller's DbContext, so the caller's unit of work saves it.
+        services.AddScoped<ICatalogCopyQuery, CatalogCopyQuery>();
+        services.AddScoped<ICatalogService, CatalogService>();
+
         // Authors and book-author links (CAT-02)
         services.AddScoped<IAuthorRepository, AuthorRepository>();
         services.AddScoped<IAuthorService, AuthorService>();
@@ -36,7 +42,7 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
 
-        // Reference seed: categories, authors and publishers (S1-04, S1-05)
+        // Catalog seed: categories, authors, publishers and books (D3)
         services.AddScoped<IModuleSeeder, CatalogSeeder>();
 
         return services;

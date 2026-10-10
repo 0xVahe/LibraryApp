@@ -138,6 +138,16 @@ public class CatalogSeedDataTests
             """, Category.NameMaxLength);
 
     [Fact]
+    public void Book_ids_keep_their_fixed_scheme()
+    {
+        // The copies seed and the loans seed reference these ids, so they must never change.
+        Assert.Equal(new Guid("b0000000-0000-0000-0000-000000000001"), CatalogSeedIds.Book(1));
+        Assert.Equal(new Guid("b0000000-0000-0000-0000-000000000057"), CatalogSeedIds.Book(57));
+        Assert.Equal(Enumerable.Range(1, CatalogSeedData.Books.Count),
+            CatalogSeedData.Books.Select(book => book.Number));
+    }
+
+    [Fact]
     public void Reference_ids_are_unique_across_all_seed_sets()
     {
         var ids = CatalogSeedData.Categories.Concat(CatalogSeedData.Authors)

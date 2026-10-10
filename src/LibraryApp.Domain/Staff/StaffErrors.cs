@@ -12,8 +12,8 @@ public static class StaffErrors
         Error.Conflict("staff.employee_id_taken", "Employee ID is already enrolled.");
     public static readonly Error EmailTaken =
         Error.Conflict("staff.email_taken", "Corporate email is already in use.");
-    public static readonly Error DepartmentNotFound =
-        Error.Validation("staff.department_not_found", "Department was not found.");
+    public static readonly Error DepartmentInvalid =
+        Error.Validation("staff.department_invalid", "Department was not found.");
     public static readonly Error CategoryNotFound =
         Error.Validation("staff.category_not_found", "Staff category was not found.");
     public static readonly Error RoleAssignmentForbidden =
@@ -26,6 +26,10 @@ public static class StaffErrors
     // Department
     public static readonly Error DepartmentNameRequired =
         Error.Validation("staff.department_name_required", "Department name is required.");
+    public static readonly Error DepartmentNotFound =
+        Error.NotFound("staff.department_not_found", "The department was not found.");
+    public static readonly Error DepartmentNameTaken =
+        Error.Conflict("staff.department_name_taken", "A department with this name already exists.");
 
     // Staff category
     public static readonly Error CategoryNameRequired =

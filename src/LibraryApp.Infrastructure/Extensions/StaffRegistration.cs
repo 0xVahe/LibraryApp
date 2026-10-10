@@ -22,6 +22,7 @@ public static class StaffRegistrationExtensions
     {
         services.AddScoped<IStaffMemberRepository, StaffMemberRepository>();
         services.AddScoped<IStaffMemberService, StaffMemberService>();
+
         services.AddScoped<IStaffManagementRepository, StaffManagementRepository>();
         services.AddScoped<IStaffAccountStore, StaffAccountStore>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
@@ -29,6 +30,9 @@ public static class StaffRegistrationExtensions
         // Temporary providers for S1-04.2; real module registrations replace these when merged.
         services.TryAddScoped<IBorrowingReadService, BorrowingReadServiceStub>();
         services.TryAddScoped<ICatalogService, CatalogServiceStub>();
+
+        services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
 
         services.Configure<CorporateEmailOptions>(configuration.GetSection(CorporateEmailOptions.SectionName));
         services.AddSingleton<CorporateEmailPolicy>();
