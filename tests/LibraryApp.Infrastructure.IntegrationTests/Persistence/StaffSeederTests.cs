@@ -64,7 +64,7 @@ public class StaffSeederTests(StaffSeederFixture fixture) : IClassFixture<StaffS
         using var scope = fixture.Services.CreateScope();
         var db = Get<LibraryDbContext>(scope);
 
-        Assert.Equal(StaffSeedData.Roles.Count, await db.Roles.CountAsync());
+        Assert.Equal(StaffRoleIds.All.Count, await db.Roles.CountAsync());
         Assert.Equal(6, await db.Departments.CountAsync());
         Assert.Equal(3, await db.StaffCategories.CountAsync());
         Assert.Equal(StaffSeedData.People.Count, await db.StaffMembers.CountAsync());
