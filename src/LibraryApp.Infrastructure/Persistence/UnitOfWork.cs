@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -70,6 +71,13 @@ public sealed class UnitOfWork(LibraryDbContext db) : IUnitOfWork
         {
             db.ChangeTracker.Clear();
             throw new DomainException(CommonErrors.UniqueViolation, ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 547 }
+            && ex.Entries.Count == 1 && ex.Entries[0] is { Entity: Publisher, State: EntityState.Deleted })
+        {
+            // A book may reference the publisher after the service's usage check; Restrict still protects it.
+            db.ChangeTracker.Clear();
+            throw new DomainException(CatalogErrors.PublisherInUse, ex);
         }
         catch
         {

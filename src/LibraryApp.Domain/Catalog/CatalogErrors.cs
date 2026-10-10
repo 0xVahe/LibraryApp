@@ -99,6 +99,14 @@ public static class CatalogErrors
     public static readonly Error BookAuthorsRequired =
         Error.Validation("catalog.book_authors_required", "A book must have at least one author (BR-CAT-5).");
 
+    // ---------- Publisher management ----------
+
+    public static readonly Error PublisherNotFound =
+        Error.NotFound("catalog.publisher_not_found", "The publisher does not exist.");
+
+    public static readonly Error PublisherInUse =
+        Error.Conflict("catalog.publisher_in_use", "A publisher referenced by a book cannot be deleted.");
+
     // ---------- Category management (CAT-03) ----------
 
     public static readonly Error CategoryNotFound =
