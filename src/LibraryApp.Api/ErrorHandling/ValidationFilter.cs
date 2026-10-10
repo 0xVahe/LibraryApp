@@ -8,9 +8,8 @@ namespace LibraryApp.Api.ErrorHandling;
 
 /// <summary>
 /// Validates every action argument that has a FluentValidation validator (SD-15, NFR-05) before the action runs.
-/// Invalid input → 400 ProblemDetails with <c>code = validation_failed</c> and <c>errors</c> per field,
-/// the same shape as model-binding errors.
-/// A module only writes <c>AbstractValidator&lt;TRequest&gt;</c> in <c>Application/&lt;Module&gt;/Validators</c>;
+/// Invalid input → 400 ProblemDetails with <c>code = validation_failed</c> and <c>errors</c> per field, the same shape as
+/// model-binding errors. A module only writes <c>AbstractValidator&lt;TRequest&gt;</c> in <c>Application/&lt;Module&gt;/Validators</c>;
 /// validators are registered automatically.
 /// </summary>
 public sealed class ValidationFilter(IServiceProvider services) : IAsyncActionFilter
@@ -18,7 +17,7 @@ public sealed class ValidationFilter(IServiceProvider services) : IAsyncActionFi
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var errors = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        
+
         foreach (var argument in context.ActionArguments.Values.Where(a => a is not null))
         {
             var validatorType = typeof(IValidator<>).MakeGenericType(argument!.GetType());
@@ -39,10 +38,8 @@ public sealed class ValidationFilter(IServiceProvider services) : IAsyncActionFi
             await next();
             return;
         }
-        
-        context.Result = new BadRequestObjectResult(ValidationProblem(
-            errors.ToDictionary(e => e.Key, e => e.Value.ToArray()),
-            context.HttpContext))
+
+        context.Result = new BadRequestObjectResult(ValidationProblem(errors.ToDictionary(e => e.Key, e => e.Value.ToArray()), context.HttpContext))
         {
             ContentTypes = { "application/problem+json" },
         };

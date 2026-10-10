@@ -228,7 +228,41 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         Assert.Equal(expected,
             await readBack.Content.ReadFromJsonAsync<StaffCategoryDto>());
     }
-    
+
+    [Fact]
+    public async Task Parallel_duplicate_creates_return_201_and_category_conflict()
+    {
+        using var client = Client();
+        var request = new UpsertStaffCategoryRequest(UniqueName(), 2, 14, 1);
+
+        var firstPost = client.PostAsJsonAsync(Route, request);
+        var secondPost = client.PostAsJsonAsync(Route, request);
+
+        var responses = await Task.WhenAll(firstPost, secondPost);
+
+        using var first = responses[0];
+        using var second = responses[1];
+
+        var createdResponse = Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.Created));
+
+        var conflictResponse = Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.Conflict));
+
+        await AssertError(conflictResponse, HttpStatusCode.Conflict, "staff.category_name_taken");
+
+        var created = await createdResponse.Content.ReadFromJsonAsync<StaffCategoryDto>();
+        Assert.NotNull(created);
+
+        using var listResponse = await client.GetAsync(Route);
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+
+        var categories = await listResponse.Content.ReadFromJsonAsync<List<StaffCategoryDto>>();
+        Assert.NotNull(categories);
+
+        var stored = Assert.Single(categories.Where(x => x.Name == request.Name));
+
+        Assert.Equal(created, stored);
+    }
+
     [Fact]
     public async Task List_returns_categories_in_name_order()
     {

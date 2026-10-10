@@ -5,6 +5,7 @@ using LibraryApp.Application.Staff.Services;
 using LibraryApp.Application.Tests.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Tests.Staff;
 
@@ -63,6 +64,38 @@ public class StaffCategoryServiceTests
         Assert.Equal(expected, await Service.GetAsync(category.Id));
         Assert.Same(category, Assert.Single(_repository.Categories));
         Assert.Equal(1, _unitOfWork.Transactions);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    public async Task Save_maps_unique_violations_and_preserves_other_errors(bool update, bool uniqueViolation)
+    {
+        var category = new StaffCategory(
+            Guid.NewGuid(), "Employee", 3, 21, 1); 
+        _repository.Categories.Add(category);
+
+        var failure = new DomainException(
+            uniqueViolation ? CommonErrors.UniqueViolation : CommonErrors.ConcurrencyConflict);
+
+        var service = new StaffCategoryService(_repository, new FailingCommitUnitOfWork(failure), _ids);
+
+        var request = new UpsertStaffCategoryRequest("Contractors", 4, 25, 0);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            update ? service.UpdateAsync(category.Id, request) : service.CreateAsync(request));
+
+        if (uniqueViolation)
+        {
+            Assert.Equal(StaffErrors.CategoryNameTaken, error.Error);
+            Assert.Same(failure, error.InnerException);
+        }
+        else
+        {
+            Assert.Same(failure, error);
+        }
     }
 
     [Theory]
@@ -199,5 +232,24 @@ public class StaffCategoryServiceTests
         }
         
         public void Add(StaffCategory category) => Categories.Add(category);
+    }
+
+    private sealed class FailingCommitUnitOfWork(DomainException failure) : IUnitOfWork
+    {
+        public async Task<T> ExecuteInTransactionAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default)
+        {
+            await operation(ct);
+            throw failure;
+        }
+
+        public async Task ExecuteInTransactionAsync(
+            Func<CancellationToken, Task> operation,
+            CancellationToken ct = default)
+        {
+            await operation(ct);
+            throw failure;
+        }
     }
 }

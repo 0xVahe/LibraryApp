@@ -3,6 +3,7 @@ using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Staff.Services;
 
@@ -24,7 +25,7 @@ public sealed class StaffCategoryService(
 
     public Task<StaffCategoryDto> CreateAsync(UpsertStaffCategoryRequest request, CancellationToken ct = default)
     {
-        return unitOfWork.ExecuteInTransactionAsync(async token =>
+        return SaveAsync(async token =>
         {
             var category = new StaffCategory(
                 ids.NewId(),
@@ -50,7 +51,7 @@ public sealed class StaffCategoryService(
         UpsertStaffCategoryRequest request,
         CancellationToken ct = default)
     {
-        return unitOfWork.ExecuteInTransactionAsync(async token =>
+        return SaveAsync(async token =>
         {
             var category = await FindAsync(id, token);
 
@@ -87,5 +88,17 @@ public sealed class StaffCategoryService(
     {
         if (await repository.NameExistsAsync(name, exceptId, ct))
             throw new DomainException(StaffErrors.CategoryNameTaken);
+    }
+    
+    private async Task<StaffCategoryDto> SaveAsync(
+        Func<CancellationToken, Task<StaffCategoryDto>> operation,
+        CancellationToken ct)
+    {
+        try {
+            return await unitOfWork.ExecuteInTransactionAsync(operation, ct);
+        }
+        catch (DomainException ex) when (ex.Error.Code == CommonErrors.UniqueViolation.Code) {
+            throw new DomainException(StaffErrors.CategoryNameTaken, ex);
+        }
     }
 }
