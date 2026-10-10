@@ -69,6 +69,8 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         }
 
         httpContext.Response.StatusCode = body.Status!.Value;
+
+        // Always written: AnyClientProblemDetailsWriter takes what the built-in writers refuse (Accept: text/plain).
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,

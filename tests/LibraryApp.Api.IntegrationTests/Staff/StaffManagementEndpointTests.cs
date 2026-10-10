@@ -16,6 +16,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
@@ -412,5 +413,268 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         await AssertError(await Client().PutAsJsonAsync($"{Route}/{Guid.NewGuid()}", new UpdateStaffMemberRequest(
             r.FirstName, r.LastName, r.CorporateEmail, r.DepartmentId, r.Position, r.LineManagerEmail, r.StaffCategoryId)),
             HttpStatusCode.NotFound, "staff.not_found");
+    }
+
+    [Theory]
+    [InlineData(StaffRoles.LibraryAdministrator, HttpStatusCode.OK)]
+    [InlineData(StaffRoles.Librarian, HttpStatusCode.OK)]
+    [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    public async Task Search_enforces_list_authorization(string? role, HttpStatusCode expected)
+    {
+        var response = await Client(role).GetAsync(Route);
+
+        Assert.Equal(expected, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Banana")]
+    [InlineData("1")]
+    [InlineData("999")]
+    [InlineData("Active, Restricted")]
+    public async Task Search_invalid_status_returns_400_problem_details(
+        string status)
+    {
+        var response = await Client().GetAsync($"{Route}?status={Uri.EscapeDataString(status)}");
+
+        await AssertError(response, HttpStatusCode.BadRequest, "staff.status_invalid");
+    }
+
+    [Fact]
+    public async Task Search_caps_page_size_at_100()
+    {
+        var result = await Client()
+            .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                $"{Route}?pageSize=500");
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result.Page);
+        Assert.Equal(100, result.PageSize);
+        Assert.InRange(result.Items.Count, 0, 100);
+    }
+
+    [Fact]
+    public async Task Search_combines_department_and_status_filters()
+    {
+        var departmentId = StaffSeedIds.Departments.InformationTechnology;
+
+        var result = await Client()
+            .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                $"{Route}?departmentId={departmentId}&status=Active");
+
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Items);
+        Assert.All(result.Items, member =>
+        {
+            Assert.Equal(departmentId, member.DepartmentId);
+            Assert.Equal("Active", member.Status);
+            Assert.Equal("Information Technology", member.DepartmentName);
+        });
+    }
+
+    [Fact]
+    public async Task Search_without_matches_returns_an_empty_page()
+    {
+        var result = await Client()
+            .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                $"{Route}?search=NO-MATCH-{Guid.NewGuid():N}");
+
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(0, result.TotalPages);
+    }
+
+    [Fact]
+    public async Task Swagger_documents_the_staff_search_endpoint()
+    {
+        var spec = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
+
+        var endpoint = spec.GetProperty("paths")
+            .GetProperty(Route)
+            .GetProperty("get");
+
+        Assert.Contains("MEM-07", endpoint.GetProperty("summary").GetString());
+
+        var responses = endpoint.GetProperty("responses");
+        foreach (var status in new[] { "200", "400", "401", "403" })
+            Assert.True(responses.TryGetProperty(status, out _));
+    }
+
+    private async Task<StaffMember[]> SeedSearchStaffAsync(params (string FirstName, string LastName, StaffMemberStatus Status)[] rows)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+
+        Guid departmentId = Guid.NewGuid();
+        string batch = Guid.NewGuid().ToString("N");
+        string idPrefix = Guid.NewGuid().ToString("N")[..20];
+
+        db.Departments.Add(new Department(departmentId, $"Search {batch}"));
+
+        var members = new List<StaffMember>();
+
+        for (int i = 0; i < rows.Length; i++)
+        {
+            var row = rows[i];
+            Guid userId = Guid.NewGuid();
+            string email = $"search.{batch}.{i}@ameriabank.am";
+
+            db.Users.Add(new AppUser
+            {
+                Id = userId,
+                UserName = email,
+                NormalizedUserName = email.ToUpperInvariant(),
+                Email = email,
+                NormalizedEmail = email.ToUpperInvariant()
+            });
+
+            // Shared prefix and increasing final digits give predictable ID order.
+            Guid memberId = Guid.ParseExact($"{idPrefix}{i + 1:000000000000}", "N");
+
+            var member = new StaffMember(
+                memberId, userId, $"SEARCH-{batch}-{i:000}",
+                row.FirstName, row.LastName, email,
+                departmentId, "Engineer", null,
+                StaffSeedIds.Categories.Employee,
+                new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc));
+
+            if (row.Status == StaffMemberStatus.Deactivated)
+                member.Deactivate();
+            else if (row.Status != StaffMemberStatus.Active)
+                member.ChangeStatus(row.Status);
+
+            db.StaffMembers.Add(member);
+            members.Add(member);
+        }
+
+        await db.SaveChangesAsync();
+        return members.ToArray();
+    }
+
+    [Fact]
+    public async Task Search_filters_work_individually_and_together()
+    {
+        string tag = Guid.NewGuid().ToString("N");
+        string aram = $"Aram{tag}";
+        string anna = $"Anna{tag}";
+        string petrosyan = $"Petrosyan{tag}";
+
+        var members = await SeedSearchStaffAsync(
+            (aram, petrosyan, StaffMemberStatus.Active),
+            (anna, petrosyan, StaffMemberStatus.Restricted),
+            (aram, $"Sargsyan{tag}", StaffMemberStatus.Suspended),
+            ($"David{tag}", $"Hakobyan{tag}", StaffMemberStatus.Deactivated),
+            (aram, petrosyan, StaffMemberStatus.Active));
+
+        using var client = Client();
+
+        async Task Check(string query, params int[] expectedIndexes)
+        {
+            var result = await client
+                .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                    $"{Route}?{query}");
+
+            Assert.NotNull(result);
+            Assert.Equal(expectedIndexes.Length, result.TotalCount);
+            Assert.Equal(
+                expectedIndexes.Select(index => members[index].Id),
+                result.Items.Select(member => member.Id));
+        }
+
+        // First name, last name and full-name prefix.
+        await Check($"search={aram}", 0, 4, 2);
+        await Check($"search={petrosyan}", 1, 0, 4);
+        await Check(
+            $"search={Uri.EscapeDataString($"{aram} Petrosyan")}", 0, 4);
+
+        // Exact employee ID and employee-ID prefix.
+        await Check($"search={members[0].EmployeeId}", 0);
+        await Check($"search={members[0].EmployeeId[..^3]}", 3, 1, 0, 4, 2);
+
+        // Internal substring must not match.
+        await Check($"search=ram{tag}");
+
+        Guid departmentId = members[0].DepartmentId;
+
+        // Department alone; also checks last-name / first-name / ID ordering.
+        await Check($"departmentId={departmentId}", 3, 1, 0, 4, 2);
+
+        // Status alone, across the entire test database.
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+
+        foreach (var status in Enum.GetValues<StaffMemberStatus>())
+        {
+            int expectedCount = await db.StaffMembers
+                .CountAsync(member => member.Status == status);
+
+            var result = await client
+                .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                    $"{Route}?status={status}&pageSize=100");
+
+            Assert.NotNull(result);
+            Assert.Equal(expectedCount, result.TotalCount);
+            Assert.NotEmpty(result.Items);
+            Assert.All(result.Items, member => Assert.Equal(status.ToString(), member.Status));
+        }
+
+        // All three filters together.
+        await Check($"search={aram}&departmentId={departmentId}&status=Active", 0, 4);
+    }
+
+    [Fact]
+    public async Task Search_pagination_has_correct_counts_order_and_size_cap()
+    {
+        var rows = Enumerable.Range(1, 120)
+            .Select(_ => (
+                FirstName: "Paging",
+                LastName: "Person",
+                Status: StaffMemberStatus.Active))
+            .ToArray();
+
+        var members = await SeedSearchStaffAsync(rows);
+        Guid departmentId = members[0].DepartmentId;
+        using var client = Client();
+
+        async Task<PagedResult<StaffMemberListItemDto>> Page(int page, int pageSize)
+        {
+            var result = await client
+                .GetFromJsonAsync<PagedResult<StaffMemberListItemDto>>(
+                    $"{Route}?departmentId={departmentId}" +
+                    $"&page={page}&pageSize={pageSize}");
+
+            Assert.NotNull(result);
+            return result;
+        }
+
+        var first = await Page(1, 20);
+        var second = await Page(2, 20);
+
+        Assert.Equal(
+            members.Take(20).Select(member => member.Id),
+            first.Items.Select(member => member.Id));
+        Assert.Equal(
+            members.Skip(20).Take(20).Select(member => member.Id),
+            second.Items.Select(member => member.Id));
+
+        Assert.Equal(120, first.TotalCount);
+        Assert.Equal(120, second.TotalCount);
+        Assert.Equal(2, second.Page);
+        Assert.Equal(20, second.PageSize);
+        Assert.Equal(6, second.TotalPages);
+
+        var capped = await Page(1, 500);
+
+        Assert.Equal(100, capped.PageSize);
+        Assert.Equal(100, capped.Items.Count);
+        Assert.Equal(120, capped.TotalCount);
+        Assert.Equal(members.Take(100).Select(member => member.Id), capped.Items.Select(member => member.Id));
+
+        var beyond = await Page(7, 20);
+
+        Assert.Empty(beyond.Items);
+        Assert.Equal(120, beyond.TotalCount);
     }
 }

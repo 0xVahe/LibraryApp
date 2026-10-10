@@ -36,6 +36,25 @@ public static class LibraryModelConventions
     }
 
     /// <summary>
+    /// SD-12, applied after all configurations: a relationship that still cascades only because EF Core chose it
+    /// (not written explicitly with <c>OnDelete(...)</c>, not an owned type) becomes Restrict. EF Core can choose
+    /// cascade after the convention in <see cref="Configure"/> has run (seen for entities without a <c>DbSet</c> in a
+    /// context derived from <c>IdentityDbContext</c>); this pass makes the rule independent of that.
+    /// </summary>
+    public static void ApplyRestrictDeleteDefault(ModelBuilder modelBuilder)
+    {
+        foreach (var foreignKey in modelBuilder.Model.GetEntityTypes()
+                     .SelectMany(e => e.GetDeclaredForeignKeys())
+                     .Cast<IConventionForeignKey>())
+        {
+            if (!foreignKey.IsOwnership
+                && foreignKey.DeleteBehavior == DeleteBehavior.Cascade
+                && foreignKey.GetDeleteBehaviorConfigurationSource() is null or ConfigurationSource.Convention)
+                foreignKey.SetDeleteBehavior(DeleteBehavior.Restrict);
+        }
+    }
+
+    /// <summary>
     /// SD-01: identifiers come from <c>IIdGenerator</c>, EF must never invent one. Applied to every entity derived from
     /// <see cref="Entity"/>, so no group has to remember <c>ValueGeneratedNever()</c>. Link tables without
     /// <see cref="Entity"/> (composite key) and Identity tables are not touched.
