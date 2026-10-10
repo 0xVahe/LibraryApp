@@ -148,6 +148,35 @@ public class CatalogSeedDataTests
     }
 
     [Fact]
+    public void Copy_ids_and_barcodes_keep_their_fixed_scheme()
+    {
+        // The loans seed references these values, so they must never change.
+        Assert.Equal(new Guid("c0000000-0000-0000-0000-000000001001"), CatalogSeedIds.Copy(1, 1));
+        Assert.Equal(new Guid("c0000000-0000-0000-0000-000000057001"), CatalogSeedIds.Copy(57, 1));
+        Assert.Equal("BK-0001-01", CatalogSeedIds.CopyBarcode(1, 1));
+        Assert.Equal("BK-0057-01", CatalogSeedIds.CopyBarcode(57, 1));
+    }
+
+    [Fact]
+    public void Every_seeded_book_has_one_to_four_copies_with_unique_valid_barcodes()
+    {
+        Assert.Equal(CatalogSeedData.Books.Select(book => book.Number).Order(), CatalogSeedData.CopiesPerBook.Keys.Order());
+        Assert.All(CatalogSeedData.CopiesPerBook.Values, count => Assert.InRange(count, 1, 4));
+        Assert.Equal(115, CatalogSeedData.CopiesPerBook.Values.Sum());
+
+        var copies = CatalogSeedData.CopiesPerBook
+            .SelectMany(entry => Enumerable.Range(1, entry.Value).Select(copy => (Book: entry.Key, Copy: copy)))
+            .ToArray();
+        var ids = copies.Select(c => CatalogSeedIds.Copy(c.Book, c.Copy)).ToArray();
+        var barcodes = copies.Select(c => CatalogSeedIds.CopyBarcode(c.Book, c.Copy)).ToArray();
+
+        Assert.Equal(ids.Length, ids.Distinct().Count());
+        Assert.Equal(barcodes.Length, barcodes.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.All(barcodes, barcode => Assert.Matches($"^[A-Z0-9-]{{1,{BookCopy.BarcodeMaxLength}}}$", barcode));
+        Assert.Empty(ids.Intersect(CatalogSeedData.Books.Select(book => CatalogSeedIds.Book(book.Number))));
+    }
+
+    [Fact]
     public void Reference_ids_are_unique_across_all_seed_sets()
     {
         var ids = CatalogSeedData.Categories.Concat(CatalogSeedData.Authors)
