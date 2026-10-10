@@ -104,11 +104,14 @@ public class DepartmentServiceTests
         var existing = await Service.CreateAsync(new("Treasury"));
         _fake.FailSaveWithUniqueViolation = true;
 
+        // New names each time: the fake has no rollback, so "Markets" stays after the failed create, and reusing it
+        // would make the update fail at the name check instead of at the simulated index violation.
         var create = await Assert.ThrowsAsync<DomainException>(() => Service.CreateAsync(new("Markets")));
-        var update = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(existing.Id, new("Markets")));
+        var update = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(existing.Id, new("Retail")));
 
         Assert.Equal(StaffErrors.DepartmentNameTaken, create.Error);
         Assert.Equal(StaffErrors.DepartmentNameTaken, update.Error);
+        Assert.IsType<DomainException>(update.InnerException);
     }
 }
 
