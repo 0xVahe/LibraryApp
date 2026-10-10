@@ -19,7 +19,7 @@ namespace LibraryApp.Application.Catalog.Services;
 /// </summary>
 public sealed class CatalogServiceStub : ICatalogService
 {
-    // ---------- Boo   ks ----------
+    // ---------- Books ----------
 
     /// <summary>Has copies BK-0001-01 and BK-0001-02 (Available), BK-0001-03 (OnLoan), BK-0001-04 (Lost).</summary>
     public static readonly Guid AvailableBookId = new("b0000000-0000-0000-0000-000000000001");

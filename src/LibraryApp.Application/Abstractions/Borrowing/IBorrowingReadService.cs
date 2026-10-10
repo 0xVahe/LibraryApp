@@ -1,23 +1,20 @@
-﻿using LibraryApp.Domain.Borrowing;
-using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Domain.Borrowing;
 
 namespace LibraryApp.Application.Abstractions.Borrowing;
 
+/// <summary>Borrowing-owned read contract. Staff uses it for BR-MEM-4; it never opens a transaction.</summary>
 public interface IBorrowingReadService
 {
-    // BR-MEM-4: check open loans before deactivation.
-    Task<IReadOnlyList<OpenLoanInfo>> GetOpenLoansAsync(
-        Guid staffMemberId,
-        CancellationToken ct = default);
+    /// <summary>All Active and Overdue loans; Returned and Lost loans are excluded. No Catalog calls or paging.</summary>
+    Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default);
 
-    // MEM-08: data for "My library".
-    Task<StaffBorrowingSummary> GetStaffSummaryAsync(
-        Guid staffMemberId,
-        CancellationToken ct = default);
+    /// <summary>MEM-08 "My library" (BQ-G2-11, the shape waits for Group 2's answer).</summary>
+    Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default);
 }
 
 public sealed record OpenLoanInfo(
     Guid LoanId,
+    Guid StaffMemberId,
     Guid BookCopyId,
     Guid BookId,
     DateTime DueAtUtc,

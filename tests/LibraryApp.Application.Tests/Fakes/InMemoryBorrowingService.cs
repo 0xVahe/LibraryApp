@@ -1,5 +1,4 @@
 ﻿using LibraryApp.Application.Abstractions.Borrowing;
-using LibraryApp.Application.Borrowing.Dto;
 using LibraryApp.Domain.Borrowing;
 
 namespace LibraryApp.Application.Tests.Fakes;
@@ -18,7 +17,7 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         DateTime dueAtUtc,
         LoanStatus status = LoanStatus.Active)
     {
-        var loan = new OpenLoanInfo(Guid.NewGuid(), bookCopyId, bookId, dueAtUtc, status);
+        var loan = new OpenLoanInfo(Guid.NewGuid(), staffMemberId, bookCopyId, bookId, dueAtUtc, status);
         _openLoans[loan.LoanId] = loan;
 
         _historicalLoans.Add(new LoanRecord(loan.LoanId, staffMemberId, bookCopyId, bookId, dueAtUtc, status, IsClosed: false));
@@ -57,7 +56,7 @@ public sealed class InMemoryBorrowingReadService : IBorrowingReadService
         _historicalLoans.Clear();
     }
 
-    public Task<IReadOnlyList<OpenLoanInfo>> GetOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default)
+    public Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default)
     {
         CheckThrowOnNextCall();
 

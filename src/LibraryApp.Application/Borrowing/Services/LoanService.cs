@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
@@ -19,6 +20,7 @@ public sealed class LoanService(
     ICatalogService catalog,
     ILoanRepository loans,
     IUnitOfWork unitOfWork,
+    IApplicationLock locks,
     IClock clock,
     IIdGenerator idGenerator)
     : ILoanService
@@ -33,6 +35,10 @@ public sealed class LoanService(
         
         Loan loan = await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
+            // 0. The staff lock deactivation also takes (BR-MEM-4): no loan is issued while the employee is being
+            //    deactivated, and two parallel issues cannot both pass the loan limit (SD-10).
+            await locks.AcquireAsync(BorrowingLocks.Staff(request.StaffMemberId), token);
+
             // 1. Check the employee's status.
             EligibilityResult eligibility =
                 await staffMembers.CanBorrowAsync(request.StaffMemberId, token);
