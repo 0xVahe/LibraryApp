@@ -9,9 +9,9 @@ using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
-using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
-using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
@@ -78,17 +78,22 @@ public class BookDetailsEndpointTests(ApiHostFactory factory) : IClassFixture<Ap
     [Fact]
     public async Task A_book_with_a_copy_on_loan_shows_the_next_expected_return_date()
     {
-        DateTime issuedAtUtc = DateTime.UtcNow;
-        var loan = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(1, 1), Members.AnnaPetrosyan, issuedAtUtc, 7);
+        var bookId = await CreateBookAsync("9781000001013", "DET-5");
+        Loan loan;
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            Guid copyOnLoan = await db.BookCopies
+                .Where(copy => copy.BookId == bookId && copy.Status == BookCopyStatus.OnLoan)
+                .Select(copy => copy.Id)
+                .SingleAsync();
+            loan = Loan.Issue(Guid.NewGuid(), copyOnLoan, Members.AnnaPetrosyan, DateTime.UtcNow, 7);
             db.Loans.Add(loan);
             await db.SaveChangesAsync();
         }
 
         using var client = Client(StaffRoles.StaffMember);
-        var response = await client.GetAsync($"/api/books/{CatalogSeedIds.Book(1)}");
+        var response = await client.GetAsync($"/api/books/{bookId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var book = await response.Content.ReadFromJsonAsync<BookDetailsDto>();
