@@ -56,7 +56,7 @@ public class StaffDeactivationServiceTests
     {
         var member = Member();
         _loans.Items = [new(Guid.NewGuid(), member.Id, CatalogServiceStub.OnLoanCopyId,
-            CatalogServiceStub.AvailableBookId, _store.UtcNow, status)];
+            CatalogServiceStub.AvailableBookId, _store.UtcNow, status, _store.UtcNow.AddDays(-21), 0)];
         var exception = await Assert.ThrowsAsync<DomainException>(() => Service.DeactivateAsync(member.Id, new("Left")));
         Assert.Equal(StaffErrors.HasActiveLoans, exception.Error);
         var books = Assert.IsAssignableFrom<IReadOnlyList<OutstandingBookDto>>(exception.Extensions["outstandingBooks"]);
@@ -95,6 +95,12 @@ public class StaffDeactivationServiceTests
             Assert.True(LockAcquired);
             return Task.FromResult(Items);
         }
+
+        public Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException("Deactivation reads only the active loans.");
+
+        public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
+            throw new NotSupportedException("Deactivation reads only the active loans.");
     }
 
     private sealed class StaffLock(ManagementFake store, LoanQueries loans) : IApplicationLock
