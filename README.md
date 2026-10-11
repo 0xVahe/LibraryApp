@@ -40,7 +40,7 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 | `api` exits or stays unhealthy | Migration failed or the database is not reachable | `docker compose logs api` |
 | Port 1433 is in use | Local SQL Server or another app | Set `MSSQL_PORT` in `.env`, or stop the other app |
 | Port 8080 is in use | Another app | Set `API_PORT` in `.env`, or stop the other app |
-| Port 5080 or 2525 is in use | Another app | Set `SMTP4DEV_PORT` or `SMTP4DEV_SMTP_PORT` in `.env` (the SMTP port also in `Mail:Port` for the API run from the IDE), or stop the other app |
+| Port 5080 or 2525 is in use | Another app | Set `SMTP4DEV_PORT` or `SMTP4DEV_SMTP_PORT` in `.env` (the API run from the IDE follows `SMTP4DEV_SMTP_PORT` through `Mail__Port` in `.env`), or stop the other app |
 
 ## Tests
 
