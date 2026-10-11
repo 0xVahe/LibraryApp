@@ -69,7 +69,7 @@ public sealed class StaffMembersController(IStaffManagementService staff, IStaff
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StaffMemberDto>> Enrol(EnrolStaffMemberRequest request, CancellationToken ct)
     {
-        var result = await staff.EnrolAsync(request, User.IsInRole(StaffRoles.LibraryAdministrator), ct);
+        var result = await staff.EnrolAsync(request, ct);
         return CreatedAtAction(nameof(Get), new { id = result.Id }, result);
     }
 
