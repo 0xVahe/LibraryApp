@@ -63,6 +63,12 @@ public sealed class DeactivationLoanQueries : IBorrowingReadService
     public ConcurrentDictionary<string, TaskCompletionSource> LockRequests { get; } = new();
     public Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default) =>
         Task.FromResult(Items.GetValueOrDefault(staffMemberId) ?? (IReadOnlyList<OpenLoanInfo>)[]);
+
+    public Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default) =>
+        throw new NotSupportedException("Deactivation reads only the active loans.");
+
+    public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
+        throw new NotSupportedException("Deactivation reads only the active loans.");
 }
 
 public sealed class ObservedStaffLock(IApplicationLock inner, DeactivationLoanQueries queries) : IApplicationLock
@@ -218,7 +224,7 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
         factory.Loans.Items[member.Id] = [new(Guid.NewGuid(), member.Id,
             factory.CopyId,
             factory.BookId,
-            new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), status)];
+            new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), status, new DateTime(2026, 9, 18, 0, 0, 0, DateTimeKind.Utc), 0)];
         var problem = await Error(await Client().PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest(Reason)),
             HttpStatusCode.Conflict, "staff.has_active_loans");
         var book = Assert.Single(problem.GetProperty("outstandingBooks").EnumerateArray());
@@ -271,7 +277,7 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
         factory.Loans.Items[member.Id] = [new(Guid.NewGuid(), member.Id,
             factory.CopyId,
             factory.BookId,
-            new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active)];
+            new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active, new DateTime(2026, 9, 18, 0, 0, 0, DateTimeKind.Utc), 0)];
         await transaction.CommitAsync();
         await Error(await request, HttpStatusCode.Conflict, "staff.has_active_loans");
         await AssertStoredState(member, false);
@@ -305,7 +311,7 @@ public class StaffDeactivationEndpointTests(StaffDeactivationFactory factory) : 
         var member = await Enrol();
         var loan = new OpenLoanInfo(Guid.NewGuid(), member.Id,
             missingBook ? factory.CopyId : Guid.NewGuid(), missingBook ? Guid.NewGuid() : factory.BookId,
-            new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active);
+            new DateTime(2026, 10, 10, 0, 0, 0, DateTimeKind.Utc), LoanStatus.Active, new DateTime(2026, 9, 19, 0, 0, 0, DateTimeKind.Utc), 0);
         factory.Loans.Items[member.Id] = [loan];
         await Error(await Client().PostAsJsonAsync(Route(member.Id), new DeactivateStaffMemberRequest(Reason)),
             HttpStatusCode.InternalServerError, "internal_error");
