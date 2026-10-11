@@ -1,6 +1,6 @@
 namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 
-/// <summary>Synthetic catalog seed: categories, authors, publishers and books (D3).</summary>
+/// <summary>Synthetic catalog seed: categories, authors, publishers, books and copies (D3).</summary>
 public static class CatalogSeedData
 {
     public static readonly IReadOnlyList<(Guid Id, string Name)> Categories =
@@ -75,6 +75,30 @@ public static class CatalogSeedData
         new(56, "Երկիր Նաիրի", ["Եղիշե Չարենց"], null, 1926, "hy", "9781000000566", 8),
         new(57, "Մենք ենք, մեր սարերը", ["Հրանտ Մաթևոսյան"], null, 1962, "hy", "9781000000573", 8),
     ];
+
+    /// <summary>
+    /// Physical copies of each seeded book (CAT-04): book number → number of copies, 1 to 4, 115 in total. Every seeded
+    /// copy starts Available; the Borrowing seed lends some of them through ICatalogService.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<int, int> CopiesPerBook = new Dictionary<int, int>
+    {
+        // Banking & Finance
+        [1] = 3, [2] = 2, [3] = 2, [4] = 2, [5] = 1, [6] = 1, [7] = 2,
+        // Risk, Compliance & AML
+        [8] = 3, [9] = 2, [10] = 3, [11] = 2, [12] = 1, [13] = 2, [14] = 2,
+        // IT & Software Engineering
+        [15] = 4, [16] = 3, [17] = 3, [18] = 2, [19] = 2, [20] = 2, [21] = 3,
+        // Data & Analytics
+        [22] = 3, [23] = 2, [24] = 2, [25] = 2, [26] = 1, [27] = 1, [28] = 2,
+        // Leadership & Management
+        [29] = 2, [30] = 3, [31] = 2, [32] = 2, [33] = 2, [34] = 1, [35] = 2,
+        // Soft Skills & Communication
+        [36] = 3, [37] = 2, [38] = 2, [39] = 2, [40] = 3, [41] = 2, [42] = 2,
+        // Customer Experience
+        [43] = 2, [44] = 1, [45] = 1, [46] = 1, [47] = 1, [48] = 1, [49] = 1,
+        // General Reading
+        [50] = 3, [51] = 3, [52] = 4, [53] = 2, [54] = 2, [55] = 1, [56] = 1, [57] = 1,
+    };
 
     // Keep these name-to-ID mappings stable: downstream book seeds reference them.
     public static readonly IReadOnlyList<(Guid Id, string Name)> Authors =

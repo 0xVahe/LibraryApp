@@ -22,7 +22,7 @@ public class CatalogReferenceSeedTests
 
         await AssertReferencesAsync(db);
         Assert.Equal(CatalogSeedData.Books.Count, await db.Books.CountAsync());
-        Assert.Empty(await db.BookCopies.ToListAsync());
+        Assert.Equal(CatalogSeedData.CopiesPerBook.Values.Sum(), await db.BookCopies.CountAsync());
     });
 
     [Fact]
