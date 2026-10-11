@@ -1,6 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
+using System.Text.RegularExpressions;
 using LibraryApp.Application.Common;
-using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -17,9 +17,12 @@ namespace LibraryApp.Infrastructure.Persistence;
 /// attempt (or the next operation in the same request) starts from the database, not from stale objects.</item>
 /// <item>A concurrent update and a unique-key violation become <see cref="DomainException"/> with
 /// <see cref="CommonErrors.ConcurrencyConflict"/> and <see cref="CommonErrors.UniqueViolation"/> (409).</item>
+/// <item>A foreign key violation becomes <see cref="CommonErrors.ReferenceInUse"/> when a referenced row is deleted, and
+/// <see cref="CommonErrors.ReferenceMissing"/> when a row points to a missing one (409), whatever the module: another
+/// request changed the data after the module's own check. A CHECK violation is not mapped: it is a defect.</item>
 /// </list>
 /// </summary>
-public sealed class UnitOfWork(LibraryDbContext db) : IUnitOfWork
+public sealed partial class UnitOfWork(LibraryDbContext db) : IUnitOfWork
 {
     public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default)
     {
@@ -72,12 +75,11 @@ public sealed class UnitOfWork(LibraryDbContext db) : IUnitOfWork
             db.ChangeTracker.Clear();
             throw new DomainException(CommonErrors.UniqueViolation, ex);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 547 }
-            && ex.Entries.Count == 1 && ex.Entries[0] is { Entity: Publisher, State: EntityState.Deleted })
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 547 } sql && IsForeignKey(sql))
         {
-            // A book may reference the publisher after the service's usage check; Restrict still protects it.
+            bool deleting = ex.Entries.Any(entry => entry.State == EntityState.Deleted);
             db.ChangeTracker.Clear();
-            throw new DomainException(CatalogErrors.PublisherInUse, ex);
+            throw new DomainException(deleting ? CommonErrors.ReferenceInUse : CommonErrors.ReferenceMissing, ex);
         }
         catch
         {
@@ -86,4 +88,11 @@ public sealed class UnitOfWork(LibraryDbContext db) : IUnitOfWork
             throw;
         }
     }
+
+    // SQL error 547 is raised for foreign keys and for CHECK constraints; the constraint name tells them apart
+    // (naming convention SD-12: FK_..., CK_...). The name is quoted in the message whatever the server language.
+    private static bool IsForeignKey(SqlException sql) => ForeignKeyName().IsMatch(sql.Message);
+
+    [GeneratedRegex("\"FK_[^\"]+\"")]
+    private static partial Regex ForeignKeyName();
 }

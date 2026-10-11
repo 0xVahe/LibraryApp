@@ -2,6 +2,7 @@ using System.Data.SqlTypes;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Application.Common;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Infrastructure.Persistence;
@@ -88,7 +89,8 @@ public class PublisherPersistenceTests(CatalogReferenceFixture fixture) : IClass
         var service = Service(db, repository);
 
         var error = await Assert.ThrowsAsync<DomainException>(() => service.DeleteAsync(publisher.Id));
-        Assert.Equal(CatalogErrors.PublisherInUse, error.Error);
+        // The race is caught by the platform for every module: the database refuses the delete (foreign key).
+        Assert.Equal(CommonErrors.ReferenceInUse, error.Error);
         var update = Assert.IsType<DbUpdateException>(error.InnerException);
         Assert.Equal(547, Assert.IsType<SqlException>(update.InnerException).Number);
         Assert.Empty(db.ChangeTracker.Entries());
