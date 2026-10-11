@@ -9,7 +9,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>Next expected return date for Catalog (CAT-08) on the host with the Development seed.</summary>
-public class LoanQueryServiceTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
+public class LoanQueryServiceTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>
 {
     private static readonly DateTime Now = DateTime.UtcNow;
 
