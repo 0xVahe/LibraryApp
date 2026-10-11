@@ -2,6 +2,7 @@ namespace LibraryApp.Application.Abstractions.Common;
 
 /// <summary>
 /// The caller of the current request, read from the access token. Use it instead of parsing claims.
+/// Available only while handling an authenticated HTTP request; event handlers, jobs and seeders must not use it.
 /// Every member throws InvalidOperationException when there is no authenticated user.
 /// </summary>
 public interface ICurrentUser

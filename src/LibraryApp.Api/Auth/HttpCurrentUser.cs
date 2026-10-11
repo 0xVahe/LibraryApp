@@ -28,3 +28,14 @@ public sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUse
         Principal.FindFirst(claimType)?.Value
         ?? throw new InvalidOperationException($"The access token has no '{claimType}' claim.");
 }
+
+public static class CurrentUserRegistration
+{
+    /// <summary>ICurrentUser for controllers and application services, read from the JWT of the current request.</summary>
+    public static IServiceCollection AddCurrentUser(this IServiceCollection services)
+    {
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        return services;
+    }
+}

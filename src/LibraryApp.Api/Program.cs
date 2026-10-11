@@ -67,10 +67,9 @@ builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();    // Group 2 — the caller, from the JWT claims
 
 builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — POST /api/auth/login per client IP
+builder.Services.AddCurrentUser();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
