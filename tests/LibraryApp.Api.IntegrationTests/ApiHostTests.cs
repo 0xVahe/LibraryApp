@@ -33,8 +33,8 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     /// <summary>
-    /// Log events of every test host. Shared, because application loggers of Serilog may still write through the
-    /// static Log.Logger, which the host built last replaces; every host has this sink, so no event is lost.
+    /// Log events of every test host. Each host writes to its own Serilog logger (preserveStaticLogger in Program.cs),
+    /// and every host has this sink, so a test finds the events of its own requests.
     /// </summary>
     public static CollectingSink Logs { get; } = new();
 
