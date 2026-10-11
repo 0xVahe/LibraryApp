@@ -17,16 +17,17 @@ public sealed class StaffManagementService(
     IEventBus events,
     IClock clock,
     IIdGenerator ids,
-    CorporateEmailPolicy emailPolicy)
+    CorporateEmailPolicy emailPolicy,
+    ICurrentUser currentUser)
     : IStaffManagementService
 {
     public async Task<StaffMemberDto> EnrolAsync(
-        EnrolStaffMemberRequest request, bool callerIsAdministrator, CancellationToken ct = default)
+        EnrolStaffMemberRequest request, CancellationToken ct = default)
     {
         RequireCorporateEmail(request.CorporateEmail);
 
         var role = request.Role ?? StaffRoles.StaffMember;
-        if (role != StaffRoles.StaffMember && !callerIsAdministrator)
+        if (role != StaffRoles.StaffMember && !currentUser.IsInRole(StaffRoles.LibraryAdministrator))
             throw new DomainException(StaffErrors.RoleAssignmentForbidden);
 
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
@@ -37,12 +38,14 @@ public sealed class StaffManagementService(
                 throw new DomainException(StaffErrors.EmployeeIdTaken);
 
             await RequireUniqueEmailAsync(email, null, null, token);
-            var (department, category) = await ReferenceNamesAsync(request.DepartmentId, request.StaffCategoryId, token);
+            var (department, category) =
+                await ReferenceNamesAsync(request.DepartmentId, request.StaffCategoryId, token);
 
             var userId = ids.NewId();
             await accounts.CreateAsync(userId, email, request.Password, role, token);
             var member = new StaffMember(ids.NewId(), userId, employeeId, request.FirstName, request.LastName,
-                email, request.DepartmentId, request.Position, request.LineManagerEmail, request.StaffCategoryId, clock.UtcNow);
+                email, request.DepartmentId, request.Position, request.LineManagerEmail, request.StaffCategoryId,
+                clock.UtcNow);
             members.Add(member);
 
             await events.PublishAsync(new StaffEnrolled(ids.NewId(), clock.UtcNow, member.Id), token);
@@ -53,7 +56,8 @@ public sealed class StaffManagementService(
     public async Task<StaffMemberDto> GetAsync(Guid id, CancellationToken ct = default) =>
         await members.GetDetailsAsync(id, ct) ?? throw new DomainException(StaffErrors.NotFound);
 
-    public async Task<StaffMemberDto> UpdateAsync(Guid id, UpdateStaffMemberRequest request, CancellationToken ct = default)
+    public async Task<StaffMemberDto> UpdateAsync(Guid id, UpdateStaffMemberRequest request,
+        CancellationToken ct = default)
     {
         RequireCorporateEmail(request.CorporateEmail);
 
@@ -65,11 +69,13 @@ public sealed class StaffManagementService(
 
             var email = request.CorporateEmail.Trim().ToLowerInvariant();
             await RequireUniqueEmailAsync(email, id, member.UserId, token);
-            var (department, category) = await ReferenceNamesAsync(request.DepartmentId, request.StaffCategoryId, token);
+            var (department, category) =
+                await ReferenceNamesAsync(request.DepartmentId, request.StaffCategoryId, token);
             if (email != member.CorporateEmail)
                 await accounts.UpdateEmailAsync(member.UserId, email, token);
 
-            member.UpdateProfile(request.FirstName, request.LastName, email, request.Position, request.LineManagerEmail);
+            member.UpdateProfile(request.FirstName, request.LastName, email, request.Position,
+                request.LineManagerEmail);
             member.MoveToDepartment(request.DepartmentId);
             member.ChangeCategory(request.StaffCategoryId);
 
@@ -89,7 +95,8 @@ public sealed class StaffManagementService(
             throw new DomainException(StaffErrors.EmailTaken);
     }
 
-    private async Task<(string Department, string Category)> ReferenceNamesAsync(Guid departmentId, Guid categoryId, CancellationToken ct)
+    private async Task<(string Department, string Category)> ReferenceNamesAsync(Guid departmentId, Guid categoryId,
+        CancellationToken ct)
     {
         var department = await members.GetDepartmentNameAsync(departmentId, ct)
                          ?? throw new DomainException(StaffErrors.DepartmentInvalid);
@@ -103,7 +110,8 @@ public sealed class StaffManagementService(
             member.DepartmentId, department, member.Position, member.LineManagerEmail,
             member.StaffCategoryId, category, member.Status.ToString(), member.JoinedLibraryAtUtc, role);
 
-    public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchRequest request, CancellationToken ct = default)
+    public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchRequest request,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(request.Paging);

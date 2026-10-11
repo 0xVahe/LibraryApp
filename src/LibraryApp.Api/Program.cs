@@ -44,7 +44,7 @@ builder.Services.AddLibraryIdentity();                          // Group 2 — I
 builder.Services.AddStaffModule(builder.Configuration);         // Group 2
 builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
 builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
-// builder.Services.AddNotificationsModule(builder.Configuration); // Group 4
+builder.Services.AddNotificationsModule(builder.Configuration);    // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
 
 // Validation messages in English whatever the culture of the server.
@@ -70,6 +70,7 @@ builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — POST /api/auth/login per client IP
+builder.Services.AddCurrentUser();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
