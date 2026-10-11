@@ -10,11 +10,12 @@ public class BookCopyServiceTests
 {
     private readonly FakeBookCopyRepository _repository = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeReservationQueue _queue = new();
     private readonly BookCopyService _service;
 
     public BookCopyServiceTests()
     {
-        _service = new BookCopyService(_repository, _unitOfWork, new FakeIdGenerator());
+        _service = new BookCopyService(_repository, _unitOfWork, new FakeIdGenerator(), _queue);
     }
 
     // ---------- add (CAT-04, BR-CAT-2) ----------
@@ -206,6 +207,106 @@ public class BookCopyServiceTests
         Assert.Equal("catalog.copy_status_change_not_allowed", error.Code);
         Assert.Equal(ErrorKind.Conflict, error.Kind);
         Assert.Equal(BookCopyStatus.Withdrawn, copy.Status);
+    }
+
+    // ---------- offer to the reservation queue (BQ-G1-10, BOR-07) ----------
+
+    [Fact]
+    public async Task A_new_copy_is_offered_to_the_reservation_queue_inside_the_transaction()
+    {
+        Guid bookId = _repository.AddBook();
+        bool offeredInsideTransaction = false;
+        _queue.OnOffer = _ =>
+        {
+            offeredInsideTransaction = _unitOfWork.Active;
+            return Task.CompletedTask;
+        };
+
+        var copy = await _service.AddCopyAsync(bookId, NewCopy("BK-1"));
+
+        Assert.Equal(new[] { (copy.Id, bookId) }, _queue.Offers);
+        Assert.True(offeredInsideTransaction);
+    }
+
+    [Fact]
+    public async Task A_refused_copy_is_not_offered()
+    {
+        Guid deletedBookId = _repository.AddBook(BookState.Deleted);
+        Guid bookId = _repository.AddBook();
+        _repository.AddCopy(bookId, "BK-1");
+
+        await ErrorOf(() => _service.AddCopyAsync(deletedBookId, NewCopy("BK-2")));
+        await ErrorOf(() => _service.AddCopyAsync(bookId, NewCopy("BK-1")));
+
+        Assert.Empty(_queue.Offers);
+    }
+
+    [Fact]
+    public async Task A_repaired_copy_is_offered_to_the_reservation_queue()
+    {
+        Guid bookId = _repository.AddBook();
+        var copy = _repository.AddCopy(bookId, "BK-1", BookCopyStatus.UnderRepair);
+
+        await _service.ChangeStatusAsync(bookId, copy.Id, new ChangeCopyStatusRequest(BookCopyStatus.Available));
+
+        Assert.Equal(new[] { (copy.Id, bookId) }, _queue.Offers);
+    }
+
+    [Theory]
+    [InlineData(BookCopyStatus.UnderRepair)]
+    [InlineData(BookCopyStatus.Lost)]
+    [InlineData(BookCopyStatus.Withdrawn)]
+    public async Task Taking_a_copy_out_of_circulation_offers_nothing(BookCopyStatus newStatus)
+    {
+        Guid bookId = _repository.AddBook();
+        var copy = _repository.AddCopy(bookId, "BK-1");
+
+        await _service.ChangeStatusAsync(bookId, copy.Id, new ChangeCopyStatusRequest(newStatus));
+
+        Assert.Empty(_queue.Offers);
+    }
+
+    [Fact]
+    public async Task Editing_a_copy_offers_nothing()
+    {
+        Guid bookId = _repository.AddBook();
+        var copy = _repository.AddCopy(bookId, "BK-1");
+
+        await _service.UpdateCopyAsync(bookId, copy.Id, new UpdateCopyRequest(BookCopyCondition.Fair, "B-02"));
+
+        Assert.Empty(_queue.Offers);
+    }
+
+    [Fact]
+    public async Task The_answer_shows_a_new_copy_reserved_by_the_queue()
+    {
+        Guid bookId = _repository.AddBook();
+        _queue.OnOffer = ReserveOfferedCopyAsync;
+
+        var copy = await _service.AddCopyAsync(bookId, NewCopy("BK-1"));
+
+        Assert.Equal(BookCopyStatus.Reserved, copy.Status);
+        Assert.Equal(BookCopyStatus.Reserved, _repository.Copies.Single().Status);
+    }
+
+    [Fact]
+    public async Task The_answer_shows_a_repaired_copy_reserved_by_the_queue()
+    {
+        Guid bookId = _repository.AddBook();
+        var copy = _repository.AddCopy(bookId, "BK-1", BookCopyStatus.UnderRepair);
+        _queue.OnOffer = ReserveOfferedCopyAsync;
+
+        var result = await _service.ChangeStatusAsync(bookId, copy.Id, new ChangeCopyStatusRequest(BookCopyStatus.Available));
+
+        Assert.Equal(BookCopyStatus.Reserved, result.Status);
+        Assert.Equal(BookCopyStatus.Reserved, copy.Status);
+    }
+
+    /// <summary>What Borrowing does when someone is waiting: the offered copy becomes Reserved.</summary>
+    private async Task ReserveOfferedCopyAsync(Guid copyId)
+    {
+        BookCopy copy = (await _repository.GetByIdAsync(copyId, CancellationToken.None))!;
+        copy.ChangeStatus(BookCopyStatus.Reserved);
     }
 
     private static AddCopyRequest NewCopy(string barcode) => new(barcode, BookCopyCondition.Good, null);
