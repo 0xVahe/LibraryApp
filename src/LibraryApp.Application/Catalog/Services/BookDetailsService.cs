@@ -1,4 +1,6 @@
 using LibraryApp.Application.Abstractions.Catalog;
+using LibraryApp.Application.Abstractions.Borrowing;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Domain.Catalog;
@@ -7,7 +9,7 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Application.Catalog.Services;
 
 /// <summary>Shows one book with "N of M available" (CAT-06). A deleted book is hidden, like in the search.</summary>
-public sealed class BookDetailsService(IBookDetailsQuery query) : IBookDetailsService
+public sealed class BookDetailsService(IBookDetailsQuery query, ILoanQueryService loanQuery, IClock clock) : IBookDetailsService
 {
     public async Task<BookDetailsDto> GetBookDetailsAsync(Guid bookId, CancellationToken cancellationToken = default)
     {
@@ -15,6 +17,11 @@ public sealed class BookDetailsService(IBookDetailsQuery query) : IBookDetailsSe
 
         if (book is null || book.IsDeleted)
             throw new DomainException(CatalogErrors.BookNotFound);
+
+        DateTime? nextDueDateUtc = await loanQuery.GetNextDueDateAsync(book.Id, cancellationToken);
+        DateOnly? nextExpectedReturnDate = nextDueDateUtc is null
+            ? null
+            : clock.ToLocalDate(nextDueDateUtc.Value);
 
         return new BookDetailsDto(
             book.Id,
@@ -30,6 +37,7 @@ public sealed class BookDetailsService(IBookDetailsQuery query) : IBookDetailsSe
             book.Authors,
             book.TotalCopies,
             book.AvailableCopies,
-            Availability: $"{book.AvailableCopies} of {book.TotalCopies} available");
+            Availability: $"{book.AvailableCopies} of {book.TotalCopies} available",
+            nextExpectedReturnDate);
     }
 }

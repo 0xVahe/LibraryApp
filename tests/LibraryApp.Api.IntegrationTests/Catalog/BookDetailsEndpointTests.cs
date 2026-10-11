@@ -2,11 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
+using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;
@@ -68,6 +72,29 @@ public class BookDetailsEndpointTests(ApiHostFactory factory) : IClassFixture<Ap
         Assert.Equal(3, book.TotalCopies);
         Assert.Equal(2, book.AvailableCopies);
         Assert.Equal("2 of 3 available", book.Availability);
+        Assert.Null(book.NextExpectedReturnDate);
+    }
+
+    [Fact]
+    public async Task A_book_with_a_copy_on_loan_shows_the_next_expected_return_date()
+    {
+        DateTime issuedAtUtc = DateTime.UtcNow;
+        var loan = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(1, 1), Members.AnnaPetrosyan, issuedAtUtc, 7);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            db.Loans.Add(loan);
+            await db.SaveChangesAsync();
+        }
+
+        using var client = Client(StaffRoles.StaffMember);
+        var response = await client.GetAsync($"/api/books/{CatalogSeedIds.Book(1)}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var book = await response.Content.ReadFromJsonAsync<BookDetailsDto>();
+        Assert.NotNull(book);
+        var clock = factory.Services.GetRequiredService<IClock>();
+        Assert.Equal(clock.ToLocalDate(loan.DueAtUtc), book.NextExpectedReturnDate);
     }
 
     [Fact]
