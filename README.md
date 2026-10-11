@@ -15,18 +15,19 @@ Requirements: Docker Desktop (running).
    ```bash
    docker compose up --build
    ```
-   The first build takes a few minutes. The API waits until SQL Server is healthy, applies the migrations and, in Development, the seed data. `docker compose ps` shows both services as `healthy` when the system is ready.
+   The first build takes a few minutes. The API waits until SQL Server and smtp4dev are healthy, applies the migrations and, in Development, the seed data. `docker compose ps` shows all three services as `healthy` when the system is ready.
 3. Open (port `API_PORT` from `.env`, 8080 by default):
    - Swagger: http://localhost:8080/swagger (log in with `POST /api/auth/login`, then "Authorize" with the `accessToken`)
    - Health: http://localhost:8080/health/ready (`Healthy` when the database answers)
    - SQL Server: `localhost,1433`, user `sa`, the password from `.env`, database `LibraryApp`
+   - smtp4dev: http://localhost:5080 (port `SMTP4DEV_PORT`): every email the API sends appears here; nothing is delivered outside the machine
 
 Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker compose down -v`, then `docker compose up --build`.
 
 ### Development without the API container
 
-1. Start only the database: `docker compose up -d sqlserver`. It starts again by itself with Docker Desktop (until you stop it with `docker compose stop`).
-2. Run `LibraryApp.Api` from the IDE (profile `http`, http://localhost:5055/swagger). In Development the API reads `.env`: `ConnectionStrings__LibraryDb` points it to the SQL Server in Docker. Without that line it uses LocalDB from `appsettings.Development.json`.
+1. Start only the database and the mail server: `docker compose up -d sqlserver smtp4dev`. They start again by themselves with Docker Desktop (until you stop them with `docker compose stop`).
+2. Run `LibraryApp.Api` from the IDE (profile `http`, http://localhost:5055/swagger). In Development the API reads `.env`: `ConnectionStrings__LibraryDb` points it to the SQL Server in Docker. Without that line it uses LocalDB from `appsettings.Development.json`. Emails go to smtp4dev on `localhost:2525` (port `SMTP4DEV_SMTP_PORT`).
 3. Tests: see [Tests](#tests).
 4. `dotnet ef database update` uses `LIBRARYAPP_DESIGNTIME_DB` from `.env`.
 
@@ -39,6 +40,7 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 | `api` exits or stays unhealthy | Migration failed or the database is not reachable | `docker compose logs api` |
 | Port 1433 is in use | Local SQL Server or another app | Set `MSSQL_PORT` in `.env`, or stop the other app |
 | Port 8080 is in use | Another app | Set `API_PORT` in `.env`, or stop the other app |
+| Port 5080 or 2525 is in use | Another app | Set `SMTP4DEV_PORT` or `SMTP4DEV_SMTP_PORT` in `.env` (the SMTP port also in `Mail:Port` for the API run from the IDE), or stop the other app |
 
 ## Tests
 
