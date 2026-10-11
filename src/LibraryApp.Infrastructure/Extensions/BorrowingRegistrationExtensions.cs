@@ -23,6 +23,9 @@ public static class BorrowingRegistrationExtensions
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
 
+        // Contract for Catalog: next expected return date of a book (CAT-08)
+        services.AddScoped<ILoanQueryService, LoanQueryService>();
+
         return services;
     }
 }
