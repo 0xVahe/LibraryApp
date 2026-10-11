@@ -20,7 +20,7 @@ public class NotificationsRegistrationTests
     }
 
     [Fact]
-    public void Without_a_mail_section_the_sender_uses_smtp4dev_defaults()
+    public void Uses_smtp4dev_defaults()
     {
         using var services = Services(new());
 
@@ -52,7 +52,7 @@ public class NotificationsRegistrationTests
     [InlineData("Mail:Host", "")]
     [InlineData("Mail:FromAddress", "not-an-email")]
     [InlineData("Mail:TimeoutSeconds", "0")]
-    public void Invalid_mail_settings_fail_options_validation(string key, string value)
+    public void Invalid_settings_fail_validation(string key, string value)
     {
         using var services = Services(new() { [key] = value });
 

@@ -18,7 +18,7 @@ public class SmtpOutlookNotificationSenderTests
         new(Options.Create(new MailOptions { Host = "127.0.0.1", Port = port, TimeoutSeconds = 5 }), _logger);
 
     [Fact]
-    public async Task Sends_the_message_to_the_mail_server()
+    public async Task Sends_message()
     {
         await using var server = FakeSmtpServer.Start();
 
@@ -45,7 +45,7 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
-    public async Task Unreachable_server_throws_delivery_exception_without_addresses()
+    public async Task Unreachable_server_fails_without_addresses()
     {
         var port = FreePort();
 
@@ -57,7 +57,7 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
-    public async Task Rejected_recipient_throws_delivery_exception_with_smtp_code_only()
+    public async Task Rejected_recipient_fails_with_smtp_code()
     {
         await using var server = FakeSmtpServer.Start(rejectRecipients: true);
 
@@ -69,7 +69,7 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
-    public async Task Invalid_recipient_address_throws_delivery_exception_before_connecting()
+    public async Task Invalid_address_fails_before_connecting()
     {
         var ex = await Assert.ThrowsAsync<NotificationDeliveryException>(() =>
             Sender(FreePort()).SendAsync(Message with { To = "anna@" }));
@@ -79,7 +79,7 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
-    public async Task Cancellation_is_not_turned_into_a_delivery_failure()
+    public async Task Cancellation_is_not_a_delivery_failure()
     {
         await using var server = FakeSmtpServer.Start();
 

@@ -9,7 +9,7 @@ public class OutlookMimeMessageTests
     private static readonly MailOptions Options = new() { FromAddress = "library@ameriabank.am", FromName = "Ameriabank Library" };
 
     [Fact]
-    public void Builds_sender_recipients_subject_and_html_body()
+    public void Builds_message()
     {
         var message = new OutlookMessage("anna@ameriabank.am", "boss@ameriabank.am", "Your book is due", "<p>Hello Anna</p>");
 
