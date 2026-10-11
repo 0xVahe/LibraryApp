@@ -9,17 +9,20 @@ internal sealed class FakeSmtpServer : IAsyncDisposable
 {
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly bool _rejectRecipients;
+    private readonly bool _failQuit;
     private readonly TaskCompletionSource<string> _data = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _session;
 
-    private FakeSmtpServer(bool rejectRecipients)
+    private FakeSmtpServer(bool rejectRecipients, bool failQuit)
     {
         _rejectRecipients = rejectRecipients;
+        _failQuit = failQuit;
         _listener.Start();
         _session = Task.Run(RunAsync);
     }
 
-    public static FakeSmtpServer Start(bool rejectRecipients = false) => new(rejectRecipients);
+    /// <param name="failQuit">Answers QUIT with an error and drops the connection, after the message was accepted.</param>
+    public static FakeSmtpServer Start(bool rejectRecipients = false, bool failQuit = false) => new(rejectRecipients, failQuit);
 
     public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
@@ -55,6 +58,9 @@ internal sealed class FakeSmtpServer : IAsyncDisposable
                         _data.TrySetResult(await ReadDataAsync(reader));
                         await writer.WriteLineAsync("250 OK");
                         break;
+                    case "QUIT" when _failQuit:
+                        await writer.WriteLineAsync("421 4.4.2 Connection dropped");
+                        return;
                     case "QUIT":
                         await writer.WriteLineAsync("221 Bye");
                         return;

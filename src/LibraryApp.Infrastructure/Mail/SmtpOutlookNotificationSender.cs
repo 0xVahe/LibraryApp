@@ -35,7 +35,6 @@ public sealed class SmtpOutlookNotificationSender(
                 await client.AuthenticateAsync(settings.UserName, settings.Password ?? string.Empty, ct);
 
             await client.SendAsync(mime, ct);
-            await client.DisconnectAsync(quit: true, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -43,6 +42,17 @@ public sealed class SmtpOutlookNotificationSender(
             var reason = $"Mail server {settings.Host}:{settings.Port} did not accept the message ({Describe(ex)}).";
             logger.LogWarning("Notification email not delivered: {Reason}", reason);
             throw new NotificationDeliveryException(reason, ex);
+        }
+
+        // The server has accepted the message: a failed QUIT must not turn into a retry and a duplicate email.
+        try
+        {
+            await client.DisconnectAsync(quit: true, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Notification email sent, but the connection to {Host}:{Port} did not close cleanly ({Error}).",
+                settings.Host, settings.Port, Describe(ex));
         }
     }
 

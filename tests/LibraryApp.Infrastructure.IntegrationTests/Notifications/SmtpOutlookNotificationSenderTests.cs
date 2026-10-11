@@ -33,6 +33,18 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
+    public async Task Failed_quit_still_counts_as_sent()
+    {
+        await using var server = FakeSmtpServer.Start(failQuit: true);
+
+        await Sender(server.Port).SendAsync(Message);
+
+        Assert.Contains("Subject: Your book is due", await server.ReceivedData);
+        Assert.Contains("QUIT", server.Commands);
+        Assert.All(_logger.Messages, AssertNoAddresses);
+    }
+
+    [Fact]
     public async Task Unreachable_server_throws_delivery_exception_without_addresses()
     {
         var port = FreePort();
