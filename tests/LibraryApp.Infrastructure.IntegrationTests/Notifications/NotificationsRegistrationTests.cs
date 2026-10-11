@@ -58,4 +58,25 @@ public class NotificationsRegistrationTests
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<MailOptions>>().Value);
     }
+
+    [Theory]
+    [InlineData("Mail:UserName", "library")]
+    [InlineData("Mail:Password", "secret-value")]
+    public void Half_credentials_fail_validation(string key, string value)
+    {
+        using var services = Services(new() { [key] = value });
+
+        var ex = Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<MailOptions>>().Value);
+        Assert.Contains("Mail:UserName and Mail:Password", ex.Message);
+        Assert.DoesNotContain(value, ex.Message);
+    }
+
+    [Fact]
+    public void Both_credentials_are_valid()
+    {
+        using var services = Services(new() { ["Mail:UserName"] = "library", ["Mail:Password"] = "secret-value" });
+
+        var options = services.GetRequiredService<IOptions<MailOptions>>().Value;
+        Assert.Equal("library", options.UserName);
+    }
 }

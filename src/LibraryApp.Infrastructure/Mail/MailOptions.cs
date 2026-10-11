@@ -4,7 +4,7 @@ using MailKit.Security;
 namespace LibraryApp.Infrastructure.Mail;
 
 /// <summary>Settings section "Mail". The defaults point to smtp4dev on this machine (NOT-03). Checked at start.</summary>
-public sealed class MailOptions
+public sealed class MailOptions : IValidatableObject
 {
     public const string SectionName = "Mail";
 
@@ -30,4 +30,13 @@ public sealed class MailOptions
 
     [Range(1, 120)]
     public int TimeoutSeconds { get; set; } = 10;
+
+    // Both or neither: half of the credentials would fail only on the first email. No values in the message (NFR-04).
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (string.IsNullOrEmpty(UserName) != string.IsNullOrEmpty(Password))
+            yield return new ValidationResult(
+                "Mail:UserName and Mail:Password must be set together or both left empty.",
+                [nameof(UserName), nameof(Password)]);
+    }
 }
