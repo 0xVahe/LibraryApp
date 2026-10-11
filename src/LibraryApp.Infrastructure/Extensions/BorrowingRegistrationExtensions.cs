@@ -21,6 +21,8 @@ public static class BorrowingRegistrationExtensions
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
         services.AddScoped<ILoanService, LoanService>();
+        services.AddScoped<IReservationRepository, ReservationRepository>();
+        services.AddScoped<IReservationService, ReservationService>();
 
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
