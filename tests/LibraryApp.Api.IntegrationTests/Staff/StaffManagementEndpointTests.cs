@@ -255,7 +255,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
     }
 
     [Theory]
-    [InlineData(true, "staff.department_not_found")]
+    [InlineData(true, "staff.department_invalid")]
     [InlineData(false, "staff.category_not_found")]
     public async Task Missing_reference_returns_400(bool department, string code)
     {

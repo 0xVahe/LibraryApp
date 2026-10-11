@@ -142,7 +142,7 @@ public class StaffManagementServiceTests
     {
         var request = department ? Request with { DepartmentId = Guid.NewGuid() } : Request with { StaffCategoryId = Guid.NewGuid() };
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.EnrolAsync(request, false));
-        Assert.Equal(department ? StaffErrors.DepartmentNotFound : StaffErrors.CategoryNotFound, error.Error);
+        Assert.Equal(department ? StaffErrors.DepartmentInvalid : StaffErrors.CategoryNotFound, error.Error);
         Assert.Empty(_fake.Accounts);
     }
 
@@ -213,6 +213,7 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public bool InTransaction { get; private set; }
     public int TransactionCalls { get; private set; }
     public bool FailCreate { get; set; }
+    public List<Guid> DeactivatedAccounts { get; } = [];
     public StaffMemberSearchFilter? LastSearchFilter { get; private set; }
     public PageRequest? LastSearchPaging { get; private set; }
     public PagedResult<StaffMemberListItemDto>? SearchResult { get; set; }
@@ -255,6 +256,12 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
         return Task.CompletedTask;
     }
     public Task<string> GetRoleAsync(Guid userId, CancellationToken ct) => Task.FromResult(Accounts[userId].Role);
+    public Task DeactivateAsync(Guid userId, CancellationToken ct)
+    {
+        Assert.True(InTransaction);
+        DeactivatedAccounts.Add(userId);
+        return Task.CompletedTask;
+    }
     public Task PublishAsync<TEvent>(TEvent domainEvent, CancellationToken ct = default) where TEvent : class, IDomainEvent
     {
         Assert.True(InTransaction);

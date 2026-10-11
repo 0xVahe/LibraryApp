@@ -17,9 +17,14 @@ public static class StaffRegistrationExtensions
     {
         services.AddScoped<IStaffMemberRepository, StaffMemberRepository>();
         services.AddScoped<IStaffMemberService, StaffMemberService>();
+
         services.AddScoped<IStaffManagementRepository, StaffManagementRepository>();
         services.AddScoped<IStaffAccountStore, StaffAccountStore>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
+        services.AddScoped<IStaffDeactivationService, StaffDeactivationService>();
+
+        services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
 
         services.Configure<CorporateEmailOptions>(configuration.GetSection(CorporateEmailOptions.SectionName));
         services.AddSingleton<CorporateEmailPolicy>();
@@ -29,6 +34,9 @@ public static class StaffRegistrationExtensions
 
         services.AddScoped<IModuleSeeder, StaffSeeder>();
 
+        services.AddScoped<IStaffCategoryRepository, StaffCategoryRepository>();
+        services.AddScoped<IStaffCategoryService, StaffCategoryService>();        
+        
         return services;
     }
 }

@@ -1,4 +1,4 @@
-using LibraryApp.Domain.Borrowing;
+﻿using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +17,15 @@ public sealed class ReservationConfiguration : IEntityTypeConfiguration<Reservat
         builder.HasOne<Book>().WithMany().HasForeignKey(x => x.BookId);
         builder.HasOne<StaffMember>().WithMany().HasForeignKey(x => x.StaffMemberId);
 
+        // The copy held for a ReadyForPickup reservation (BQ-G1-03); kept after the reservation ends, for history.
+        builder.HasOne<BookCopy>().WithMany().HasForeignKey(x => x.CopyId).OnDelete(DeleteBehavior.Restrict);
+
+        // One held copy serves one ReadyForPickup reservation (BQ-G1-03). ReservationStatus: ReadyForPickup = 2.
+        builder.HasIndex(x => x.CopyId)
+            .IsUnique()
+            .HasFilter("[Status] = 2")
+            .HasDatabaseName("UX_Reservations_ReadyForPickup_CopyId");
+
         // One active reservation per member and book (G3-04). ReservationStatus: Waiting = 1, ReadyForPickup = 2.
         builder.HasIndex(x => new { x.StaffMemberId, x.BookId })
             .IsUnique()
@@ -33,8 +42,13 @@ public sealed class ReservationConfiguration : IEntityTypeConfiguration<Reservat
 
         // QueuePosition is 1..n while Waiting and 0 otherwise (G3-03).
         // Keep CHECK SQL on one line: a multi-line string carries the line endings of the checkout into the model.
-        builder.ToTable(t => t.HasCheckConstraint(
-            "CK_Reservations_QueuePosition",
-            "([Status] = 1 AND [QueuePosition] >= 1) OR ([Status] <> 1 AND [QueuePosition] = 0)"));
+        // A ReadyForPickup reservation always names its held copy (BQ-G1-03).
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint(
+                "CK_Reservations_QueuePosition",
+                "([Status] = 1 AND [QueuePosition] >= 1) OR ([Status] <> 1 AND [QueuePosition] = 0)");
+            t.HasCheckConstraint("CK_Reservations_ReadyForPickup_CopyId", "[Status] <> 2 OR [CopyId] IS NOT NULL");
+        });
     }
 }
