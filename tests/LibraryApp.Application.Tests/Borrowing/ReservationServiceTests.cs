@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
@@ -27,7 +28,7 @@ public sealed class ReservationServiceTests
         fixture.Loans.CopyIds.Add(otherCopyId);
         fixture.Catalog.Copies[otherCopyId] = Copy(otherCopyId, Guid.NewGuid());
 
-        ReservationDto result = await fixture.Service.CreateAsync(BookId, StaffId);
+        ReservationDto result = await fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId));
 
         Assert.Equal(fixture.Ids.Id, result.ReservationId);
         Assert.Equal(BookId, result.BookId);
@@ -39,7 +40,8 @@ public sealed class ReservationServiceTests
         Assert.Null(result.ReadyUntilUtc);
         Assert.Equal(1, fixture.UnitOfWork.CommitCount);
         Assert.Equal(0, fixture.UnitOfWork.RollbackCount);
-        Assert.Equal(new[] { "borrowing:reservation:staff:" + StaffId.ToString("N"), "borrowing:reservation:book:" + BookId.ToString("N") }, fixture.Lock.Resources);
+        // The shared staff lock (issuance and deactivation take it too), then the queue of the book: BorrowingLocks order.
+        Assert.Equal(new[] { BorrowingLocks.Staff(StaffId), BorrowingLocks.Book(BookId) }, fixture.Lock.Resources);
         Assert.Equal(new[] { otherCopyId }, fixture.Catalog.LastResolvedCopyIds);
         Assert.Single(fixture.Reservations.Saved);
     }
@@ -51,6 +53,7 @@ public sealed class ReservationServiceTests
         fixture.Catalog.Book = null;
 
         await AssertRejected(fixture, CatalogErrors.BookNotFound);
+        Assert.Empty(fixture.Lock.Resources);   // checked before any lock is taken
     }
 
     [Fact]
@@ -59,7 +62,8 @@ public sealed class ReservationServiceTests
         var fixture = new Fixture();
         fixture.Catalog.Book = Book(isDeleted: true);
 
-        await AssertRejected(fixture, CatalogErrors.BookDeleted);
+        // A deleted book is gone for readers: the same 404 as an unknown book.
+        await AssertRejected(fixture, CatalogErrors.BookNotFound);
     }
 
     [Fact]
@@ -80,7 +84,7 @@ public sealed class ReservationServiceTests
         var fixture = new Fixture { Status = status };
 
         DomainException exception = await Assert.ThrowsAsync<DomainException>(
-            () => fixture.Service.CreateAsync(BookId, StaffId));
+            () => fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId)));
 
         Assert.Equal(expectedError, exception.Error.Code);
         Assert.Equal(0, fixture.UnitOfWork.CommitCount);
@@ -117,10 +121,84 @@ public sealed class ReservationServiceTests
         Assert.Equal(new[] { copyId }, fixture.Catalog.LastResolvedCopyIds);
     }
 
+    [Fact]
+    public async Task CreateAsync_reports_the_duplicate_before_the_limit_of_three()
+    {
+        var fixture = new Fixture { HasActiveForBook = true, ActiveCount = 3 };
+
+        await AssertRejected(fixture, BorrowingErrors.DuplicateActiveReservation);
+        Assert.Equal(ErrorKind.Conflict, BorrowingErrors.DuplicateActiveReservation.Kind);
+    }
+
+    [Fact]
+    public async Task CreateAsync_reports_a_held_book_before_the_duplicate_and_the_limit()
+    {
+        var fixture = new Fixture { HasActiveForBook = true, ActiveCount = 3 };
+        var copyId = Guid.NewGuid();
+        fixture.Loans.CopyIds.Add(copyId);
+        fixture.Catalog.Copies[copyId] = Copy(copyId, BookId);
+
+        await AssertRejected(fixture, BorrowingErrors.BookAlreadyOnLoan);
+    }
+
+    [Fact]
+    public async Task A_staff_member_reserves_for_themselves_without_naming_anyone()
+    {
+        var fixture = new Fixture();
+        fixture.CurrentUser.Role = StaffRoles.StaffMember;
+        fixture.CurrentUser.StaffMemberId = StaffId;
+
+        ReservationDto result = await fixture.Service.CreateAsync(new CreateReservationRequest(BookId));
+
+        Assert.Equal(StaffId, result.StaffMemberId);
+    }
+
+    [Fact]
+    public async Task A_staff_member_cannot_reserve_for_someone_else()
+    {
+        var fixture = new Fixture();
+        fixture.CurrentUser.Role = StaffRoles.StaffMember;
+        fixture.CurrentUser.StaffMemberId = Guid.NewGuid();
+
+        var exception = await Assert.ThrowsAsync<DomainException>(
+            () => fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId)));
+
+        Assert.Equal(BorrowingErrors.ReservationForAnotherStaffMember, exception.Error);
+        Assert.Equal(0, fixture.UnitOfWork.CommitCount + fixture.UnitOfWork.RollbackCount);   // refused before the transaction
+    }
+
+    [Fact]
+    public async Task A_librarian_must_name_the_staff_member()
+    {
+        var fixture = new Fixture();
+
+        var exception = await Assert.ThrowsAsync<DomainException>(
+            () => fixture.Service.CreateAsync(new CreateReservationRequest(BookId)));
+
+        Assert.Equal(BorrowingErrors.ReservationStaffMemberRequired, exception.Error);
+    }
+
+    [Fact]
+    public async Task GetAsync_shows_a_staff_member_only_their_own_reservation()
+    {
+        var fixture = new Fixture();
+        ReservationDto created = await fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId));
+
+        Assert.Equal(created, await fixture.Service.GetAsync(created.ReservationId));   // Librarian
+
+        fixture.CurrentUser.Role = StaffRoles.StaffMember;
+        fixture.CurrentUser.StaffMemberId = StaffId;
+        Assert.Equal(created, await fixture.Service.GetAsync(created.ReservationId));
+
+        fixture.CurrentUser.StaffMemberId = Guid.NewGuid();
+        var exception = await Assert.ThrowsAsync<DomainException>(() => fixture.Service.GetAsync(created.ReservationId));
+        Assert.Equal(BorrowingErrors.ReservationNotFound, exception.Error);
+    }
+
     private static async Task AssertRejected(Fixture fixture, Error expectedError)
     {
         DomainException exception = await Assert.ThrowsAsync<DomainException>(
-            () => fixture.Service.CreateAsync(BookId, StaffId));
+            () => fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId)));
 
         Assert.Equal(expectedError, exception.Error);
         Assert.Equal(0, fixture.UnitOfWork.CommitCount);
@@ -144,6 +222,7 @@ public sealed class ReservationServiceTests
         public readonly LockFake Lock = new();
         public readonly UnitOfWorkFake UnitOfWork;
         public readonly FakeIdGenerator Ids = new();
+        public readonly FakeCurrentUser CurrentUser = new();   // a Librarian unless a test says otherwise
         public StaffMemberStatus Status
         {
             set => Staff.Status = value;
@@ -167,7 +246,7 @@ public sealed class ReservationServiceTests
             Catalog.Book = Book();
             UnitOfWork = new UnitOfWorkFake(Reservations);
             Service = new ReservationService(
-                Staff, Catalog, Loans, Reservations, UnitOfWork, Lock,
+                Staff, Catalog, Loans, Reservations, UnitOfWork, Lock, CurrentUser,
                 new TestClock(Now), Ids);
         }
     }
@@ -269,6 +348,8 @@ public sealed class ReservationServiceTests
             _pending.Add(reservation);
             return Task.CompletedTask;
         }
+        public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
+            Task.FromResult(Saved.SingleOrDefault(r => r.Id == reservationId));
         public void Commit()
         {
             Saved.AddRange(_pending);

@@ -9,4 +9,7 @@ public interface IReservationRepository
     Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default);
     Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default);
     Task AddAsync(Reservation reservation, CancellationToken ct = default);
+
+    /// <summary>The reservation with this id, read only; null when there is none.</summary>
+    Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default);
 }

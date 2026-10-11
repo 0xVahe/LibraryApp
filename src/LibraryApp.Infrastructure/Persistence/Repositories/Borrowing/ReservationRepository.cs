@@ -33,4 +33,7 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
         ArgumentNullException.ThrowIfNull(reservation);
         await db.Reservations.AddAsync(reservation, ct);
     }
+
+    public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
+        db.Reservations.AsNoTracking().SingleOrDefaultAsync(r => r.Id == reservationId, ct);
 }

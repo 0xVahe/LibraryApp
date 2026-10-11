@@ -88,8 +88,8 @@ public static class BorrowingErrors
         "borrowing.reservation_limit_reached",
         "The employee already has the maximum of three active reservations.");
 
-    /// <summary>The employee already has an active reservation for this book.</summary>
-    public static readonly Error DuplicateActiveReservation = Error.BusinessRule(
+    /// <summary>The employee already has an active reservation for this book (a conflict with the current queue).</summary>
+    public static readonly Error DuplicateActiveReservation = Error.Conflict(
         "borrowing.duplicate_active_reservation",
         "The employee already has an active reservation for this book.");
 
@@ -97,6 +97,21 @@ public static class BorrowingErrors
     public static readonly Error BookAlreadyOnLoan = Error.BusinessRule(
         "borrowing.book_already_on_loan",
         "The employee already holds this book through an open loan.");
+
+    /// <summary>No reservation has this id, or it belongs to another staff member (NFR-03).</summary>
+    public static readonly Error ReservationNotFound = Error.NotFound(
+        "borrowing.reservation_not_found",
+        "The reservation does not exist.");
+
+    /// <summary>A Staff Member may reserve only for themselves (NFR-03).</summary>
+    public static readonly Error ReservationForAnotherStaffMember = Error.Forbidden(
+        "borrowing.reservation_for_another_staff_member",
+        "A staff member can reserve books only for themselves.");
+
+    /// <summary>A Librarian or Library Administrator must name the staff member the reservation is for.</summary>
+    public static readonly Error ReservationStaffMemberRequired = Error.Validation(
+        "borrowing.reservation_staff_member_required",
+        "Name the staff member the reservation is for.");
 
     /// <summary>Restricted employees cannot make reservations.</summary>
     public static readonly Error RestrictedReservationForbidden = Error.BusinessRule(

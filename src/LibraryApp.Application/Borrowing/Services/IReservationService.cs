@@ -5,6 +5,12 @@ namespace LibraryApp.Application.Borrowing.Services;
 /// <summary>Reservation operations of the Borrowing module.</summary>
 public interface IReservationService
 {
-    /// <summary>Creates a waiting reservation when the employee and book satisfy BOR-07.</summary>
-    Task<ReservationDto> CreateAsync(Guid bookId, Guid staffMemberId, CancellationToken ct = default);
+    /// <summary>
+    /// Places the staff member at the end of the book's queue (BOR-07, BR-BOR-2, BR-BOR-3). A Staff Member reserves only for
+    /// themselves; a Librarian or Library Administrator names the staff member (NFR-03).
+    /// </summary>
+    Task<ReservationDto> CreateAsync(CreateReservationRequest request, CancellationToken ct = default);
+
+    /// <summary>One reservation; a Staff Member sees only their own (others are reported as not found).</summary>
+    Task<ReservationDto> GetAsync(Guid reservationId, CancellationToken ct = default);
 }

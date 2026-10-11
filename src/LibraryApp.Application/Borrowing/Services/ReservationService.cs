@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
@@ -10,7 +11,12 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Borrowing.Services;
 
-/// <summary>Creates reservations while enforcing BOR-07 within one serialized database transaction.</summary>
+/// <summary>
+/// Reservations (BOR-07). Creating one runs in one transaction under the staff lock and the book's queue lock
+/// (<see cref="BorrowingLocks"/>, in that order), so the limits of the employee and the queue positions of the book are
+/// decided one request at a time; the unique index on active reservations is the last line of defence (409).
+/// The input is validated by <c>CreateReservationRequestValidator</c> before the endpoint is reached (SD-15).
+/// </summary>
 public sealed class ReservationService(
     IStaffMemberService staffMembers,
     ICatalogService catalog,
@@ -18,70 +24,94 @@ public sealed class ReservationService(
     IReservationRepository reservations,
     IUnitOfWork unitOfWork,
     IApplicationLock applicationLock,
+    ICurrentUser currentUser,
     IClock clock,
     IIdGenerator idGenerator) : IReservationService
 {
-    private const int MaximumActiveReservations = 3;
+    /// <summary>BR-BOR-2: at most 3 active (Waiting or ReadyForPickup) reservations per employee.</summary>
+    public const int MaximumActiveReservations = 3;
 
-    public async Task<ReservationDto> CreateAsync(
-        Guid bookId,
-        Guid staffMemberId,
-        CancellationToken ct = default)
+    public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, CancellationToken ct = default)
     {
-        if (bookId == Guid.Empty || staffMemberId == Guid.Empty)
-            throw new DomainException(BorrowingErrors.InvalidReferenceId);
+        ArgumentNullException.ThrowIfNull(request);
+        Guid staffMemberId = ResolveStaffMember(request.StaffMemberId);
+        Guid bookId = request.BookId;
 
         Reservation reservation = await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            // Keep the shared lock order (staff, then book) to protect both the employee limit and book queue.
-            await applicationLock.AcquireAsync($"borrowing:reservation:staff:{staffMemberId:N}", token);
-            await applicationLock.AcquireAsync($"borrowing:reservation:book:{bookId:N}", token);
+            // A deleted book is gone for readers: the same 404 as an unknown one.
+            BookDto? book = await catalog.GetBookAsync(bookId, token);
+            if (book is null || book.IsDeleted)
+                throw new DomainException(CatalogErrors.BookNotFound);
 
-            BookDto book = await catalog.GetBookAsync(bookId, token)
-                ?? throw new DomainException(CatalogErrors.BookNotFound);
-            if (book.IsDeleted)
-                throw new DomainException(CatalogErrors.BookDeleted);
+            await applicationLock.AcquireAsync(BorrowingLocks.Staff(staffMemberId), token);
+            await applicationLock.AcquireAsync(BorrowingLocks.Book(bookId), token);
 
-            // Group 2 allows Restricted members to borrow, but BOR-07 explicitly excludes them from reservations.
-            StaffMemberStatus status = await staffMembers.GetStatusAsync(staffMemberId, token);
-            if (status == StaffMemberStatus.Restricted)
+            // Restricted: may borrow one book but not reserve (BR-MEM-3, BQ-G2-05); Suspended and Deactivated: Staff's reason.
+            if (await staffMembers.GetStatusAsync(staffMemberId, token) == StaffMemberStatus.Restricted)
                 throw new DomainException(BorrowingErrors.RestrictedReservationForbidden);
 
             EligibilityResult eligibility = await staffMembers.CanBorrowAsync(staffMemberId, token);
             if (!eligibility.IsAllowed)
                 throw new DomainException(eligibility.Error!);
 
+            // BR-BOR-3: a reservation only when no copy is Available.
             if (await catalog.GetAvailableCopyAsync(bookId, token) is not null)
                 throw new DomainException(BorrowingErrors.ReservationCopyAvailable);
+
+            // BR-BOR-2: not a book the employee already holds.
+            IReadOnlyList<Guid> openLoanCopyIds = await loans.GetOpenLoanCopyIdsAsync(staffMemberId, token);
+            if (openLoanCopyIds.Count > 0)
+            {
+                IReadOnlyList<BookCopyDto> heldCopies = await catalog.GetCopiesAsync(openLoanCopyIds, token);
+                if (heldCopies.Any(copy => copy.BookId == bookId))
+                    throw new DomainException(BorrowingErrors.BookAlreadyOnLoan);
+            }
+
+            // The most precise reason first: already in this queue (409), then the limit of 3 (BR-BOR-2).
+            if (await reservations.HasActiveForBookAsync(staffMemberId, bookId, token))
+                throw new DomainException(BorrowingErrors.DuplicateActiveReservation);
 
             if (await reservations.CountActiveAsync(staffMemberId, token) >= MaximumActiveReservations)
                 throw new DomainException(BorrowingErrors.ReservationLimitReached);
 
-            if (await reservations.HasActiveForBookAsync(staffMemberId, bookId, token))
-                throw new DomainException(BorrowingErrors.DuplicateActiveReservation);
-
-            IReadOnlyList<Guid> openLoanCopyIds =
-                await loans.GetOpenLoanCopyIdsAsync(staffMemberId, token);
-            if (openLoanCopyIds.Count > 0)
-            {
-                IReadOnlyList<BookCopyDto> openLoanCopies = await catalog.GetCopiesAsync(openLoanCopyIds, token);
-                if (openLoanCopies.Any(copy => copy.BookId == bookId))
-                    throw new DomainException(BorrowingErrors.BookAlreadyOnLoan);
-            }
-
-            int queuePosition = checked(await reservations.CountWaitingForBookAsync(bookId, token) + 1);
-            Reservation created = Reservation.Create(
-                idGenerator.NewId(),
-                bookId,
-                staffMemberId,
-                clock.UtcNow,
-                queuePosition);
+            // FIFO: the end of the queue of Waiting reservations.
+            int queuePosition = await reservations.CountWaitingForBookAsync(bookId, token) + 1;
+            Reservation created = Reservation.Create(idGenerator.NewId(), bookId, staffMemberId, clock.UtcNow, queuePosition);
 
             await reservations.AddAsync(created, token);
             return created;
         }, ct);
 
         return ToDto(reservation);
+    }
+
+    public async Task<ReservationDto> GetAsync(Guid reservationId, CancellationToken ct = default)
+    {
+        Reservation? reservation = await reservations.FindAsync(reservationId, ct);
+
+        // NFR-03: a Staff Member sees only their own reservations; another one is reported as not found.
+        if (reservation is null || (IsStaffMemberOnly && reservation.StaffMemberId != currentUser.StaffMemberId))
+            throw new DomainException(BorrowingErrors.ReservationNotFound);
+
+        return ToDto(reservation);
+    }
+
+    private bool IsStaffMemberOnly =>
+        !currentUser.IsInRole(StaffRoles.Librarian) && !currentUser.IsInRole(StaffRoles.LibraryAdministrator);
+
+    /// <summary>Who the reservation is for: a Staff Member — themselves only; a Librarian or Administrator — the named one.</summary>
+    private Guid ResolveStaffMember(Guid? requested)
+    {
+        if (IsStaffMemberOnly)
+        {
+            Guid own = currentUser.StaffMemberId ?? throw new DomainException(BorrowingErrors.ReservationForAnotherStaffMember);
+            if (requested is { } other && other != own)
+                throw new DomainException(BorrowingErrors.ReservationForAnotherStaffMember);
+            return own;
+        }
+
+        return requested ?? throw new DomainException(BorrowingErrors.ReservationStaffMemberRequired);
     }
 
     private static ReservationDto ToDto(Reservation reservation) => new(
