@@ -7,12 +7,10 @@ namespace LibraryApp.Domain.Borrowing;
 /// </summary>
 public static class BorrowingErrors
 {
-    /// <summary>A copy barcode is required to issue a loan.</summary>
-    public static readonly Error BarcodeRequired = Error.Validation(
-        "borrowing.barcode_required",
-        "A copy barcode is required.");
-    
-    
+    /// <summary>No loan has this id.</summary>
+    public static readonly Error LoanNotFound =
+        Error.NotFound("borrowing.loan_not_found", "The loan does not exist.");
+
     /// <summary>No copy has the barcode that was scanned.</summary>
     public static readonly Error CopyNotFound =
         Error.NotFound("borrowing.copy_not_found", "No copy with this barcode was found.");
@@ -20,8 +18,7 @@ public static class BorrowingErrors
     /// <summary>The copy exists but cannot be lent now (on loan, reserved, under repair, lost or withdrawn).</summary>
     public static readonly Error CopyNotAvailable =
         Error.BusinessRule("borrowing.copy_not_available", "This copy is not available for lending.");
-    
-    
+
     /// <summary>
     /// A required reference identifier is empty.
     /// </summary>

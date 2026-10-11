@@ -29,4 +29,8 @@ public sealed class LoanRepository(LibraryDbContext db) : ILoanRepository
                 l => l.StaffMemberId == staffMemberId
                      && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue),
                 ct);
+
+    /// <inheritdoc />
+    public Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default) =>
+        db.Set<Loan>().AsNoTracking().SingleOrDefaultAsync(l => l.Id == loanId, ct);
 }
