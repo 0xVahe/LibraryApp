@@ -32,8 +32,10 @@ public sealed class BookCopyRepository(LibraryDbContext db) : IBookCopyRepositor
             .OrderBy(copy => copy.Barcode)
             .ToListAsync(ct);
 
-    public Task<BookCopy?> GetByIdAsync(Guid copyId, CancellationToken ct) =>
-        db.BookCopies.SingleOrDefaultAsync(copy => copy.Id == copyId, ct);
+    // FindAsync looks at the tracked copies first, so a copy added in the same unit of work (not saved yet) is found
+    // too: Borrowing reserves a new copy through SetCopyStatusAsync before the transaction is saved (BQ-G1-10).
+    public async Task<BookCopy?> GetByIdAsync(Guid copyId, CancellationToken ct) =>
+        await db.BookCopies.FindAsync(new object[] { copyId }, ct);
 
     public void Add(BookCopy copy) => db.BookCopies.Add(copy);
 }

@@ -61,3 +61,15 @@ internal sealed class FakeCategories : ICategoryRepository
     public void Add(Category category) => Categories.Add(category);
     public void Remove(Category category) => Categories.Remove(category);
 }
+
+internal sealed class FakePublishers : IPublisherRepository
+{
+    public List<Publisher> Publishers { get; } = [];
+    public List<Book> Books { get; } = [];
+    public Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<PublisherDto>>(Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
+    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+    public void Add(Publisher publisher) => Publishers.Add(publisher);
+    public void Remove(Publisher publisher) => Publishers.Remove(publisher);
+    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) => Task.FromResult(Books.Any(x => x.PublisherId == id));
+}

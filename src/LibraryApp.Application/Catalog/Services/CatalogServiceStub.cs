@@ -5,12 +5,12 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Application.Catalog.Services;
 
 /// <summary>
-/// Temporary in-memory stand-in for <see cref="ICatalogService"/>, so Borrowing can code and test against the frozen
-/// contract before the real Catalog service exists ("Until a provider is ready, consumers code against a stub").
-/// Group 1 replaces it with the real service in a separate pull request after that service is merged.
+/// Temporary in-memory stand-in for <see cref="ICatalogService"/>, written so other modules could code and test against
+/// the frozen contract before the real Catalog service existed ("Until a provider is ready, consumers code against a stub").
 /// <para>
-/// Not registered in dependency injection: create it in tests, or register it yourself until the Catalog module
-/// registration exists. Each instance has its own data (fixed ids below). Not thread-safe.
+/// The real service, <see cref="CatalogService"/>, is registered by <c>AddCatalogModule</c> (CAT-07), so do not register
+/// this stub in the application. It will be removed from <c>src</c> before the code freeze (21 October): for tests, prefer
+/// a fake in your own test project. Each instance has its own data (fixed ids below). Not thread-safe.
 /// </para>
 /// <para>
 /// Status changes use the real <see cref="BookCopy"/> entity, so the copy status transition rules are the same as in
@@ -19,7 +19,7 @@ namespace LibraryApp.Application.Catalog.Services;
 /// </summary>
 public sealed class CatalogServiceStub : ICatalogService
 {
-    // ---------- Boo   ks ----------
+    // ---------- Books ----------
 
     /// <summary>Has copies BK-0001-01 and BK-0001-02 (Available), BK-0001-03 (OnLoan), BK-0001-04 (Lost).</summary>
     public static readonly Guid AvailableBookId = new("b0000000-0000-0000-0000-000000000001");

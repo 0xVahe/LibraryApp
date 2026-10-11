@@ -4,7 +4,6 @@ namespace LibraryApp.Application.Borrowing.Ports;
 
 /// <summary>
 /// Storage of loans. It only stages changes; saving and committing belong to the unit of work.
-/// Only the methods Task 3 needs are here. Later tasks will add more (get by id, history, and so on).
 /// </summary>
 public interface ILoanRepository
 {
@@ -19,6 +18,9 @@ public interface ILoanRepository
     /// </summary>
     Task<int> CountOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default);
 
-    /// <summary>Gets copy ids for the employee's Active or Overdue loans (BOR-07).</summary>
+    /// <summary>The loan with this id, read only; null when there is none.</summary>
+    Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default);
+
+    /// <summary>Copy ids of the employee's open (Active or Overdue) loans (BOR-07, BR-BOR-2).</summary>
     Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default);
 }

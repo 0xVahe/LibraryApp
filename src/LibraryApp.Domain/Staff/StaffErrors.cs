@@ -12,8 +12,8 @@ public static class StaffErrors
         Error.Conflict("staff.employee_id_taken", "Employee ID is already enrolled.");
     public static readonly Error EmailTaken =
         Error.Conflict("staff.email_taken", "Corporate email is already in use.");
-    public static readonly Error DepartmentNotFound =
-        Error.Validation("staff.department_not_found", "Department was not found.");
+    public static readonly Error DepartmentInvalid =
+        Error.Validation("staff.department_invalid", "Department was not found.");
     public static readonly Error CategoryNotFound =
         Error.Validation("staff.category_not_found", "Staff category was not found.");
     public static readonly Error RoleAssignmentForbidden =
@@ -22,10 +22,16 @@ public static class StaffErrors
         Error.Validation("staff.account_write_failed", "The user account could not be saved.");
     public static readonly Error AccountRoleInvalid =
         Error.Conflict("staff.account_role_invalid", "The staff account must have exactly one supported role.");
-
+    public static readonly Error CategoryNameTaken =
+        Error.Conflict("staff.category_name_taken", "Staff category name is already in use.");
+    
     // Department
     public static readonly Error DepartmentNameRequired =
         Error.Validation("staff.department_name_required", "Department name is required.");
+    public static readonly Error DepartmentNotFound =
+        Error.NotFound("staff.department_not_found", "The department was not found.");
+    public static readonly Error DepartmentNameTaken =
+        Error.Conflict("staff.department_name_taken", "A department with this name already exists.");
 
     // Staff category
     public static readonly Error CategoryNameRequired =
@@ -39,7 +45,10 @@ public static class StaffErrors
 
     public static readonly Error MaxRenewalsInvalid =
         Error.Validation("staff.max_renewals_invalid", "Maximum renewals must not be negative.");
-
+    
+    public static readonly Error CategoryResourceNotFound =
+        Error.NotFound("staff.category_resource_not_found", "Staff category was not found.");
+    
     // Staff member
     public static readonly Error EmployeeIdRequired =
         Error.Validation("staff.employee_id_required", "Employee ID is required.");
@@ -70,6 +79,9 @@ public static class StaffErrors
 
     public static readonly Error AlreadyDeactivated =
         Error.BusinessRule("staff.already_deactivated", "The staff member is already deactivated.");
+
+    public static readonly Error HasActiveLoans =
+        Error.Conflict("staff.has_active_loans", "Return all outstanding books before deactivating the staff member.");
 
     public static readonly Error DeactivatedProfileLocked =
         Error.Conflict("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");

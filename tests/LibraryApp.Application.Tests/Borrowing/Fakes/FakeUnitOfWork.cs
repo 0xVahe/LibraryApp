@@ -2,7 +2,7 @@ using LibraryApp.Application.Abstractions.Common;
 
 namespace LibraryApp.Application.Tests.Borrowing.Fakes;
 
-public sealed class FakeUnitOfWork(FakeLoanRepository loans, InMemoryCatalogService catalog)
+public sealed class FakeUnitOfWork(FakeLoanRepository loans, InMemoryCatalogService catalog, FakeEventBus? events = null)
     : IUnitOfWork
 {
     public int StartedCount { get; private set; }
@@ -25,6 +25,7 @@ public sealed class FakeUnitOfWork(FakeLoanRepository loans, InMemoryCatalogServ
 
             ct.ThrowIfCancellationRequested();
             loans.Commit();
+            events?.Commit();
             CommittedCount++;
 
             return result;
@@ -32,6 +33,7 @@ public sealed class FakeUnitOfWork(FakeLoanRepository loans, InMemoryCatalogServ
         catch
         {
             loans.Rollback();
+            events?.Rollback();
             catalog.Restore(catalogSnapshot);
             RolledBackCount++;
 

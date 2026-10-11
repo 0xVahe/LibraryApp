@@ -1,4 +1,5 @@
 ﻿using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Domain.Tests.Borrowing;
 
@@ -11,7 +12,7 @@ public class PenaltyPolicyTests
     {
         var result = _policy.GetStatus(4);
 
-        Assert.Equal("Active", result);
+        Assert.Equal(StaffMemberStatus.Active, result);
     }
 
     [Fact]
@@ -19,7 +20,7 @@ public class PenaltyPolicyTests
     {
         var result = _policy.GetStatus(5);
 
-        Assert.Equal("Restricted", result);
+        Assert.Equal(StaffMemberStatus.Restricted, result);
     }
 
     [Fact]
@@ -27,7 +28,7 @@ public class PenaltyPolicyTests
     {
         var result = _policy.GetStatus(9);
 
-        Assert.Equal("Restricted", result);
+        Assert.Equal(StaffMemberStatus.Restricted, result);
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public class PenaltyPolicyTests
     {
         var result = _policy.GetStatus(10);
 
-        Assert.Equal("Suspended", result);
+        Assert.Equal(StaffMemberStatus.Suspended, result);
     }
 
     [Fact]

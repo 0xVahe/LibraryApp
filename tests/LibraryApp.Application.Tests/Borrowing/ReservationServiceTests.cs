@@ -251,6 +251,7 @@ public sealed class ReservationServiceTests
         public Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Guid>>(CopyIds);
         public Task<int> CountOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default) => Task.FromResult(0);
         public Task AddAsync(Loan loan, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class ReservationRepositoryFake : IReservationRepository

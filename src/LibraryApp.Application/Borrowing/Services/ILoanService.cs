@@ -18,4 +18,7 @@ public interface ILoanService
     /// the copy is not available, or Catalog rejects the status change.
     /// </exception>
     Task<LoanDto> IssueAsync(IssueLoanRequest request, CancellationToken ct = default);
+
+    /// <summary>One loan. Throws <c>borrowing.loan_not_found</c> when there is none.</summary>
+    Task<LoanDto> GetAsync(Guid loanId, CancellationToken ct = default);
 }
