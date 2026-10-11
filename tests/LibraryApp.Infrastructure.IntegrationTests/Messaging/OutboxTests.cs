@@ -34,6 +34,12 @@ public sealed class OutboxFixture : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddPlatform(configuration, new TestEnvironment());
+
+        // Only the handlers of this test project: module handlers come and go and must not change what these tests count.
+        var moduleHandlers = services.Where(d => d.ServiceType.IsGenericType
+            && d.ServiceType.GetGenericTypeDefinition() == typeof(IEventHandler<>)).ToList();
+        foreach (var handler in moduleHandlers)
+            services.Remove(handler);
         services.AddEventHandlers(typeof(OutboxFixture).Assembly);
         Services = services.BuildServiceProvider();
 
@@ -178,8 +184,7 @@ public class OutboxTests(OutboxFixture fixture) : IClassFixture<OutboxFixture>
 
         Assert.Equal(1, HandlerLog.CallsOf(nameof(SteadyHandler), loanIssued.EventId));
         Assert.Equal(1, HandlerLog.CallsOf(nameof(FlakyHandler), loanIssued.EventId));
-        // The event is handled by the two test handlers and the discovered LoanIssued notification handler.
-        Assert.Equal(3, await fixture.InboxCountAsync(loanIssued.EventId));
+        Assert.Equal(2, await fixture.InboxCountAsync(loanIssued.EventId));
         Assert.NotNull((await fixture.MessageAsync(loanIssued.EventId))!.ProcessedAtUtc);
     }
 
