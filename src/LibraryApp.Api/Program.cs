@@ -29,10 +29,12 @@ if (builder.Environment.IsDevelopment()
     builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
 
 // Logging: Serilog to console and file (requirements document). Settings: appsettings "Serilog".
+// preserveStaticLogger: every ILogger<T> writes to this host's own logger, not to the static Log.Logger that another
+// host in the same process (integration tests) replaces and closes when it stops.
 builder.Host.UseSerilog((context, services, logger) => logger
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
-    .Enrich.FromLogContext());
+    .Enrich.FromLogContext(), preserveStaticLogger: true);
 
 // Platform: database, unit of work, clock, id generator, health checks (Integration Owner).
 builder.Services.AddPlatform(builder.Configuration, builder.Environment);
