@@ -20,7 +20,7 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 /// The real Borrowing read contract for Staff (BR-MEM-4) on the host with the Development seed: the registered
 /// provider, the open loans it returns, and Staff's deactivation refused because of them.
 /// </summary>
-public class BorrowingReadServiceTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
+public class BorrowingReadServiceTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>
 {
     private static readonly DateTime Now = DateTime.UtcNow;
 

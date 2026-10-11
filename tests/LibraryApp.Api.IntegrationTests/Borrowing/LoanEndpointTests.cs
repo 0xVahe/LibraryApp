@@ -23,7 +23,7 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 /// and seeded copies (CatalogSeedIds). Every test uses its own staff member and copies, so the tests of the class do
 /// not depend on each other.
 /// </summary>
-public class LoanEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
+public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>
 {
     // As the API writes JSON: camelCase, enums as names (SD-11).
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
