@@ -31,11 +31,14 @@ public sealed class BorrowingReadService(LibraryDbContext db, IClock clock) : IB
 
         // Points stop counting at ExpiresAtUtc even before the daily job marks the record Expired (BQ-G2-11, note 2).
         DateTime now = clock.UtcNow;
-        List<ActivePenaltyInfo> penalties = await db.PenaltyRecords
-            .AsNoTracking()
-            .Where(p => p.StaffMemberId == staffMemberId && p.Status == PenaltyRecordStatus.Active && p.ExpiresAtUtc > now)
-            .OrderBy(p => p.CreatedAtUtc)
-            .Select(p => new ActivePenaltyInfo(p.Id, p.LoanId, p.Points, p.Reason, p.CreatedAtUtc, p.ExpiresAtUtc))
+        // The book through the penalty's loan and that loan's copy (foreign keys), in the same query.
+        List<ActivePenaltyInfo> penalties = await (
+                from p in db.PenaltyRecords.AsNoTracking()
+                    .Where(p => p.StaffMemberId == staffMemberId && p.Status == PenaltyRecordStatus.Active && p.ExpiresAtUtc > now)
+                join loan in db.Loans.AsNoTracking() on p.LoanId equals loan.Id
+                join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+                orderby p.CreatedAtUtc
+                select new ActivePenaltyInfo(p.Id, p.LoanId, copy.BookId, p.Points, p.Reason, p.CreatedAtUtc, p.ExpiresAtUtc))
             .ToListAsync(ct);
 
         return new StaffBorrowingSummary(staffMemberId, loans, reservations, penalties.Sum(p => p.Points), penalties);

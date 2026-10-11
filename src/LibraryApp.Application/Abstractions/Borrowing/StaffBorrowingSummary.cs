@@ -24,9 +24,11 @@ public sealed record OpenReservationInfo(
     DateTime? ReadyUntilUtc,
     DateTime CreatedAtUtc);
 
+/// <param name="BookId">The book of the loan behind the penalty; that loan is usually returned, so it is not in ActiveLoans.</param>
 public sealed record ActivePenaltyInfo(
     Guid PenaltyId,
     Guid LoanId,
+    Guid BookId,
     int Points,
     string Reason,
     DateTime CreatedAtUtc,

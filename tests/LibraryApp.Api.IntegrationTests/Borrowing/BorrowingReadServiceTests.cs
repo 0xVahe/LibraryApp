@@ -91,7 +91,7 @@ public class BorrowingReadServiceTests(ApiHostFactory factory) : IClassFixture<A
         Guid member = Members.AramSargsyan;
         var renewed = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(23, 1), member, Now.AddDays(-10), 21);
         renewed.Renew(21);
-        var returned = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(23, 2), member, Now.AddDays(-120), 21);
+        var returned = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(33, 1), member, Now.AddDays(-120), 21);
         returned.Return(Now.AddDays(-100));
 
         var waiting = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(24), member, Now.AddDays(-3), 1);
@@ -130,8 +130,9 @@ public class BorrowingReadServiceTests(ApiHostFactory factory) : IClassFixture<A
             summary.Reservations);
         Assert.Equal(
             [
-                new ActivePenaltyInfo(older.Id, returned.Id, 3, "Returned late", older.CreatedAtUtc, older.ExpiresAtUtc),
-                new ActivePenaltyInfo(newer.Id, renewed.Id, 1, "Returned damaged", newer.CreatedAtUtc, newer.ExpiresAtUtc),
+                // The book of a returned loan, which is not in ActiveLoans.
+                new ActivePenaltyInfo(older.Id, returned.Id, CatalogSeedIds.Book(33), 3, "Returned late", older.CreatedAtUtc, older.ExpiresAtUtc),
+                new ActivePenaltyInfo(newer.Id, renewed.Id, CatalogSeedIds.Book(23), 1, "Returned damaged", newer.CreatedAtUtc, newer.ExpiresAtUtc),
             ],
             summary.ActivePenalties);
         Assert.Equal(4, summary.ActivePenaltyPoints);
