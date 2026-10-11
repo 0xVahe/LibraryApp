@@ -41,6 +41,12 @@ public sealed class FakeLoanRepository : ILoanRepository
         return Task.CompletedTask;
     }
 
+    public Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(_saved.SingleOrDefault(loan => loan.Id == loanId));
+    }
+
     public void Commit()
     {
         _saved.AddRange(_pending);
