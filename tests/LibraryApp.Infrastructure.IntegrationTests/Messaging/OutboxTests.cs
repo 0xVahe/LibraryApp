@@ -34,6 +34,12 @@ public sealed class OutboxFixture : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddPlatform(configuration, new TestEnvironment());
+
+        // Only the handlers of this test project: module handlers come and go and must not change what these tests count.
+        var moduleHandlers = services.Where(d => d.ServiceType.IsGenericType
+            && d.ServiceType.GetGenericTypeDefinition() == typeof(IEventHandler<>)).ToList();
+        foreach (var handler in moduleHandlers)
+            services.Remove(handler);
         services.AddEventHandlers(typeof(OutboxFixture).Assembly);
         Services = services.BuildServiceProvider();
 

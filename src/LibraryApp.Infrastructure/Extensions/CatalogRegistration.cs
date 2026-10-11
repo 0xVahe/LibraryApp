@@ -38,6 +38,10 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<IAuthorRepository, AuthorRepository>();
         services.AddScoped<IAuthorService, AuthorService>();
 
+        // Publishers
+        services.AddScoped<IPublisherRepository, PublisherRepository>();
+        services.AddScoped<IPublisherService, PublisherService>();
+
         // Categories (CAT-03)
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
