@@ -1,7 +1,6 @@
 # One command starts the system (NFR-13):  docker compose up --build
 #   API + Swagger   http://localhost:${API_PORT:-8080}/swagger
 #   SQL Server      localhost,${MSSQL_PORT:-1433}  (user sa, password from .env)
-#   smtp4dev        http://localhost:${SMTP4DEV_PORT:-5080}  (emails sent by the API, NOT-03)
 # First copy .env.sample to .env and set MSSQL_SA_PASSWORD and JWT_SIGNING_KEY. .env is ignored by git.
 # Only the database (API from the IDE):  docker compose up -d sqlserver
 
@@ -39,8 +38,6 @@ services:
     depends_on:
       sqlserver:
         condition: service_healthy
-      smtp4dev:
-        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development   # Swagger and seed data are enabled only in Development
       UseHttpsRedirection: "false"          # the container listens on plain HTTP
@@ -49,9 +46,6 @@ services:
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}   # the API refuses to start without it
       Database__MigrateOnStartup: "true"
       Seed__Enabled: "true"
-      # Emails go to smtp4dev on its container port; nothing leaves the machine (NOT-03).
-      Mail__Host: smtp4dev
-      Mail__Port: "25"
     ports:
       - "${API_PORT:-8080}:8080"
     # The runtime image has no curl: a plain HTTP request from bash. "unhealthy" in `docker compose ps`
@@ -62,15 +56,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-
-  # Fake mail server (NOT-03): accepts every email and shows it in a web page instead of delivering it.
-  smtp4dev:
-    image: rnwood/smtp4dev:v3
-    container_name: libraryapp-smtp4dev
-    restart: unless-stopped
-    ports:
-      - "${SMTP4DEV_PORT:-5080}:80"   # web page with the received emails
-      - "${SMTP4DEV_SMTP_PORT:-2525}:25"   # SMTP, same port as Mail:Port in appsettings.json for the API run from the IDE
 
 volumes:
   sqlserver-data:
