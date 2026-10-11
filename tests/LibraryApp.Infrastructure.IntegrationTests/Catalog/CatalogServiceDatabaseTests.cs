@@ -1,4 +1,6 @@
+using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
+using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
 using LibraryApp.Domain.Catalog;
@@ -258,6 +260,33 @@ public class CatalogServiceDatabaseTests(CatalogServiceDatabase database) : ICla
         var error = await Assert.ThrowsAsync<DomainException>(() => slowChange);
         Assert.Equal(CommonErrors.ConcurrencyConflict, error.Error);
         Assert.Equal(BookCopyStatus.OnLoan, await StatusOfAsync(CatalogServiceDatabase.ConflictCopyId));
+    }
+
+    // ---------- a new copy offered to the reservation queue (BQ-G1-10) ----------
+
+    [Fact]
+    public async Task A_copy_added_in_a_unit_of_work_can_be_reserved_before_it_is_saved()
+    {
+        BookCopyDto copy;
+        await using (var db = database.NewContext())
+        {
+            var copies = new BookCopyService(
+                new BookCopyRepository(db), new UnitOfWork(db), new SequentialGuidGenerator(TimeProvider.System),
+                new ReservingQueue(Service(db)));
+
+            copy = await copies.AddCopyAsync(
+                CatalogServiceDatabase.StatusBookId, new AddCopyRequest("ST-NEW", BookCopyCondition.New, null));
+        }
+
+        Assert.Equal(BookCopyStatus.Reserved, copy.Status);
+        Assert.Equal(BookCopyStatus.Reserved, await StatusOfAsync(copy.Id));
+    }
+
+    /// <summary>Does what Borrowing does when someone is waiting: reserves the offered copy through the catalog contract.</summary>
+    private sealed class ReservingQueue(ICatalogService catalog) : IReservationQueueService
+    {
+        public Task OfferCopyAsync(Guid copyId, Guid bookId, CancellationToken ct = default) =>
+            catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Reserved, ct);
     }
 
     private async Task<BookCopyStatus> StatusOfAsync(Guid copyId)
