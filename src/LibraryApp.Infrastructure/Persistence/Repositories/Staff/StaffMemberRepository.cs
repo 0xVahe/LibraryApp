@@ -1,0 +1,28 @@
+using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Staff;
+using Microsoft.EntityFrameworkCore;
+
+namespace LibraryApp.Infrastructure.Persistence.Repositories.Staff;
+
+public sealed class StaffMemberRepository(LibraryDbContext db) : IStaffMemberRepository
+{
+    public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        db.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public Task<StaffMemberStatus?> GetStatusAsync(Guid id, CancellationToken ct) =>
+        db.StaffMembers
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => (StaffMemberStatus?)x.Status)
+            .SingleOrDefaultAsync(ct);
+
+    public Task<StaffLendingInfo?> GetLendingInfoAsync(Guid id, CancellationToken ct) =>
+        (from member in db.StaffMembers.AsNoTracking()
+            join category in db.StaffCategories.AsNoTracking() on member.StaffCategoryId equals category.Id
+            where member.Id == id
+            select new StaffLendingInfo(
+                member.Status,
+                new LendingRules(category.MaxLoans, category.LoanDays, category.MaxRenewals)))
+        .SingleOrDefaultAsync(ct);
+}

@@ -1,0 +1,83 @@
+# One command starts the system (NFR-13):  docker compose up --build
+#   API + Swagger   http://localhost:${API_PORT:-8080}/swagger
+#   SQL Server      localhost,${MSSQL_PORT:-1433}  (user sa, password from .env)
+#   smtp4dev        http://localhost:${SMTP4DEV_PORT:-5080}  (emails sent by the API; SMTP localhost:${SMTP4DEV_SMTP_PORT:-2525})
+# First copy .env.sample to .env and set MSSQL_SA_PASSWORD and JWT_SIGNING_KEY. .env is ignored by git.
+# Only the database and the mail server (API from the IDE):  docker compose up -d sqlserver smtp4dev
+
+# Fixed project name: the same containers and data volume whatever the folder of the clone is called.
+name: libraryapp
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: libraryapp-sqlserver
+    platform: linux/amd64
+    restart: unless-stopped   # back by itself when Docker Desktop starts, unless stopped with `docker compose stop`
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    # Healthy only when every database is ONLINE: after a restart LibraryApp is still being recovered for a few
+    # seconds while SQL Server already answers, and an API starting then would try to create it again.
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -o /dev/null -Q \"IF EXISTS (SELECT 1 FROM sys.databases WHERE state_desc <> 'ONLINE') RAISERROR('A database is not online yet', 16, 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/LibraryApp.Api/Dockerfile
+    container_name: libraryapp-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      smtp4dev:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development   # Swagger and seed data are enabled only in Development
+      UseHttpsRedirection: "false"          # the container listens on plain HTTP
+      # Inside the compose network the database host is "sqlserver" on its container port, not localhost.
+      ConnectionStrings__LibraryDb: "Server=sqlserver,1433;Database=LibraryApp;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env}   # the API refuses to start without it
+      Database__MigrateOnStartup: "true"
+      Seed__Enabled: "true"
+      # Emails go to smtp4dev on its container port; nothing leaves the machine (INT-08, NOT-03).
+      Mail__Host: smtp4dev
+      Mail__Port: "25"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    # The runtime image has no curl: a plain HTTP request from bash. "unhealthy" in `docker compose ps`
+    # means the API runs but /health/ready fails (for example the database is not reachable).
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Fake mail server (T-13, INT-08): accepts every email and shows it on a web page instead of delivering it.
+  smtp4dev:
+    image: rnwood/smtp4dev:3.15.0
+    container_name: libraryapp-smtp4dev
+    restart: unless-stopped
+    ports:
+      - "${SMTP4DEV_PORT:-5080}:80"          # web page with the received emails
+      - "${SMTP4DEV_SMTP_PORT:-2525}:25"     # SMTP for the API run from the IDE (Mail:Port in appsettings.json)
+    # Healthy when the SMTP server greets with 220, so the API never starts sending before it can.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/25 && head -n 1 <&3 | grep -q '^220'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  sqlserver-data:

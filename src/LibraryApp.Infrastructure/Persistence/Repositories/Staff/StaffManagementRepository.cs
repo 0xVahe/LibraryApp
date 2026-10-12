@@ -1,0 +1,108 @@
+using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Identity;
+using Microsoft.EntityFrameworkCore;
+using LibraryApp.Application.Common;
+
+namespace LibraryApp.Infrastructure.Persistence.Repositories.Staff;
+
+public sealed class StaffManagementRepository(LibraryDbContext db) : IStaffManagementRepository
+{
+    public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        db.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct)
+    {
+        var profile = await (from member in db.StaffMembers.AsNoTracking()
+            join department in db.Departments on member.DepartmentId equals department.Id
+            join category in db.StaffCategories on member.StaffCategoryId equals category.Id
+            where member.Id == id
+            select new
+            {
+                member.UserId,
+                Dto = new StaffMemberDto(member.Id, member.EmployeeId, member.FirstName, member.LastName,
+                 member.CorporateEmail, member.DepartmentId, department.Name, member.Position, member.LineManagerEmail,
+                 member.StaffCategoryId, category.Name, member.Status.ToString(), member.JoinedLibraryAtUtc, string.Empty)
+            }).SingleOrDefaultAsync(ct);
+
+        if (profile is null)
+            return null;
+
+        return profile.Dto with { Role = await StaffAccountRoles.GetAsync(db, profile.UserId, ct) };
+    }
+
+    public Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct) =>
+        db.StaffMembers.AnyAsync(x => x.EmployeeId == employeeId, ct);
+
+    public Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct) =>
+        db.StaffMembers.AnyAsync(x => x.CorporateEmail == email && (!exceptMemberId.HasValue || x.Id != exceptMemberId.Value), ct);
+
+    public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) =>
+        db.Departments.Where(x => x.Id == id).Select(x => x.Name).SingleOrDefaultAsync(ct);
+
+    public Task<string?> GetCategoryNameAsync(Guid id, CancellationToken ct) =>
+        db.StaffCategories.Where(x => x.Id == id).Select(x => x.Name).SingleOrDefaultAsync(ct);
+
+    public async Task<PagedResult<StaffMemberListItemDto>> SearchAsync(
+        StaffMemberSearchFilter filter,
+        PageRequest paging,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(paging);
+
+        IQueryable<StaffMember> members = db.StaffMembers.AsNoTracking();
+
+        if (filter.Text is not null)
+        {
+            string text = filter.Text;
+
+            members = members.Where(member =>
+                member.FirstName.StartsWith(text) ||
+                member.LastName.StartsWith(text) ||
+                (member.FirstName + " " + member.LastName).StartsWith(text) ||
+                member.EmployeeId.StartsWith(text));
+        }
+
+        if (filter.DepartmentId is Guid departmentId)
+        {
+            members = members.Where(member => member.DepartmentId == departmentId);
+        }
+
+        if (filter.Status is StaffMemberStatus status)
+        {
+            members = members.Where(member => member.Status == status);
+        }
+
+        int totalCount = await members.CountAsync(ct);
+
+        List<StaffMemberListItemDto> items = await members
+            .OrderBy(member => member.LastName)
+            .ThenBy(member => member.FirstName)
+            .ThenBy(member => member.Id)
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
+            .Select(member => new StaffMemberListItemDto(
+                member.Id,
+                member.EmployeeId,
+                member.FirstName,
+                member.LastName,
+                member.CorporateEmail,
+                member.DepartmentId,
+                db.Departments
+                    .Where(department => department.Id == member.DepartmentId)
+                    .Select(department => department.Name)
+                    .First(),
+                member.Status.ToString()))
+            .ToListAsync(ct);
+
+        return new PagedResult<StaffMemberListItemDto>(
+            items,
+            totalCount,
+            paging.Page,
+            paging.PageSize);
+    }
+
+    public void Add(StaffMember member) => db.StaffMembers.Add(member);
+}
