@@ -29,4 +29,17 @@ public sealed class LoanRepository(LibraryDbContext db) : ILoanRepository
                 l => l.StaffMemberId == staffMemberId
                      && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue),
                 ct);
+
+    /// <inheritdoc />
+    public Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default) =>
+        db.Set<Loan>().AsNoTracking().SingleOrDefaultAsync(l => l.Id == loanId, ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default) =>
+        await db.Set<Loan>()
+            .AsNoTracking()
+            .Where(l => l.StaffMemberId == staffMemberId
+                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .Select(l => l.BookCopyId)
+            .ToListAsync(ct);
 }

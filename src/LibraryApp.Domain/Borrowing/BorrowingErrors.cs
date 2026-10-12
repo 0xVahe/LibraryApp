@@ -7,12 +7,10 @@ namespace LibraryApp.Domain.Borrowing;
 /// </summary>
 public static class BorrowingErrors
 {
-    /// <summary>A copy barcode is required to issue a loan.</summary>
-    public static readonly Error BarcodeRequired = Error.Validation(
-        "borrowing.barcode_required",
-        "A copy barcode is required.");
-    
-    
+    /// <summary>No loan has this id.</summary>
+    public static readonly Error LoanNotFound =
+        Error.NotFound("borrowing.loan_not_found", "The loan does not exist.");
+
     /// <summary>No copy has the barcode that was scanned.</summary>
     public static readonly Error CopyNotFound =
         Error.NotFound("borrowing.copy_not_found", "No copy with this barcode was found.");
@@ -20,8 +18,7 @@ public static class BorrowingErrors
     /// <summary>The copy exists but cannot be lent now (on loan, reserved, under repair, lost or withdrawn).</summary>
     public static readonly Error CopyNotAvailable =
         Error.BusinessRule("borrowing.copy_not_available", "This copy is not available for lending.");
-    
-    
+
     /// <summary>
     /// A required reference identifier is empty.
     /// </summary>
@@ -80,6 +77,46 @@ public static class BorrowingErrors
     
     
     // Reservation errors
+
+    /// <summary>An available copy exists, so this book does not need to be reserved.</summary>
+    public static readonly Error ReservationCopyAvailable = Error.BusinessRule(
+        "borrowing.reservation_copy_available",
+        "A copy of this book is available; reservation is not required.");
+
+    /// <summary>The employee already has the maximum number of active reservations.</summary>
+    public static readonly Error ReservationLimitReached = Error.BusinessRule(
+        "borrowing.reservation_limit_reached",
+        "The employee already has the maximum of three active reservations.");
+
+    /// <summary>The employee already has an active reservation for this book (a conflict with the current queue).</summary>
+    public static readonly Error DuplicateActiveReservation = Error.Conflict(
+        "borrowing.duplicate_active_reservation",
+        "The employee already has an active reservation for this book.");
+
+    /// <summary>The employee already holds an open loan for this book.</summary>
+    public static readonly Error BookAlreadyOnLoan = Error.BusinessRule(
+        "borrowing.book_already_on_loan",
+        "The employee already holds this book through an open loan.");
+
+    /// <summary>No reservation has this id, or it belongs to another staff member (NFR-03).</summary>
+    public static readonly Error ReservationNotFound = Error.NotFound(
+        "borrowing.reservation_not_found",
+        "The reservation does not exist.");
+
+    /// <summary>A Staff Member may reserve only for themselves (NFR-03).</summary>
+    public static readonly Error ReservationForAnotherStaffMember = Error.Forbidden(
+        "borrowing.reservation_for_another_staff_member",
+        "A staff member can reserve books only for themselves.");
+
+    /// <summary>A Librarian or Library Administrator must name the staff member the reservation is for.</summary>
+    public static readonly Error ReservationStaffMemberRequired = Error.Validation(
+        "borrowing.reservation_staff_member_required",
+        "Name the staff member the reservation is for.");
+
+    /// <summary>Restricted employees cannot make reservations.</summary>
+    public static readonly Error RestrictedReservationForbidden = Error.BusinessRule(
+        "borrowing.restricted_reservation_forbidden",
+        "Restricted employees cannot make reservations.");
 
     /// <summary>
     /// A waiting reservation requires a positive queue position.

@@ -7,6 +7,7 @@ using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Tests.Borrowing;
@@ -23,6 +24,7 @@ public sealed class LoanServiceTests
     private readonly FakeLoanRepository _loans = new();
     private readonly InMemoryCatalogService _catalog = new();
     private readonly FakeIdGenerator _ids = new();
+    private readonly FakeEventBus _events = new();
     private readonly FakeApplicationLock _locks;
     private readonly FakeUnitOfWork _unitOfWork;
     private readonly LoanService _service;
@@ -31,8 +33,8 @@ public sealed class LoanServiceTests
     {
         // The lock writes into the staff call log, so a test can see what happened first.
         _locks = new FakeApplicationLock(_staff.Calls);
-        _unitOfWork = new FakeUnitOfWork(_loans, _catalog);
-        _service = new LoanService(_staff, _catalog, _loans, _unitOfWork, _locks, new TestClock(_now), _ids);
+        _unitOfWork = new FakeUnitOfWork(_loans, _catalog, _events);
+        _service = new LoanService(_staff, _catalog, _loans, _unitOfWork, _locks, _events, new TestClock(_now), _ids);
     }
 
     [Fact]
@@ -58,6 +60,34 @@ public sealed class LoanServiceTests
         Assert.Equal(BookCopyStatus.OnLoan, (await _catalog.GetCopyByBarcodeAsync(Barcode))!.Status);
         Assert.Equal(1, _unitOfWork.CommittedCount);
         Assert.Equal(0, _unitOfWork.RolledBackCount);
+    }
+
+    [Fact]
+    public async Task IssueAsync_publishes_LoanIssued_with_the_loan_and_the_book()
+    {
+        var bookId = Guid.NewGuid();
+        _catalog.Seed(new BookCopyDto(_copyId, bookId, Barcode, BookCopyStatus.Available, BookCopyCondition.Good, "A-1"));
+
+        LoanDto loan = await _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode));
+
+        var issued = Assert.IsType<LoanIssued>(Assert.Single(_events.Published));
+        Assert.Equal(loan.LoanId, issued.LoanId);
+        Assert.Equal(_staffId, issued.StaffMemberId);
+        Assert.Equal(_copyId, issued.BookCopyId);
+        Assert.Equal(bookId, issued.BookId);
+        Assert.Equal(loan.DueAtUtc, issued.DueAtUtc);
+        Assert.Equal(_now, issued.OccurredAtUtc);
+    }
+
+    [Fact]
+    public async Task GetAsync_returns_the_loan_and_refuses_an_unknown_id()
+    {
+        SeedCopy(BookCopyStatus.Available);
+        LoanDto issued = await _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode));
+
+        Assert.Equal(issued, await _service.GetAsync(issued.LoanId));
+        var error = await Assert.ThrowsAsync<DomainException>(() => _service.GetAsync(Guid.NewGuid()));
+        Assert.Equal(BorrowingErrors.LoanNotFound, error.Error);
     }
 
     [Fact]
@@ -145,6 +175,7 @@ public sealed class LoanServiceTests
             _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode)));
 
         AssertNothingIssued(BookCopyStatus.Available);
+        Assert.Empty(_events.Published);
     }
 
     private void SeedCopy(BookCopyStatus status) =>

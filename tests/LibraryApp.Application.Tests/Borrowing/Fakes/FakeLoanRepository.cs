@@ -30,6 +30,18 @@ public sealed class FakeLoanRepository : ILoanRepository
         return Task.FromResult(count);
     }
 
+    public Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(
+        Guid staffMemberId,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        IReadOnlyList<Guid> copyIds = _saved
+            .Where(loan => loan.StaffMemberId == staffMemberId && loan.IsOpen)
+            .Select(loan => loan.BookCopyId)
+            .ToList();
+        return Task.FromResult(copyIds);
+    }
+
     public Task AddAsync(Loan loan, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -39,6 +51,12 @@ public sealed class FakeLoanRepository : ILoanRepository
         _pending.Add(loan);
 
         return Task.CompletedTask;
+    }
+
+    public Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(_saved.SingleOrDefault(loan => loan.Id == loanId));
     }
 
     public void Commit()

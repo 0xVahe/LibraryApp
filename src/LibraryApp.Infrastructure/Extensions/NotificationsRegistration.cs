@@ -1,5 +1,7 @@
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Notifications;
 using LibraryApp.Infrastructure.Mail;
+using LibraryApp.Infrastructure.Persistence.Seed.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +18,9 @@ public static class NotificationsRegistrationExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IOutlookNotificationSender, SmtpOutlookNotificationSender>();
+
+        // Default notification templates, development seed (NOT-02).
+        services.AddScoped<IModuleSeeder, NotificationTemplateSeeder>();
 
         return services;
     }

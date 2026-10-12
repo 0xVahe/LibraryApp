@@ -43,8 +43,7 @@ builder.Services.AddPlatform(builder.Configuration, builder.Environment);
 builder.Services.AddLibraryIdentity();                          // Group 2 — Identity
 builder.Services.AddStaffModule(builder.Configuration);         // Group 2
 builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
-builder.Services.AddBorrowingReadModule();                       // Group 3 — temporary read provider
-// builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
+builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
 builder.Services.AddNotificationsModule(builder.Configuration);    // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
 
@@ -77,6 +76,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Api.xml"));
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Application.xml"));   // DTOs
+    options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Domain.xml"));        // enums used in DTOs
     options.SchemaFilter<StaffMemberExamples>();
     // "Authorize" button (Group 2, MEM-02): paste the accessToken from POST /api/auth/login.
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
