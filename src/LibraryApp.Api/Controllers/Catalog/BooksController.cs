@@ -57,22 +57,23 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
         return Ok(book);
     }
 
-    /// <summary>Creates a book (CAT-01).</summary>
+    /// <summary>Creates a book (CAT-01) and returns it like GET /api/books/{id}.</summary>
     [HttpPost]
     [Authorize(Roles = Writers)]
-    [ProducesResponseType<Guid>(StatusCodes.Status201Created)]
+    [ProducesResponseType<BookDetailsDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<Guid>> Create(
+    public async Task<ActionResult<BookDetailsDto>> Create(
         CreateBookRequest request,
         CancellationToken cancellationToken)
     {
         var id = await bookService.CreateAsync(request, cancellationToken);
+        BookDetailsDto book = await detailsService.GetBookDetailsAsync(id, cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { id }, id);
+        return CreatedAtAction(nameof(GetById), new { id }, book);
     }
 
     /// <summary>Updates a book (CAT-01).</summary>

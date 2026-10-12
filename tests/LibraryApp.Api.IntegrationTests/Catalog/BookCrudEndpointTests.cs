@@ -177,9 +177,16 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
 
-        var id = await response.Content.ReadFromJsonAsync<Guid>();
+        var created = await response.Content.ReadFromJsonAsync<BookDetailsDto>();
 
+        Assert.NotNull(created);
+        var id = created.Id;
         Assert.NotEqual(Guid.Empty, id);
+        Assert.EndsWith($"/api/books/{id}", response.Headers.Location!.ToString());
+        Assert.Equal(request.Title, created.Title);
+        Assert.Equal(request.Isbn, created.Isbn);
+        Assert.Equal(new[] { "Create test author" }, created.Authors);
+        Assert.Equal("0 of 0 available", created.Availability);
 
         db.ChangeTracker.Clear();
 
