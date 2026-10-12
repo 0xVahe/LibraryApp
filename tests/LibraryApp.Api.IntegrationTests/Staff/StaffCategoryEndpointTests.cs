@@ -243,9 +243,9 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         using var first = responses[0];
         using var second = responses[1];
 
-        var createdResponse = Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.Created));
+        var createdResponse = Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Created);
 
-        var conflictResponse = Assert.Single(responses.Where(x => x.StatusCode == HttpStatusCode.Conflict));
+        var conflictResponse = Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Conflict);
 
         await AssertError(conflictResponse, HttpStatusCode.Conflict, "staff.category_name_taken");
 
@@ -258,7 +258,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         var categories = await listResponse.Content.ReadFromJsonAsync<List<StaffCategoryDto>>();
         Assert.NotNull(categories);
 
-        var stored = Assert.Single(categories.Where(x => x.Name == request.Name));
+        var stored = Assert.Single(categories, x => x.Name == request.Name);
 
         Assert.Equal(created, stored);
     }
