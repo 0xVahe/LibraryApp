@@ -52,6 +52,10 @@ public static class CatalogRegistrationExtensions
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<ICategoryService, CategoryService>();
 
+        // Book CRUD (CAT-01)
+        services.AddScoped<IBookRepository, BookRepository>();
+        services.AddScoped<IBookService, BookService>();
+
         // Catalog seed: categories, authors, publishers, books and copies (D3)
         services.AddScoped<IModuleSeeder, CatalogSeeder>();
 

@@ -24,6 +24,16 @@ public static class CatalogErrors
     public static readonly Error BookAlreadyDeleted =
         Error.Conflict("catalog.book_already_deleted", "The book is already deleted.");
 
+    public static readonly Error BookIsbnDuplicate =
+        Error.Conflict(
+            "catalog.book_isbn_duplicate",
+            "A book with this ISBN already exists.");
+
+    public static readonly Error BookHasCopiesInCirculation =
+        Error.Conflict(
+            "catalog.book_has_copies_in_circulation",
+            "A book cannot be deleted while any copy is on loan or reserved (BR-CAT-3).");
+
     // ---------- Author, Publisher ----------
 
     public static readonly Error AuthorNameRequired =
