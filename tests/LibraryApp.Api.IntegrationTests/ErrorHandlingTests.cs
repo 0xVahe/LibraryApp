@@ -44,6 +44,7 @@ public sealed class TestErrorsController : ControllerBase
     {
         "business" => throw new DomainException(Error.BusinessRule("test.rule", "Maximum renewals reached")),
         "validation" => throw new DomainException(Error.Validation("test.invalid", "Invalid")),
+        "unauthorized" => throw new DomainException(Error.Unauthorized("test.unauthorized", "Login required")),
         "forbidden" => throw new DomainException(Error.Forbidden("test.forbidden", "Not yours")),
         "notfound" => throw new DomainException(Error.NotFound("test.not_found", "No such loan")),
         "conflict" => throw new DomainException(Error.Conflict("test.conflict", "Already returned")),
@@ -90,6 +91,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Theory]
     [InlineData("business", HttpStatusCode.UnprocessableEntity, "test.rule")]
     [InlineData("validation", HttpStatusCode.BadRequest, "test.invalid")]
+    [InlineData("unauthorized", HttpStatusCode.Unauthorized, "test.unauthorized")]
     [InlineData("forbidden", HttpStatusCode.Forbidden, "test.forbidden")]
     [InlineData("notfound", HttpStatusCode.NotFound, "test.not_found")]
     [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
@@ -101,6 +103,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal(status, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 

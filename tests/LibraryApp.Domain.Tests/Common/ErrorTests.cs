@@ -19,6 +19,7 @@ public class ErrorTests
     [InlineData(ErrorKind.Forbidden)]
     [InlineData(ErrorKind.NotFound)]
     [InlineData(ErrorKind.Conflict)]
+    [InlineData(ErrorKind.Unauthorized)]
     public void Factory_methods_set_the_kind(ErrorKind kind)
     {
         var error = kind switch
@@ -26,6 +27,7 @@ public class ErrorTests
             ErrorKind.Validation => Error.Validation("x.y", "m"),
             ErrorKind.Forbidden => Error.Forbidden("x.y", "m"),
             ErrorKind.NotFound => Error.NotFound("x.y", "m"),
+            ErrorKind.Unauthorized => Error.Unauthorized("x.y", "m"),
             _ => Error.Conflict("x.y", "m"),
         };
 

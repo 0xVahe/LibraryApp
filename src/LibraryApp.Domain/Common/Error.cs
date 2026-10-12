@@ -20,6 +20,9 @@ public enum ErrorKind
 
     /// <summary>The operation clashes with the current state (HTTP 409). Example: duplicate ISBN.</summary>
     Conflict = 5,
+
+    /// <summary>The caller must authenticate (HTTP 401).</summary>
+    Unauthorized = 6,
 }
 
 /// <summary>
@@ -34,4 +37,5 @@ public sealed record Error(string Code, string Message, ErrorKind Kind = ErrorKi
     public static Error Forbidden(string code, string message) => new(code, message, ErrorKind.Forbidden);
     public static Error NotFound(string code, string message) => new(code, message, ErrorKind.NotFound);
     public static Error Conflict(string code, string message) => new(code, message, ErrorKind.Conflict);
+    public static Error Unauthorized(string code, string message) => new(code, message, ErrorKind.Unauthorized);
 }

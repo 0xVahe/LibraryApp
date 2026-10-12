@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Identity;
@@ -23,12 +24,34 @@ public class AuthEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Unknown_corporate_email_returns_401()
+    [Theory]
+    [InlineData(false, "application/json")]
+    [InlineData(false, "text/plain")]
+    [InlineData(true, "application/json")]
+    [InlineData(true, "text/plain")]
+    public async Task Invalid_credentials_return_the_same_401_problem(bool existingAccount, string accept)
     {
-        var response = await Login($"nobody.{Guid.NewGuid():N}@ameriabank.am");
+        var email = $"login.{Guid.NewGuid():N}@ameriabank.am";
+        if (existingAccount)
+        {
+            using var scope = factory.Services.CreateScope();
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
+            Assert.True((await users.CreateAsync(user, Password)).Succeeded);
+        }
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Accept.ParseAdd(accept);
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password = "WrongPass1" });
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(401, body.GetProperty("status").GetInt32());
+        Assert.Equal("staff.invalid_credentials", body.GetProperty("code").GetString());
+        Assert.Equal("urn:library:error:staff.invalid_credentials", body.GetProperty("type").GetString());
+        Assert.Equal(StaffErrors.InvalidCredentials.Message, body.GetProperty("detail").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 
     [Fact]

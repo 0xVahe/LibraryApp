@@ -10,7 +10,7 @@ namespace LibraryApp.Api.ErrorHandling;
 /// <summary>
 /// Turns every exception into an RFC 7807 ProblemDetails response with <c>code</c> and <c>traceId</c> (NFR-07, SD-05).
 /// A module never mentions HTTP: it throws <see cref="DomainException"/>, and the status comes from <see cref="Error.Kind"/>:
-/// Validation 400, Forbidden 403, NotFound 404, Conflict 409, BusinessRule 422. Anything else is 500 with no details
+/// Validation 400, Unauthorized 401, Forbidden 403, NotFound 404, Conflict 409, BusinessRule 422. Anything else is 500 with no details
 /// (the exception is logged with the trace id, never sent to the client).
 /// <para>
 /// Safety net for database races that a module did not translate itself: a concurrency conflict (row version) and a
@@ -90,15 +90,34 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
         Extensions = { ["code"] = code },
     };
 
-    /// <summary>Adds <c>traceId</c> to every ProblemDetails the API writes (errors, validation, 404 of routing).</summary>
-    public static void AddTraceId(ProblemDetailsContext context) =>
+    /// <summary>Adds standard codes to empty 401/403 answers and a trace id to every error.</summary>
+    public static void CustomizeProblemDetails(ProblemDetailsContext context)
+    {
+        var problem = context.ProblemDetails;
+        if (!problem.Extensions.ContainsKey("code"))
+        {
+            var code = problem.Status switch
+            {
+                StatusCodes.Status401Unauthorized => "unauthorized",
+                StatusCodes.Status403Forbidden => "forbidden",
+                _ => null,
+            };
+            if (code is not null)
+            {
+                problem.Extensions["code"] = code;
+                problem.Type = $"urn:library:error:{code}";
+            }
+        }
+
         context.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+    }
 
     /// <summary>HTTP status of every <see cref="ErrorKind"/>; a new kind is added here in the same pull request.</summary>
     private static (int Status, string Title)? Describe(ErrorKind kind) => kind switch
     {
         ErrorKind.BusinessRule => (StatusCodes.Status422UnprocessableEntity, "Business rule violated"),
         ErrorKind.Validation => (StatusCodes.Status400BadRequest, "Validation failed"),
+        ErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
         ErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
         ErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
         ErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),

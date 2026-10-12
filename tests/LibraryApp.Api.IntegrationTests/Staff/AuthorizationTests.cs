@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 using Microsoft.AspNetCore.Authorization;
@@ -48,6 +50,35 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
         Assert.Equal(HttpStatusCode.Unauthorized, (await Get("/test-authorization/default")).StatusCode);
     }
 
+    [Theory]
+    [InlineData(false, "application/json")]
+    [InlineData(false, "text/plain")]
+    [InlineData(false, "application/xml")]
+    [InlineData(true, "application/json")]
+    [InlineData(true, "text/plain")]
+    [InlineData(true, "application/xml")]
+    public async Task Middleware_errors_have_standard_codes_for_any_accept_header(bool wrongRole, string accept)
+    {
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Accept.ParseAdd(accept);
+        if (wrongRole)
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(StaffRoles.StaffMember));
+
+        var response = await client.GetAsync("/test-authorization/librarian");
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var status = wrongRole ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized;
+        var code = wrongRole ? "forbidden" : "unauthorized";
+
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal((int)status, body.GetProperty("status").GetInt32());
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
+        Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
+        if (!wrongRole)
+            Assert.Contains(response.Headers.WwwAuthenticate, header => header.Scheme == "Bearer");
+    }
+
     [Fact]
     public async Task Endpoint_without_attributes_accepts_any_valid_token()
     {
@@ -71,5 +102,7 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.DoesNotContain("error_description", response.Headers.WwwAuthenticate.ToString());
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("unauthorized", body.GetProperty("code").GetString());
     }
 }
