@@ -26,6 +26,7 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
     [HttpGet]
     [ProducesResponseType<PagedResult<BookSearchResultDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<PagedResult<BookSearchResultDto>>> Search(
         [FromQuery] string? search,
         [FromQuery] Guid? categoryId,
@@ -61,6 +62,7 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
     [Authorize(Roles = Writers)]
     [ProducesResponseType<Guid>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -78,6 +80,7 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
     [Authorize(Roles = Writers)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -95,6 +98,7 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = Writers)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

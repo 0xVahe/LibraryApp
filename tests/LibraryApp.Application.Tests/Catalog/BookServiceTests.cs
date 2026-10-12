@@ -2,6 +2,7 @@ using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using LibraryApp.Application.Tests.Fakes;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -10,7 +11,8 @@ public class BookServiceTests
     private readonly FakeBooks _books = new();
     private readonly FakeAuthors _authors = new();
     private readonly TestTransaction _transaction = new();
-    private readonly FakeClock _clock = new();
+    private readonly TestClock _clock = new(
+        new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc));
 
     private BookService Service => new(
         _books,

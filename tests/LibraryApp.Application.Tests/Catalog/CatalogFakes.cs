@@ -68,13 +68,9 @@ internal sealed class FakeBooks : IBookRepository
     public HashSet<Guid> CategoryIds { get; } = [];
     public HashSet<Guid> PublisherIds { get; } = [];
     public List<BookCopy> Copies { get; } = [];
-    public Dictionary<Guid, BookDetailsDto> BookDetails { get; } = [];
 
     public Task<Book?> FindAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(Books.SingleOrDefault(x => x.Id == id));
-
-    public Task<BookDetailsDto?> GetDetailsAsync(Guid id, CancellationToken ct) =>
-        Task.FromResult(BookDetails.GetValueOrDefault(id));
 
     public Task<bool> CategoryExistsAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(CategoryIds.Contains(id));
@@ -100,38 +96,22 @@ internal sealed class FakeBooks : IBookRepository
     public void Add(Book book) => Books.Add(book);
 }
 
-internal sealed class FakeClock : IClock
-{
-    public DateTime UtcNow { get; set; } =
-        new(2026, 10, 9, 8, 0, 0, DateTimeKind.Utc);
-
-    public DateOnly LocalToday => DateOnly.FromDateTime(ToLocal(UtcNow));
-
-    public DateTime ToLocal(DateTime utc) =>
-        TimeZoneInfo.ConvertTimeFromUtc(
-            DateTime.SpecifyKind(utc, DateTimeKind.Utc),
-            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan"));
-
-    public DateOnly ToLocalDate(DateTime utc) =>
-        DateOnly.FromDateTime(ToLocal(utc));
-
-    public DateTime StartOfLocalDayUtc(DateOnly localDate) =>
-        TimeZoneInfo.ConvertTimeToUtc(
-            localDate.ToDateTime(TimeOnly.MinValue),
-            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan"));
-
-    public DateTime EndOfLocalDayUtc(DateOnly localDate) =>
-        StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
-}
-
 internal sealed class FakePublishers : IPublisherRepository
 {
     public List<Publisher> Publishers { get; } = [];
     public List<Book> Books { get; } = [];
+
     public Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<PublisherDto>>(Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
-    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+        Task.FromResult<IReadOnlyList<PublisherDto>>(
+            Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
+
+    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+
     public void Add(Publisher publisher) => Publishers.Add(publisher);
+
     public void Remove(Publisher publisher) => Publishers.Remove(publisher);
-    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) => Task.FromResult(Books.Any(x => x.PublisherId == id));
+
+    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Books.Any(x => x.PublisherId == id));
 }

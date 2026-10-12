@@ -2,6 +2,7 @@ using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Tests.Fakes;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -50,7 +51,7 @@ public class CatalogValidationTests
     public void Create_book_requires_at_least_one_author()
     {
         var validator = new CreateBookRequestValidator(
-            new FakeClock());
+            new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)));
 
         var request = new CreateBookRequest(
             "Test book",
@@ -76,7 +77,7 @@ public class CatalogValidationTests
     public void Create_book_rejects_thirteen_digit_values_without_isbn_prefix(
         string isbn)
     {
-        var validator = new CreateBookRequestValidator(new FakeClock());
+        var validator = new CreateBookRequestValidator(new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)));
 
         var request = new CreateBookRequest(
             "Test book",
