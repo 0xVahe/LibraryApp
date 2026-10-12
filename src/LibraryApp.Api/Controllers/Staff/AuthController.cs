@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using LibraryApp.Api.Auth;
 using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Staff.Dto;
@@ -38,5 +39,30 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
             StatusCode = StatusCodes.Status401Unauthorized,
             ContentTypes = { "application/problem+json" },
         };
+    }
+
+    /// <summary>Changes the generated initial password before an imported staff account can use the API.</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangeInitialPassword(ChangeInitialPasswordRequest request, CancellationToken ct)
+    {
+        if (!Guid.TryParse(User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value, out var userId) ||
+            !await authService.ChangeInitialPasswordAsync(userId, request, ct))
+        {
+            var problem = GlobalExceptionHandler.Problem(StatusCodes.Status400BadRequest, "Password change failed",
+                "The current password is invalid or this account does not require an initial password change.",
+                "staff.initial_password_change_failed");
+            problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+            return new ObjectResult(problem)
+            {
+                StatusCode = StatusCodes.Status400BadRequest,
+                ContentTypes = { "application/problem+json" },
+            };
+        }
+
+        return NoContent();
     }
 }

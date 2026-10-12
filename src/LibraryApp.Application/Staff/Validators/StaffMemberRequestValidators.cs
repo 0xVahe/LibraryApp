@@ -46,3 +46,14 @@ public sealed class UpdateStaffMemberRequestValidator : AbstractValidator<Update
             .When(x => !string.IsNullOrWhiteSpace(x.LineManagerEmail));
     }
 }
+
+public sealed class ChangeInitialPasswordRequestValidator : AbstractValidator<ChangeInitialPasswordRequest>
+{
+    public ChangeInitialPasswordRequestValidator()
+    {
+        RuleFor(x => x.CurrentPassword).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.NewPassword).Cascade(CascadeMode.Stop).NotEmpty().MinimumLength(8).MaximumLength(128)
+            .Must(x => x.Any(char.IsLetter) && x.Any(c => c is >= '0' and <= '9'))
+            .WithMessage("Passwords must have at least one digit and one letter.");
+    }
+}

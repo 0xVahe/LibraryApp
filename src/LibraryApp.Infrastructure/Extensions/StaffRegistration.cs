@@ -5,6 +5,7 @@ using LibraryApp.Application.Staff.Services;
 using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
+using LibraryApp.Infrastructure.Staff;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +22,8 @@ public static class StaffRegistrationExtensions
         services.AddScoped<IStaffManagementRepository, StaffManagementRepository>();
         services.AddScoped<IStaffAccountStore, StaffAccountStore>();
         services.AddScoped<IStaffManagementService, StaffManagementService>();
+        services.AddScoped<IStaffCsvParser, StaffCsvParser>();
+        services.AddScoped<StaffImportService>();
         services.AddScoped<IStaffDeactivationService, StaffDeactivationService>();
 
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();

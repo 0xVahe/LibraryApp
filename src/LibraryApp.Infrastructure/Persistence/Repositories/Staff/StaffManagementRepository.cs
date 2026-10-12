@@ -44,6 +44,28 @@ public sealed class StaffManagementRepository(LibraryDbContext db) : IStaffManag
     public Task<string?> GetCategoryNameAsync(Guid id, CancellationToken ct) =>
         db.StaffCategories.Where(x => x.Id == id).Select(x => x.Name).SingleOrDefaultAsync(ct);
 
+    public async Task<IReadOnlyList<Department>> GetDepartmentsByNamesAsync(IReadOnlyCollection<string> names,
+        CancellationToken ct) => await db.Departments.AsNoTracking().Where(x => names.Contains(x.Name)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<StaffCategory>> GetCategoriesByNamesAsync(IReadOnlyCollection<string> names,
+        CancellationToken ct) => await db.StaffCategories.AsNoTracking().Where(x => names.Contains(x.Name)).ToListAsync(ct);
+
+    public async Task<IReadOnlyCollection<string>> GetExistingEmployeeIdsAsync(IReadOnlyCollection<string> employeeIds,
+        CancellationToken ct) => await db.StaffMembers.Where(x => employeeIds.Contains(x.EmployeeId))
+        .Select(x => x.EmployeeId).ToListAsync(ct);
+
+    public async Task<IReadOnlyCollection<string>> GetExistingEmailsAsync(IReadOnlyCollection<string> emails,
+        CancellationToken ct) => await db.StaffMembers.Where(x => emails.Contains(x.CorporateEmail))
+        .Select(x => x.CorporateEmail).ToListAsync(ct);
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetDepartmentNamesAsync(IReadOnlyCollection<Guid> ids,
+        CancellationToken ct) => await db.Departments.Where(x => ids.Contains(x.Id))
+        .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, string>> GetCategoryNamesAsync(IReadOnlyCollection<Guid> ids,
+        CancellationToken ct) => await db.StaffCategories.Where(x => ids.Contains(x.Id))
+        .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+
     public async Task<PagedResult<StaffMemberListItemDto>> SearchAsync(
         StaffMemberSearchFilter filter,
         PageRequest paging,

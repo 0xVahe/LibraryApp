@@ -276,11 +276,37 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     Task<bool> IStaffAccountStore.EmailExistsAsync(string email, Guid? exceptId, CancellationToken ct) =>
         Task.FromResult(Accounts.Any(x => x.Value.Email == email && x.Key != exceptId));
 
+    Task<IReadOnlyCollection<string>> IStaffAccountStore.GetExistingEmailsAsync(IReadOnlyCollection<string> emails, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyCollection<string>>(Accounts.Values.Where(account => emails.Contains(account.Email, StringComparer.OrdinalIgnoreCase))
+            .Select(account => account.Email).ToArray());
+
     public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(id == DepartmentId ? "IT" : null);
 
     public Task<string?> GetCategoryNameAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(id == CategoryId ? "Employee" : null);
+
+    public Task<IReadOnlyList<Department>> GetDepartmentsByNamesAsync(IReadOnlyCollection<string> names, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Department>>(names.Contains("IT", StringComparer.OrdinalIgnoreCase)
+            ? [new Department(DepartmentId, "IT")] : []);
+
+    public Task<IReadOnlyList<StaffCategory>> GetCategoriesByNamesAsync(IReadOnlyCollection<string> names, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<StaffCategory>>(names.Contains("Employee", StringComparer.OrdinalIgnoreCase)
+            ? [new StaffCategory(CategoryId, "Employee", 5, 14, 1)] : []);
+
+    public Task<IReadOnlyCollection<string>> GetExistingEmployeeIdsAsync(IReadOnlyCollection<string> ids, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyCollection<string>>(Members.Values.Where(member => ids.Contains(member.EmployeeId, StringComparer.OrdinalIgnoreCase))
+            .Select(member => member.EmployeeId).ToArray());
+
+    Task<IReadOnlyCollection<string>> IStaffManagementRepository.GetExistingEmailsAsync(IReadOnlyCollection<string> emails, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyCollection<string>>(Members.Values.Where(member => emails.Contains(member.CorporateEmail, StringComparer.OrdinalIgnoreCase))
+            .Select(member => member.CorporateEmail).ToArray());
+
+    Task<IReadOnlyDictionary<Guid, string>> IStaffManagementRepository.GetDepartmentNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, string>>(ids.Contains(DepartmentId) ? new Dictionary<Guid, string> { [DepartmentId] = "IT" } : new Dictionary<Guid, string>());
+
+    Task<IReadOnlyDictionary<Guid, string>> IStaffManagementRepository.GetCategoryNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, string>>(ids.Contains(CategoryId) ? new Dictionary<Guid, string> { [CategoryId] = "Employee" } : new Dictionary<Guid, string>());
 
     public void Add(StaffMember member)
     {
@@ -288,7 +314,8 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
         Members.Add(member.Id, member);
     }
 
-    public Task CreateAsync(Guid userId, string email, string password, string role, CancellationToken ct)
+    public Task CreateAsync(Guid userId, string email, string password, string role, CancellationToken ct,
+        bool requirePasswordChange = false)
     {
         Assert.True(InTransaction);
         if (FailCreate) throw new DomainException(StaffErrors.AccountWriteFailed);

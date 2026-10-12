@@ -8,7 +8,8 @@ public sealed record LoginAccount(
     string Email,
     Guid? StaffMemberId,
     StaffMemberStatus? StaffStatus,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    bool MustChangePassword = false);
 
 /// <summary>Hides ASP.NET Core Identity from the Application layer.</summary>
 public interface IUserAccountStore
@@ -19,4 +20,6 @@ public interface IUserAccountStore
     /// whether the email exists.
     /// </summary>
     Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct);
+
+    Task<bool> ChangeInitialPasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct);
 }

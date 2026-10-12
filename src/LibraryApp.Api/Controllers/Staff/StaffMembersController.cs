@@ -11,8 +11,59 @@ namespace LibraryApp.Api.Controllers.Staff;
 [Tags("Staff Members")]
 [Route("api/staff-members")]
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
-public sealed class StaffMembersController(IStaffManagementService staff, IStaffDeactivationService deactivation) : ControllerBase
+public sealed class StaffMembersController(
+    IStaffManagementService staff,
+    IStaffDeactivationService deactivation,
+    StaffImportService import) : ControllerBase
 {
+    /// <summary>Imports up to 1000 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
+    /// <remarks>
+    /// Upload multipart/form-data using the <c>file</c> field. A successful response contains each member and a
+    /// one-time temporary password. Imported accounts must change that password at their first sign-in.
+    /// </remarks>
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(1_100_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1_100_000)]
+    [ProducesResponseType<StaffImportResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<StaffImportResult>> Import([FromForm] IFormFile file, CancellationToken ct)
+    {
+        if (file.Length > StaffImportLimits.MaximumFileBytes)
+            return ImportBadRequest([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            return Ok(await import.ImportAsync(stream, ct));
+        }
+        catch (StaffImportException ex)
+        {
+            return ImportBadRequest(ex.Errors);
+        }
+        catch (StaffCsvFormatException ex)
+        {
+            return ImportBadRequest([new StaffImportError(ex.RowNumber, ex.Field, ex.Message)]);
+        }
+    }
+
+    private BadRequestObjectResult ImportBadRequest(IReadOnlyList<StaffImportError> errors)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Staff import failed",
+            Detail = "No staff members were created. Correct the listed rows and upload the file again.",
+            Type = "urn:library:error:staff.import_invalid"
+        };
+        problem.Extensions["code"] = "staff.import_invalid";
+        problem.Extensions["errors"] = errors;
+        problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
+        return BadRequest(problem);
+    }
+
     /// <summary>Deactivates an employee who has no outstanding loans (MEM-01, BR-MEM-4).</summary>
     /// <remarks>A 409 staff.has_active_loans response lists titles and barcodes in outstandingBooks.
     /// Success locks the login account and publishes StaffStatusChanged. Repeating deactivation returns 422.</remarks>
