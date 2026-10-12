@@ -60,19 +60,19 @@ public class DepartmentEndpointTests(ApiHostFactory factory) : IClassFixture<Api
 
         var created = await client.PostAsJsonAsync(Route, new UpsertDepartmentRequest(name));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-
+        
         var department = (await created.Content.ReadFromJsonAsync<DepartmentDto>())!;
         Assert.Equal(name, department.Name);
         Assert.Equal(department, await client.GetFromJsonAsync<DepartmentDto>(created.Headers.Location));
         Assert.Contains(department, (await client.GetFromJsonAsync<List<DepartmentDto>>(Route))!);
-
+        
         var renamed = NewName();
         var updated = await client.PutAsJsonAsync($"{Route}/{department.Id}", new UpsertDepartmentRequest(renamed));
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         Assert.Equal(new DepartmentDto(department.Id, renamed), await updated.Content.ReadFromJsonAsync<DepartmentDto>());
         Assert.Equal(renamed, (await client.GetFromJsonAsync<DepartmentDto>($"{Route}/{department.Id}"))!.Name);
     }
-
+    
     [Fact]
     public async Task Duplicate_name_returns_409_on_create_and_update_and_keeps_the_old_name()
     {
@@ -114,7 +114,7 @@ public class DepartmentEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         var longest = Guid.NewGuid().ToString("N").PadRight(100, 'x');
         Assert.Equal(longest, (await Create($"  {longest}  ")).Name);
     }
-
+    
     [Fact]
     public async Task Concurrent_creates_with_the_same_name_give_one_201_and_name_taken_for_the_rest()
     {

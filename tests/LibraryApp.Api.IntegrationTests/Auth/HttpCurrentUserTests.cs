@@ -109,10 +109,11 @@ public class HttpCurrentUserTests
         public DateTime StartOfLocalDayUtc(DateOnly localDate) => localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         public DateTime EndOfLocalDayUtc(DateOnly localDate) => StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
     }
-
+    
     /// <summary>Holds the context in a field: HttpContextAccessor uses AsyncLocal, which does not flow out of an async helper.</summary>
     private sealed class TestHttpContextAccessor(HttpContext? context) : IHttpContextAccessor
     {
         public HttpContext? HttpContext { get; set; } = context;
     }
 }
+

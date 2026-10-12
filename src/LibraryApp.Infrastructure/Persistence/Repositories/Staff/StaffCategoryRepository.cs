@@ -21,7 +21,7 @@ public sealed class StaffCategoryRepository(LibraryDbContext db) : IStaffCategor
                 category.MaxRenewals))
             .ToListAsync(ct);
     }
-
+    
     public Task<bool> NameExistsAsync(string name, Guid? exceptId = null, CancellationToken ct = default)
     {
         return db.StaffCategories.AnyAsync(

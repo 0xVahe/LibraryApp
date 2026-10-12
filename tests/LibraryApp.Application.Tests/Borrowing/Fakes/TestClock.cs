@@ -5,8 +5,8 @@ namespace LibraryApp.Application.Tests.Fakes;
 
 public sealed class TestClock(DateTime utcNow) : IClock
 {
-    public DateTime UtcNow { get; set; } = utcNow.Kind == DateTimeKind.Utc
-        ? utcNow
+    public DateTime UtcNow { get; set; } = utcNow.Kind == DateTimeKind.Utc 
+        ? utcNow 
         : throw new ArgumentException("UtcNow must be UTC DateTimeKind.", nameof(utcNow));
 
     public DateOnly LocalToday => DateOnly.FromDateTime(UtcNow);

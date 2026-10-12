@@ -74,7 +74,7 @@ public class StaffCategoryServiceTests
     public async Task Save_maps_unique_violations_and_preserves_other_errors(bool update, bool uniqueViolation)
     {
         var category = new StaffCategory(
-            Guid.NewGuid(), "Employee", 3, 21, 1);
+            Guid.NewGuid(), "Employee", 3, 21, 1); 
         _repository.Categories.Add(category);
 
         var failure = new DomainException(
@@ -126,7 +126,7 @@ public class StaffCategoryServiceTests
         Assert.Equal(before, await Service.GetAsync(target.Id));
         Assert.Equal(1, _unitOfWork.Transactions);
     }
-
+    
     [Theory]
     [InlineData("Employee")]
     [InlineData("  Employee  ")]
@@ -147,7 +147,7 @@ public class StaffCategoryServiceTests
         Assert.Equal(expected, await Service.GetAsync(category.Id));
         Assert.Same(category, Assert.Single(_repository.Categories));
     }
-
+    
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -230,7 +230,7 @@ public class StaffCategoryServiceTests
             return Task.FromResult(
                 Categories.Any(category => category.Name == name && (!exceptId.HasValue || category.Id != exceptId.Value)));
         }
-
+        
         public void Add(StaffCategory category) => Categories.Add(category);
     }
 

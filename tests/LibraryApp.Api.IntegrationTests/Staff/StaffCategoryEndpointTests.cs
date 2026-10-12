@@ -55,10 +55,10 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(
             body.GetProperty("traceId").GetString()));
-
+        
         return body;
     }
-
+    
     private static async Task AssertValidationError(
         HttpResponseMessage response, string field)
     {
@@ -177,7 +177,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         await AssertError(duplicate, HttpStatusCode.Conflict,
             "staff.category_name_taken");
     }
-
+    
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData(StaffRoles.Librarian, HttpStatusCode.Forbidden)]
@@ -199,7 +199,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         Assert.Equal(expected, post.StatusCode);
         Assert.Equal(expected, put.StatusCode);
     }
-
+    
     [Fact]
     public async Task Updating_limits_with_own_trimmed_name_succeeds()
     {
@@ -302,7 +302,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
 
         Assert.Equal(new[] { alpha, middle, zulu }, actual);
     }
-
+    
     [Fact]
     public async Task Duplicate_update_returns_409_and_preserves_original_values()
     {
