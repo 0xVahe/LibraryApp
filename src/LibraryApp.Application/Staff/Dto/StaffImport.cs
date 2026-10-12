@@ -24,16 +24,3 @@ public sealed record StaffImportError(int RowNumber, string Field, string Messag
 public sealed record StaffImportMemberResult(StaffMemberDto Member, string TemporaryPassword);
 
 public sealed record StaffImportResult(IReadOnlyList<StaffImportMemberResult> Members);
-
-public sealed class StaffImportException(IReadOnlyList<StaffImportError> errors)
-    : Exception("The staff CSV contains invalid rows.")
-{
-    public IReadOnlyList<StaffImportError> Errors { get; } = errors;
-}
-
-public sealed class StaffCsvFormatException(int rowNumber, string field, string message)
-    : Exception(message)
-{
-    public int RowNumber { get; } = rowNumber;
-    public string Field { get; } = field;
-}

@@ -22,6 +22,12 @@ public static class StaffErrors
         Error.Validation("staff.account_write_failed", "The user account could not be saved.");
     public static readonly Error AccountRoleInvalid =
         Error.Conflict("staff.account_role_invalid", "The staff account must have exactly one supported role.");
+    public static readonly Error ImportInvalid =
+        Error.Validation("staff.import_invalid", "The staff CSV contains invalid rows.");
+    public static readonly Error InitialPasswordChangeFailed =
+        Error.Validation("staff.initial_password_change_failed", "The current password is invalid or this account does not require an initial password change.");
+    public static readonly Error PasswordChangeRequired =
+        Error.Forbidden("staff.password_change_required", "Change your initial password before using this endpoint.");
     public static readonly Error CategoryNameTaken =
         Error.Conflict("staff.category_name_taken", "Staff category name is already in use.");
     

@@ -1,6 +1,8 @@
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LibraryApp.Application.Common;
@@ -14,7 +16,7 @@ namespace LibraryApp.Api.Controllers.Staff;
 public sealed class StaffMembersController(
     IStaffManagementService staff,
     IStaffDeactivationService deactivation,
-    StaffImportService import) : ControllerBase
+    IStaffImportService import) : ControllerBase
 {
     /// <summary>Imports up to 1000 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
     /// <remarks>
@@ -32,7 +34,7 @@ public sealed class StaffMembersController(
     public async Task<ActionResult<StaffImportResult>> Import([FromForm] IFormFile file, CancellationToken ct)
     {
         if (file.Length > StaffImportLimits.MaximumFileBytes)
-            return ImportBadRequest([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
+            throw ImportFailure([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
 
         try
         {
@@ -41,28 +43,16 @@ public sealed class StaffMembersController(
         }
         catch (StaffImportException ex)
         {
-            return ImportBadRequest(ex.Errors);
+            throw ImportFailure(ex.Errors);
         }
         catch (StaffCsvFormatException ex)
         {
-            return ImportBadRequest([new StaffImportError(ex.RowNumber, ex.Field, ex.Message)]);
+            throw ImportFailure([new StaffImportError(ex.RowNumber, ex.Field, ex.Message)]);
         }
     }
 
-    private BadRequestObjectResult ImportBadRequest(IReadOnlyList<StaffImportError> errors)
-    {
-        var problem = new ProblemDetails
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Staff import failed",
-            Detail = "No staff members were created. Correct the listed rows and upload the file again.",
-            Type = "urn:library:error:staff.import_invalid"
-        };
-        problem.Extensions["code"] = "staff.import_invalid";
-        problem.Extensions["errors"] = errors;
-        problem.Extensions["traceId"] = HttpContext.TraceIdentifier;
-        return BadRequest(problem);
-    }
+    private static DomainException ImportFailure(IReadOnlyList<StaffImportError> rows) =>
+        new(StaffErrors.ImportInvalid, extensions: new Dictionary<string, object?> { ["rows"] = rows });
 
     /// <summary>Deactivates an employee who has no outstanding loans (MEM-01, BR-MEM-4).</summary>
     /// <remarks>A 409 staff.has_active_loans response lists titles and barcodes in outstandingBooks.

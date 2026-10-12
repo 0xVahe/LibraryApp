@@ -387,7 +387,17 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
 
         using var restrictedClient = factory.CreateClient();
         restrictedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await restrictedClient.GetAsync(Route)).StatusCode);
+        var blocked = await restrictedClient.GetAsync(Route);
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        var blockedProblem = await blocked.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("staff.password_change_required", blockedProblem.GetProperty("code").GetString());
+        Assert.True(blockedProblem.TryGetProperty("traceId", out _));
+        var failedPasswordChange = await restrictedClient.PostAsJsonAsync("/api/auth/change-password",
+            new ChangeInitialPasswordRequest("incorrect", "SecureChange9"));
+        Assert.Equal(HttpStatusCode.BadRequest, failedPasswordChange.StatusCode);
+        var failedPasswordProblem = await failedPasswordChange.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("staff.initial_password_change_failed", failedPasswordProblem.GetProperty("code").GetString());
+        Assert.True(failedPasswordProblem.TryGetProperty("traceId", out _));
         Assert.Equal(HttpStatusCode.NoContent, (await restrictedClient.PostAsJsonAsync("/api/auth/change-password",
             new ChangeInitialPasswordRequest(imported.TemporaryPassword, "SecureChange9"))).StatusCode);
         var newLogin = await factory.CreateClient().PostAsJsonAsync("/api/auth/login",
@@ -412,7 +422,8 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("staff.import_invalid", body.GetProperty("code").GetString());
-        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        Assert.True(body.TryGetProperty("traceId", out _));
+        var error = Assert.Single(body.GetProperty("rows").EnumerateArray());
         Assert.Equal(3, error.GetProperty("rowNumber").GetInt32());
         Assert.Equal("FirstName", error.GetProperty("field").GetString());
         using var verify = factory.Services.CreateScope();
@@ -433,9 +444,51 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var error = Assert.Single(body.GetProperty("errors").EnumerateArray());
+        var error = Assert.Single(body.GetProperty("rows").EnumerateArray());
         Assert.Equal(2, error.GetProperty("rowNumber").GetInt32());
         Assert.Equal("Role", error.GetProperty("field").GetString());
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Import_reports_employee_id_and_email_that_already_exist_in_the_database()
+    {
+        var existing = await Enrol(Request());
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category\n" +
+                  $"{existing.EmployeeId},Other,Employee,other.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee\n" +
+                  $"IMP-{Guid.NewGuid():N},Other,Employee,{existing.CorporateEmail},Information Technology,Engineer,,Employee\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client().PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var rows = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "EmployeeId");
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "CorporateEmail");
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Import_reports_unknown_department_and_category_without_creating_members()
+    {
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category\n" +
+                  $"IMP-{Guid.NewGuid():N},Valid,Employee,valid.{Guid.NewGuid():N}@ameriabank.am,Unknown Department,Engineer,,Unknown Category\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client().PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var rows = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "Department");
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "Category");
         using var verify = factory.Services.CreateScope();
         Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
     }

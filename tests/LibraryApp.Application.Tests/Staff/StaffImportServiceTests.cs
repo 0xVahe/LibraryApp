@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Application.Staff.Validators;

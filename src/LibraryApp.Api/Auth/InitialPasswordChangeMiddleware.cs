@@ -1,4 +1,6 @@
 using LibraryApp.Infrastructure.Identity;
+using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Api.Auth;
 
@@ -13,10 +15,7 @@ public sealed class InitialPasswordChangeMiddleware(RequestDelegate next)
             context.Request.Path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase);
 
         if (requiresChange && !isChangeEndpoint)
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
-        }
+            throw new DomainException(StaffErrors.PasswordChangeRequired);
 
         await next(context);
     }

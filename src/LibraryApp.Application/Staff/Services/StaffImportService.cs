@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 
@@ -14,7 +15,7 @@ public sealed class StaffImportService(
     CorporateEmailPolicy emailPolicy,
     IStaffManagementRepository members,
     IStaffAccountStore accounts,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser) : IStaffImportService
 {
     public const int MaximumRows = StaffImportLimits.MaximumRows;
 

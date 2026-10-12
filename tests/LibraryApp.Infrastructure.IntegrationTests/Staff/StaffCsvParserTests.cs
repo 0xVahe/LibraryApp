@@ -1,4 +1,5 @@
 using System.Text;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Infrastructure.Staff;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Staff;
@@ -42,7 +43,7 @@ public sealed class StaffCsvParserTests
     {
         const string csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail\n";
 
-        var error = await Assert.ThrowsAsync<LibraryApp.Application.Staff.Dto.StaffCsvFormatException>(() => Parse(csv));
+        var error = await Assert.ThrowsAsync<StaffCsvFormatException>(() => Parse(csv));
 
         Assert.Equal("Category", error.Field);
         Assert.Equal(1, error.RowNumber);
@@ -55,7 +56,7 @@ public sealed class StaffCsvParserTests
         for (var i = 0; i <= LibraryApp.Application.Staff.Dto.StaffImportLimits.MaximumRows; i++)
             csv.Append($"E-{i},Anna,Employee,anna{i}@ameriabank.am,IT,Engineer,,Employee\n");
 
-        var error = await Assert.ThrowsAsync<LibraryApp.Application.Staff.Dto.StaffCsvFormatException>(
+        var error = await Assert.ThrowsAsync<StaffCsvFormatException>(
             () => Parse(csv.ToString()));
 
         Assert.Equal("File", error.Field);

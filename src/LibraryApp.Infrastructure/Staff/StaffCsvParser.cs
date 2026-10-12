@@ -1,5 +1,6 @@
 using System.Text;
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Application.Staff.Ports;
 
 namespace LibraryApp.Infrastructure.Staff;

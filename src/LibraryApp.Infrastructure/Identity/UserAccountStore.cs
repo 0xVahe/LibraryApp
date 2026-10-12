@@ -12,7 +12,8 @@ public sealed class UserAccountStore(
     UserManager<AppUser> userManager,
     IPasswordHasher<AppUser> passwordHasher,
     LibraryDbContext db,
-    IClock clock) : IUserAccountStore
+    IClock clock,
+    IUnitOfWork unitOfWork) : IUserAccountStore
 {
     // Hash of a random password, checked when the email is unknown: that path then costs as much as a wrong password.
     private static string? _dummyPasswordHash;
@@ -60,26 +61,35 @@ public sealed class UserAccountStore(
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var user = await userManager.FindByIdAsync(userId.ToString());
-        if (user is null)
-            return false;
+        try
+        {
+            return await unitOfWork.ExecuteInTransactionAsync<bool>(async token =>
+            {
+                token.ThrowIfCancellationRequested();
+                var user = await userManager.FindByIdAsync(userId.ToString());
+                if (user is null)
+                    throw new InitialPasswordChangeRejectedException();
 
-        var marker = (await userManager.GetClaimsAsync(user)).FirstOrDefault(claim =>
-            claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
-        if (marker is null)
-            return false;
+                var marker = (await userManager.GetClaimsAsync(user)).FirstOrDefault(claim =>
+                    claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
+                if (marker is null)
+                    throw new InitialPasswordChangeRejectedException();
 
-        var changed = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
-        if (!changed.Succeeded)
-            return false;
+                var changed = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+                if (!changed.Succeeded)
+                    throw new InitialPasswordChangeRejectedException();
 
-        var removed = await userManager.RemoveClaimAsync(user, marker);
-        if (!removed.Succeeded)
-            return false;
+                var removed = await userManager.RemoveClaimAsync(user, marker);
+                if (!removed.Succeeded)
+                    throw new InitialPasswordChangeRejectedException();
 
-        await transaction.CommitAsync(ct);
-        return true;
+                return true;
+            }, ct);
+        }
+        catch (InitialPasswordChangeRejectedException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -123,4 +133,6 @@ public sealed class UserAccountStore(
         var hash = _dummyPasswordHash ??= passwordHasher.HashPassword(new AppUser(), Guid.NewGuid().ToString("N"));
         passwordHasher.VerifyHashedPassword(new AppUser(), hash, password);
     }
+
+    private sealed class InitialPasswordChangeRejectedException : Exception { }
 }
