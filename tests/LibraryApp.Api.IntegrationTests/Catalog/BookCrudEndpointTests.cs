@@ -84,7 +84,8 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
     private async Task<(Guid BookId, Guid CategoryId)> SeedBookAsync(
         string? isbn = null,
         bool withOnLoanCopy = false,
-        bool withReservedCopy = false)
+        bool withReservedCopy = false,
+        bool withAvailableCopy = false)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
@@ -107,7 +108,7 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
         db.AddRange(category, author, book,
             new BookAuthor(book.Id, author.Id));
 
-        if (withOnLoanCopy || withReservedCopy)
+        if (withOnLoanCopy || withReservedCopy || withAvailableCopy)
         {
             var copy = new BookCopy(
                 Guid.NewGuid(),
@@ -116,10 +117,10 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
                 BookCopyCondition.Good,
                 null);
 
-            copy.ChangeStatus(
-                withReservedCopy
-                    ? BookCopyStatus.Reserved
-                    : BookCopyStatus.OnLoan);
+            if (withReservedCopy)
+                copy.ChangeStatus(BookCopyStatus.Reserved);
+            else if (withOnLoanCopy)
+                copy.ChangeStatus(BookCopyStatus.OnLoan);
 
             db.Add(copy);
         }
@@ -218,6 +219,12 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
         var response = await client.PostAsJsonAsync("/api/books", request);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            "catalog.book_isbn_duplicate",
+            problem.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -392,6 +399,37 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
 
         Assert.True(deletedBook.IsDeleted);
         Assert.NotNull(deletedBook.DeletedAtUtc);
+    }
+
+    [Fact]
+    public async Task Deleting_a_book_with_an_available_copy_withdraws_the_copy()
+    {
+        var (bookId, _) = await SeedBookAsync(withAvailableCopy: true);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+
+        var copyBeforeDelete = await db.BookCopies
+            .SingleAsync(x => x.BookId == bookId);
+
+        Assert.Equal(BookCopyStatus.Available, copyBeforeDelete.Status);
+
+        using var client = Client(StaffRoles.Librarian);
+
+        var response = await client.DeleteAsync($"/api/books/{bookId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        db.ChangeTracker.Clear();
+
+        var deletedBook = await db.Books
+            .SingleAsync(x => x.Id == bookId);
+
+        var withdrawnCopy = await db.BookCopies
+            .SingleAsync(x => x.BookId == bookId);
+
+        Assert.True(deletedBook.IsDeleted);
+        Assert.Equal(BookCopyStatus.Withdrawn, withdrawnCopy.Status);
     }
 
     [Fact]

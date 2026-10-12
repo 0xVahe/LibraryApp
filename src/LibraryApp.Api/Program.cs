@@ -29,10 +29,12 @@ if (builder.Environment.IsDevelopment()
     builder.Configuration["Jwt:SigningKey"] = jwtSigningKey;
 
 // Logging: Serilog to console and file (requirements document). Settings: appsettings "Serilog".
+// preserveStaticLogger: every ILogger<T> writes to this host's own logger, not to the static Log.Logger that another
+// host in the same process (integration tests) replaces and closes when it stops.
 builder.Host.UseSerilog((context, services, logger) => logger
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
-    .Enrich.FromLogContext());
+    .Enrich.FromLogContext(), preserveStaticLogger: true);
 
 // Platform: database, unit of work, clock, id generator, health checks (Integration Owner).
 builder.Services.AddPlatform(builder.Configuration, builder.Environment);
@@ -41,8 +43,8 @@ builder.Services.AddPlatform(builder.Configuration, builder.Environment);
 builder.Services.AddLibraryIdentity();                          // Group 2 — Identity
 builder.Services.AddStaffModule(builder.Configuration);         // Group 2
 builder.Services.AddCatalogModule(builder.Configuration);       // Group 1
-// builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
-// builder.Services.AddNotificationsModule(builder.Configuration); // Group 4
+builder.Services.AddBorrowingModule(builder.Configuration);     // Group 3
+builder.Services.AddNotificationsModule(builder.Configuration);    // Group 4
 // builder.Services.AddReportingModule(builder.Configuration);     // Group 4
 
 // Validation messages in English whatever the culture of the server.
@@ -68,6 +70,7 @@ builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — POST /api/auth/login per client IP
+builder.Services.AddCurrentUser();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

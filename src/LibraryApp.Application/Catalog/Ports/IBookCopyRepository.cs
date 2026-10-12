@@ -14,7 +14,7 @@ public interface IBookCopyRepository
     /// <summary>All copies of the book, retired ones included, ordered by barcode. Read only.</summary>
     Task<IReadOnlyList<BookCopy>> GetByBookAsync(Guid bookId, CancellationToken ct);
 
-    /// <summary>Tracked: changes are saved by the unit of work.</summary>
+    /// <summary>Tracked: changes are saved by the unit of work. Also finds a copy added in the same unit of work.</summary>
     Task<BookCopy?> GetByIdAsync(Guid copyId, CancellationToken ct);
 
     /// <summary>Saved by the unit of work.</summary>

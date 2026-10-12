@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
@@ -10,11 +11,14 @@ namespace LibraryApp.Application.Catalog.Services;
 /// <summary>
 /// Copy management for librarians (CAT-04). Every change runs in <see cref="IUnitOfWork"/>, so a concurrent change of
 /// the same copy (RowVersion) or a duplicate barcode caught by the database index becomes a 409.
+/// A copy that becomes available outside a loan (a new copy, or the end of a repair) is offered to the reservation queue
+/// in the same transaction (BQ-G1-10).
 /// </summary>
 public sealed class BookCopyService(
     IBookCopyRepository copies,
     IUnitOfWork unitOfWork,
-    IIdGenerator ids) : IBookCopyService
+    IIdGenerator ids,
+    IReservationQueueService reservationQueue) : IBookCopyService
 {
     public async Task<IReadOnlyList<BookCopyDto>> GetCopiesAsync(Guid bookId, CancellationToken ct = default)
     {
@@ -52,6 +56,11 @@ public sealed class BookCopyService(
                 throw new DomainException(CatalogErrors.CopyBarcodeDuplicate);
 
             copies.Add(copy);
+
+            // If someone is waiting for this book, Borrowing reserves the new copy for the first person in the queue.
+            await reservationQueue.OfferCopyAsync(copy.Id, bookId, token);
+
+            // After the offer: the copy may now be Reserved, and the answer shows its real status.
             return ToDto(copy);
         }, ct);
     }
@@ -79,6 +88,10 @@ public sealed class BookCopyService(
             EnsureLibrarianMayChange(copy, request.Status);
             copy.ChangeStatus(request.Status);           // the transition table: Lost and Withdrawn are final
 
+            // A repaired copy is back on the shelf: offer it to the queue, like a new copy.
+            if (copy.Status == BookCopyStatus.Available)
+                await reservationQueue.OfferCopyAsync(copy.Id, bookId, token);
+
             return ToDto(copy);
         }, ct);
     }
@@ -86,7 +99,7 @@ public sealed class BookCopyService(
     /// <summary>
     /// BR-CAT-4. A copy that is OnLoan or Reserved belongs to a loan or a reservation, so only Borrowing changes it.
     /// Otherwise the librarian may set UnderRepair, Lost or Withdrawn, and Available only to end a repair
-    /// (temporary decision until the BA answers who returns a repaired copy).
+    /// (agreed with Group 3 in BQ-G1-06).
     /// </summary>
     private static void EnsureLibrarianMayChange(BookCopy copy, BookCopyStatus newStatus)
     {

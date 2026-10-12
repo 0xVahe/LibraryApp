@@ -134,7 +134,7 @@ public sealed class BorrowingLifecycleTests
         Reservation reservation = CreateReservation();
         DateTime readyUntilUtc = IssuedAtUtc.AddDays(3);
 
-        reservation.MarkReady(readyUntilUtc);
+        reservation.MarkReady(Guid.NewGuid(),readyUntilUtc);
 
         Assert.Equal(
             ReservationStatus.ReadyForPickup,
@@ -165,7 +165,7 @@ public sealed class BorrowingLifecycleTests
     {
         Reservation reservation = CreateReservation();
 
-        reservation.MarkReady(IssuedAtUtc.AddDays(3));
+        reservation.MarkReady(Guid.NewGuid(),IssuedAtUtc.AddDays(3));
         reservation.Fulfil();
 
         Assert.Equal(

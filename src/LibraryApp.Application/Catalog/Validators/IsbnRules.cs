@@ -25,7 +25,9 @@ internal static class IsbnRules
             return true;
         }
 
-        if (value.Length == 13 && value.All(char.IsAsciiDigit)
+        if (value.Length == 13
+            && value.All(char.IsAsciiDigit)
+            && (value.StartsWith("978") || value.StartsWith("979"))
             && IsValidIsbn13(value))
         {
             normalized = value;

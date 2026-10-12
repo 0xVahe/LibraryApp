@@ -170,11 +170,24 @@ public sealed class BookService : IBookService
             if (book is null || book.IsDeleted)
                 throw new DomainException(CatalogErrors.BookNotFound);
 
-            // 3. Ensure that no copies are on loan or reserved.
-            if (await _bookRepository.HasCopiesInCirculationAsync(id, token))
-                throw new DomainException(CatalogErrors.BookHasCopiesInCirculation);
+            // 3. Load all copies and prevent deletion while copies are in circulation.
+            var copies = await _bookRepository.GetCopiesForUpdateAsync(id, token);
 
-            // 4. Mark the book as deleted without removing its record.
+            if (copies.Any(c =>
+                    c.Status is BookCopyStatus.OnLoan or BookCopyStatus.Reserved))
+            {
+                throw new DomainException(CatalogErrors.BookHasCopiesInCirculation);
+            }
+
+            // 4. Withdraw copies that must no longer be available for lending.
+            // Lost copies remain Lost because Lost is a final status.
+            foreach (var copy in copies.Where(
+                         c => c.CanChangeStatusTo(BookCopyStatus.Withdrawn)))
+            {
+                copy.ChangeStatus(BookCopyStatus.Withdrawn);
+            }
+
+            // 5. Soft-delete the book.
             book.Delete(_clock.UtcNow);
         }, ct);
 }

@@ -67,8 +67,7 @@ internal sealed class FakeBooks : IBookRepository
     public List<Book> Books { get; } = [];
     public HashSet<Guid> CategoryIds { get; } = [];
     public HashSet<Guid> PublisherIds { get; } = [];
-    public HashSet<Guid> BooksWithCopiesInCirculation { get; } = [];
-
+    public List<BookCopy> Copies { get; } = [];
     public Dictionary<Guid, BookDetailsDto> BookDetails { get; } = [];
 
     public Task<Book?> FindAsync(Guid id, CancellationToken ct) =>
@@ -92,8 +91,11 @@ internal sealed class FakeBooks : IBookRepository
             x.Isbn == isbn &&
             (!excludeBookId.HasValue || x.Id != excludeBookId.Value)));
 
-    public Task<bool> HasCopiesInCirculationAsync(Guid bookId, CancellationToken ct) =>
-        Task.FromResult(BooksWithCopiesInCirculation.Contains(bookId));
+    public Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(
+        Guid bookId,
+        CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<BookCopy>>(
+            Copies.Where(c => c.BookId == bookId).ToArray());
 
     public void Add(Book book) => Books.Add(book);
 }
@@ -120,4 +122,16 @@ internal sealed class FakeClock : IClock
 
     public DateTime EndOfLocalDayUtc(DateOnly localDate) =>
         StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
+}
+
+internal sealed class FakePublishers : IPublisherRepository
+{
+    public List<Publisher> Publishers { get; } = [];
+    public List<Book> Books { get; } = [];
+    public Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<PublisherDto>>(Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
+    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+    public void Add(Publisher publisher) => Publishers.Add(publisher);
+    public void Remove(Publisher publisher) => Publishers.Remove(publisher);
+    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) => Task.FromResult(Books.Any(x => x.PublisherId == id));
 }

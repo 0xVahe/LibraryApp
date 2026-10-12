@@ -379,6 +379,76 @@ public class BookServiceTests
     }
 
     [Fact]
+    public async Task Delete_withdraws_available_and_under_repair_copies_but_preserves_lost_and_other_books()
+    {
+        var book = new Book(
+            Guid.NewGuid(),
+            "Clean Code",
+            "9780132350884",
+            2008,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null);
+
+        var otherBook = new Book(
+            Guid.NewGuid(),
+            "Refactoring",
+            "9780201485677",
+            1999,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null);
+
+        _books.Books.Add(book);
+        _books.Books.Add(otherBook);
+
+        var availableCopy = new BookCopy(
+            Guid.NewGuid(),
+            book.Id,
+            "BC-DELETE-AVAILABLE",
+            BookCopyCondition.Good,
+            "A-01");
+
+        var repairCopy = new BookCopy(
+            Guid.NewGuid(),
+            book.Id,
+            "BC-DELETE-REPAIR",
+            BookCopyCondition.Good,
+            "A-02");
+
+        repairCopy.ChangeStatus(BookCopyStatus.UnderRepair);
+
+        var lostCopy = new BookCopy(
+            Guid.NewGuid(),
+            book.Id,
+            "BC-DELETE-LOST",
+            BookCopyCondition.Good,
+            "A-03");
+
+        lostCopy.ChangeStatus(BookCopyStatus.Lost);
+
+        var otherBookCopy = new BookCopy(
+            Guid.NewGuid(),
+            otherBook.Id,
+            "BC-OTHER-BOOK",
+            BookCopyCondition.Good,
+            "B-01");
+
+        _books.Copies.AddRange(
+            [availableCopy, repairCopy, lostCopy, otherBookCopy]);
+
+        await Service.DeleteAsync(book.Id);
+
+        Assert.True(book.IsDeleted);
+        Assert.Equal(BookCopyStatus.Withdrawn, availableCopy.Status);
+        Assert.Equal(BookCopyStatus.Withdrawn, repairCopy.Status);
+        Assert.Equal(BookCopyStatus.Lost, lostCopy.Status);
+        Assert.Equal(BookCopyStatus.Available, otherBookCopy.Status);
+    }
+
+    [Fact]
     public async Task Delete_fails_when_book_does_not_exist()
     {
         var error = await Assert.ThrowsAsync<DomainException>(
@@ -402,7 +472,16 @@ public class BookServiceTests
             null);
 
         _books.Books.Add(book);
-        _books.BooksWithCopiesInCirculation.Add(book.Id);
+
+        var copy = new BookCopy(
+            Guid.NewGuid(),
+            book.Id,
+            "BC-DELETE-01",
+            BookCopyCondition.Good,
+            "A-01");
+
+        copy.ChangeStatus(BookCopyStatus.OnLoan);
+        _books.Copies.Add(copy);
 
         var error = await Assert.ThrowsAsync<DomainException>(
             () => Service.DeleteAsync(book.Id));

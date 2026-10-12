@@ -15,7 +15,7 @@ public interface IBookRepository
         Guid? excludeBookId,
         CancellationToken ct);
 
-    Task<bool> HasCopiesInCirculationAsync(
+    Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(
         Guid bookId,
         CancellationToken ct);
 

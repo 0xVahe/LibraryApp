@@ -68,4 +68,30 @@ public class CatalogValidationTests
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(CreateBookRequest.AuthorIds));
     }
+
+    [Theory]
+    [InlineData("4006381333931")]
+    [InlineData("5901234123457")]
+    [InlineData("0000000000000")]
+    public void Create_book_rejects_thirteen_digit_values_without_isbn_prefix(
+        string isbn)
+    {
+        var validator = new CreateBookRequestValidator(new FakeClock());
+
+        var request = new CreateBookRequest(
+            "Test book",
+            isbn,
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            [Guid.NewGuid()]);
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.Isbn));
+    }
 }

@@ -25,14 +25,14 @@ public sealed class BookRepository(LibraryDbContext db) : IBookRepository
                  && (!excludeBookId.HasValue || x.Id != excludeBookId.Value),
             ct);
 
-    public Task<bool> HasCopiesInCirculationAsync(
+    public async Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(
         Guid bookId,
-        CancellationToken ct) =>
-        db.BookCopies.AnyAsync(
-            x => x.BookId == bookId
-                 && (x.Status == BookCopyStatus.OnLoan
-                     || x.Status == BookCopyStatus.Reserved),
-            ct);
+        CancellationToken ct)
+    {
+        return await db.BookCopies
+            .Where(x => x.BookId == bookId)
+            .ToListAsync(ct);
+    }
 
     public void Add(Book book) =>
         db.Books.Add(book);
