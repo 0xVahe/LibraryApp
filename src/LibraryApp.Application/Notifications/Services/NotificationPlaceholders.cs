@@ -23,6 +23,14 @@ public static partial class NotificationPlaceholders
     public static IReadOnlyList<string> Find(string template) =>
         Pattern().Matches(template).Select(m => m.Groups[1].Value).Distinct(StringComparer.Ordinal).ToList();
 
-    [GeneratedRegex(@"\{\{(\w+)\}\}")]
+    /// <summary>False when "{{" or "}}" is left that is not a valid placeholder, such as {{Book.Title}} or an unclosed {{Name.</summary>
+    public static bool IsWellFormed(string template)
+    {
+        var rest = Pattern().Replace(template, string.Empty);
+        return !rest.Contains("{{", StringComparison.Ordinal) && !rest.Contains("}}", StringComparison.Ordinal);
+    }
+
+    // Spaces inside the braces are allowed: {{ BookTitle }} is the same as {{BookTitle}}.
+    [GeneratedRegex(@"\{\{\s*(\w+)\s*\}\}")]
     internal static partial Regex Pattern();
 }

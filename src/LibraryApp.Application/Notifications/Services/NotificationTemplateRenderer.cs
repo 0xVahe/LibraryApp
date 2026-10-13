@@ -12,18 +12,28 @@ public sealed class NotificationTemplateRenderer : INotificationTemplateRenderer
         ArgumentNullException.ThrowIfNull(bodyTemplate);
         ArgumentNullException.ThrowIfNull(values);
 
+        // Otherwise the raw braces would reach the employee (templates are editable, NOT-09).
+        if (!NotificationPlaceholders.IsWellFormed(subjectTemplate) || !NotificationPlaceholders.IsWellFormed(bodyTemplate))
+            throw new ArgumentException("The template has a malformed placeholder; use {{Name}} with letters, digits or _ only.");
+
         // Names only in the message: the values can be personal data (NFR-06).
         var missing = NotificationPlaceholders.Find(subjectTemplate)
             .Concat(NotificationPlaceholders.Find(bodyTemplate))
             .Distinct(StringComparer.Ordinal)
-            .Where(name => !values.TryGetValue(name, out var value) || value is null)
+            .Where(name => !values.TryGetValue(name, out var value) || string.IsNullOrWhiteSpace(value))
             .ToList();
         if (missing.Count > 0)
             throw new ArgumentException($"No value for placeholder(s): {string.Join(", ", missing)}.", nameof(values));
 
         var subject = OneLine(Replace(subjectTemplate, values, encode: false));
         if (subject.Length > Notification.SubjectMaxLength)
-            subject = subject[..Notification.SubjectMaxLength].TrimEnd();
+        {
+            subject = subject[..Notification.SubjectMaxLength];
+            // Never keep half of an emoji (surrogate pair) at the cut.
+            if (char.IsHighSurrogate(subject[^1]))
+                subject = subject[..^1];
+            subject = subject.TrimEnd();
+        }
 
         var body = Replace(bodyTemplate, values, encode: true);
         return new RenderedNotification(subject, NotificationEmailLayout.Wrap(body));
