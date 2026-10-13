@@ -72,6 +72,53 @@ public class NotificationTemplateRendererTests
     }
 
     [Fact]
+    public void Cut_keeps_whole_emoji()
+    {
+        // "Loan: " is 6 characters, so the emoji starts at index 299 and the cut at 300 would split it.
+        var values = new Dictionary<string, string>(Values)
+        {
+            [NotificationPlaceholders.BookTitle] = new string('x', 293) + "\U0001F600" + "tail",
+        };
+
+        var result = _renderer.Render("Loan: {{BookTitle}}", "<p>Body</p>", values);
+
+        Assert.Equal(299, result.Subject.Length);
+        Assert.False(char.IsHighSurrogate(result.Subject[^1]));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Blank_value_counts_as_missing(string blank)
+    {
+        var values = new Dictionary<string, string>(Values) { [NotificationPlaceholders.EmployeeName] = blank };
+
+        var ex = Assert.Throws<ArgumentException>(() => _renderer.Render("Welcome", "<p>Dear {{EmployeeName}},</p>", values));
+
+        Assert.Contains("EmployeeName", ex.Message);
+    }
+
+    [Fact]
+    public void Placeholder_with_spaces_renders()
+    {
+        var result = _renderer.Render("{{ BookTitle }}", "<p>Dear {{ EmployeeName }},</p>", Values);
+
+        Assert.Equal("Clean Code", result.Subject);
+        Assert.Contains("Dear Anna Petrosyan,", result.HtmlBody);
+    }
+
+    [Theory]
+    [InlineData("<p>{{Book.Title}}</p>")]
+    [InlineData("<p>{{Book-Title}}</p>")]
+    [InlineData("<p>Dear {{EmployeeName</p>")]
+    [InlineData("<p>Dear EmployeeName}}</p>")]
+    public void Malformed_placeholder_fails(string body)
+    {
+        Assert.Throws<ArgumentException>(() => _renderer.Render("Welcome", body, Values));
+        Assert.False(NotificationPlaceholders.IsWellFormed(body));
+    }
+
+    [Fact]
     public void Extra_values_are_ignored()
     {
         var result = _renderer.Render("Welcome", "<p>Dear {{EmployeeName}}</p>", Values);
