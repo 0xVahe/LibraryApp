@@ -2,7 +2,7 @@ namespace LibraryApp.Application.Staff.Dto;
 
 public static class StaffImportLimits
 {
-    public const int MaximumRows = 1000;
+    public const int MaximumRows = 200;
     public const long MaximumFileBytes = 1_000_000;
 }
 

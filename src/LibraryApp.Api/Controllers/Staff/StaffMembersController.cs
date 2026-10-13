@@ -18,7 +18,7 @@ public sealed class StaffMembersController(
     IStaffDeactivationService deactivation,
     IStaffImportService import) : ControllerBase
 {
-    /// <summary>Imports up to 1000 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
+    /// <summary>Imports up to 200 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
     /// <remarks>
     /// Upload multipart/form-data using the <c>file</c> field. A successful response contains each member and a
     /// one-time temporary password. Imported accounts must change that password at their first sign-in.
