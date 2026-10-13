@@ -15,7 +15,7 @@ namespace LibraryApp.Api.ErrorHandling;
 /// <para>
 /// Safety net for database races that a module did not translate itself: a concurrency conflict (row version) and a
 /// unique index violation become 409. A module that knows the meaning throws its own error instead
-/// (for example <c>catalog.isbn_duplicate</c>).
+/// (for example <c>catalog.book_isbn_duplicate</c>).
 /// </para>
 /// </summary>
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IProblemDetailsService problemDetails)

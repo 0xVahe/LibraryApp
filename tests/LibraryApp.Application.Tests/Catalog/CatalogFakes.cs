@@ -62,14 +62,56 @@ internal sealed class FakeCategories : ICategoryRepository
     public void Remove(Category category) => Categories.Remove(category);
 }
 
+internal sealed class FakeBooks : IBookRepository
+{
+    public List<Book> Books { get; } = [];
+    public HashSet<Guid> CategoryIds { get; } = [];
+    public HashSet<Guid> PublisherIds { get; } = [];
+    public List<BookCopy> Copies { get; } = [];
+
+    public Task<Book?> FindAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Books.SingleOrDefault(x => x.Id == id));
+
+    public Task<bool> CategoryExistsAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(CategoryIds.Contains(id));
+
+    public Task<bool> PublisherExistsAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(PublisherIds.Contains(id));
+
+    public Task<bool> IsbnExistsAsync(
+        string isbn,
+        Guid? excludeBookId,
+        CancellationToken ct) =>
+        Task.FromResult(Books.Any(x =>
+            !x.IsDeleted &&
+            x.Isbn == isbn &&
+            (!excludeBookId.HasValue || x.Id != excludeBookId.Value)));
+
+    public Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(
+        Guid bookId,
+        CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<BookCopy>>(
+            Copies.Where(c => c.BookId == bookId).ToArray());
+
+    public void Add(Book book) => Books.Add(book);
+}
+
 internal sealed class FakePublishers : IPublisherRepository
 {
     public List<Publisher> Publishers { get; } = [];
     public List<Book> Books { get; } = [];
+
     public Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<PublisherDto>>(Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
-    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+        Task.FromResult<IReadOnlyList<PublisherDto>>(
+            Publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
+
+    public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Publishers.SingleOrDefault(x => x.Id == id));
+
     public void Add(Publisher publisher) => Publishers.Add(publisher);
+
     public void Remove(Publisher publisher) => Publishers.Remove(publisher);
-    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) => Task.FromResult(Books.Any(x => x.PublisherId == id));
+
+    public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult(Books.Any(x => x.PublisherId == id));
 }
