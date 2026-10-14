@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
@@ -7,7 +8,8 @@ namespace LibraryApp.Application.Reporting.Services;
 public sealed class ReportingService(
     IReportingReadRepository repository,
     IClock clock,
-    IWorkingDayCalendar workingDayCalendar) : IReportingService
+    IWorkingDayCalendar workingDayCalendar,
+    IMemoryCache cache) : IReportingService
 {
     public async Task<OverdueLoansReportDto> GetOverdueLoansAsync(
         Guid? departmentId,
@@ -47,5 +49,34 @@ public sealed class ReportingService(
             .ToList();
 
         return new OverdueLoansReportDto(today, nowUtc, departmentId, minimumDaysOverdue, maximumDaysOverdue, items);
+    }
+
+    public async Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default)
+    {
+        DateTime nowUtc = clock.UtcNow;
+        DateOnly today = clock.LocalToday;
+        string cacheKey = $"reporting:dashboard:{today:yyyy-MM-dd}";
+        if (cache.TryGetValue(cacheKey, out DashboardReportDto? cached) && cached is not null)
+            return cached;
+
+        DashboardCountsData counts = await repository.GetDashboardCountsAsync(nowUtc, ct);
+        decimal percentage = counts.TotalLoans == 0
+            ? 0m
+            : Math.Round((decimal)counts.OverdueLoans * 100m / counts.TotalLoans, 1, MidpointRounding.AwayFromZero);
+
+        DashboardReportDto report = new(
+            today,
+            nowUtc,
+            counts.TotalBooks,
+            counts.TotalCopies,
+            counts.ActiveReaders,
+            counts.ActiveLoans,
+            counts.OverdueLoans,
+            percentage,
+            counts.RestrictedEmployees,
+            counts.SuspendedEmployees);
+
+        cache.Set(cacheKey, report, TimeSpan.FromMinutes(5));
+        return report;
     }
 }

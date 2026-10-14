@@ -29,4 +29,9 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
 
         return Ok(await reporting.GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, ct));
     }
+
+    [HttpGet("dashboard")]
+    [ProducesResponseType<DashboardReportDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<DashboardReportDto>> GetDashboard(CancellationToken ct) =>
+        Ok(await reporting.GetDashboardAsync(ct));
 }

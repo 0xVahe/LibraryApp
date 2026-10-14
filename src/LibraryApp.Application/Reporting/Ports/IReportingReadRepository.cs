@@ -5,6 +5,7 @@ namespace LibraryApp.Application.Reporting.Ports;
 public interface IReportingReadRepository
 {
     Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(DateTime nowUtc, CancellationToken ct = default);
+    Task<DashboardCountsData> GetDashboardCountsAsync(DateTime nowUtc, CancellationToken ct = default);
 }
 
 public sealed record OverdueLoanData(
@@ -17,3 +18,13 @@ public sealed record OverdueLoanData(
     string BookTitle,
     DateTime DueAtUtc,
     int PointsSoFar);
+
+public sealed record DashboardCountsData(
+    int TotalBooks,
+    int TotalCopies,
+    int ActiveReaders,
+    int ActiveLoans,
+    int TotalLoans,
+    int OverdueLoans,
+    int RestrictedEmployees,
+    int SuspendedEmployees);

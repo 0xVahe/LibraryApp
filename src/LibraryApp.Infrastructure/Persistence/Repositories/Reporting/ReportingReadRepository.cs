@@ -1,3 +1,4 @@
+using LibraryApp.Domain.Staff;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
 using LibraryApp.Domain.Borrowing;
@@ -37,5 +38,32 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
                 loan.DueAtUtc,
                 points == null ? 0 : points.Points))
             .ToListAsync(ct);
+    }
+
+    public async Task<DashboardCountsData> GetDashboardCountsAsync(DateTime nowUtc, CancellationToken ct = default)
+    {
+        int totalBooks = await db.Books.AsNoTracking().CountAsync(book => !book.IsDeleted, ct);
+        int totalCopies = await db.BookCopies.AsNoTracking().CountAsync(ct);
+        int activeReaders = await db.StaffMembers.AsNoTracking().CountAsync(staff => staff.Status == StaffMemberStatus.Active, ct);
+        int activeLoans = await db.Loans.AsNoTracking().CountAsync(
+            loan => loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue, ct);
+        int totalLoans = await db.Loans.AsNoTracking().CountAsync(ct);
+        int overdueLoans = await db.Loans.AsNoTracking().CountAsync(
+            loan => (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
+                    && loan.DueAtUtc < nowUtc, ct);
+        int restrictedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(
+            staff => staff.Status == StaffMemberStatus.Restricted, ct);
+        int suspendedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(
+            staff => staff.Status == StaffMemberStatus.Suspended, ct);
+
+        return new DashboardCountsData(
+            totalBooks,
+            totalCopies,
+            activeReaders,
+            activeLoans,
+            totalLoans,
+            overdueLoans,
+            restrictedEmployees,
+            suspendedEmployees);
     }
 }

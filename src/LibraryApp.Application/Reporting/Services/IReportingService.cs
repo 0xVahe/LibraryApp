@@ -9,4 +9,6 @@ public interface IReportingService
         int? minimumDaysOverdue,
         int? maximumDaysOverdue,
         CancellationToken ct = default);
+
+    Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default);
 }
