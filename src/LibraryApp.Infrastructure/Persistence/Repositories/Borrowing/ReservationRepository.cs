@@ -28,6 +28,14 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
                            && reservation.Status == ReservationStatus.Waiting,
             ct);
 
+    public async Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default) =>
+        await db.Reservations
+            .Where(reservation => reservation.BookId == bookId && reservation.Status == ReservationStatus.Waiting)
+            .OrderBy(reservation => reservation.QueuePosition)
+            .ThenBy(reservation => reservation.CreatedAtUtc)
+            .ThenBy(reservation => reservation.Id)
+            .ToListAsync(ct);
+
     public async Task AddAsync(Reservation reservation, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reservation);
