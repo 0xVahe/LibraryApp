@@ -15,6 +15,7 @@ namespace LibraryApp.Application.Catalog.Dto;
 /// <param name="TotalCopies">Copies the library still has: every status except Lost and Withdrawn.</param>
 /// <param name="AvailableCopies">Copies with status Available.</param>
 /// <param name="Availability">The two numbers as text, for example "2 of 3 available".</param>
+/// <param name="NextExpectedReturnDate">Earliest due date of an open loan in the library's local time zone; null when no copy is on loan (CAT-08).</param>
 public sealed record BookDetailsDto(
     Guid Id,
     string Title,
@@ -29,4 +30,5 @@ public sealed record BookDetailsDto(
     IReadOnlyList<string> Authors,
     int TotalCopies,
     int AvailableCopies,
-    string Availability);
+    string Availability,
+    DateOnly? NextExpectedReturnDate);

@@ -2,12 +2,16 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
@@ -68,6 +72,34 @@ public class BookDetailsEndpointTests(ApiHostFactory factory) : IClassFixture<Ap
         Assert.Equal(3, book.TotalCopies);
         Assert.Equal(2, book.AvailableCopies);
         Assert.Equal("2 of 3 available", book.Availability);
+        Assert.Null(book.NextExpectedReturnDate);
+    }
+
+    [Fact]
+    public async Task A_book_with_a_copy_on_loan_shows_the_next_expected_return_date()
+    {
+        var bookId = await CreateBookAsync("9781000001013", "DET-5");
+        Loan loan;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            Guid copyOnLoan = await db.BookCopies
+                .Where(copy => copy.BookId == bookId && copy.Status == BookCopyStatus.OnLoan)
+                .Select(copy => copy.Id)
+                .SingleAsync();
+            loan = Loan.Issue(Guid.NewGuid(), copyOnLoan, Members.AnnaPetrosyan, DateTime.UtcNow, 7);
+            db.Loans.Add(loan);
+            await db.SaveChangesAsync();
+        }
+
+        using var client = Client(StaffRoles.StaffMember);
+        var response = await client.GetAsync($"/api/books/{bookId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var book = await response.Content.ReadFromJsonAsync<BookDetailsDto>();
+        Assert.NotNull(book);
+        var clock = factory.Services.GetRequiredService<IClock>();
+        Assert.Equal(clock.ToLocalDate(loan.DueAtUtc), book.NextExpectedReturnDate);
     }
 
     [Fact]
