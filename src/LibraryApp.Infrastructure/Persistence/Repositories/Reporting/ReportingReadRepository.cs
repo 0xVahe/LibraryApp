@@ -1,7 +1,8 @@
-using LibraryApp.Domain.Staff;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Reporting;
@@ -66,4 +67,33 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
             restrictedEmployees,
             suspendedEmployees);
     }
+
+    public async Task<IReadOnlyList<TopBookReportItemDto>> GetTopBooksAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            group loan by new { book.Id, book.Title } into grouped
+            orderby grouped.Count() descending, grouped.Key.Title
+            select new TopBookReportItemDto(grouped.Key.Id, grouped.Key.Title, grouped.Count()))
+            .Take(10)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+            group loan by new { category.Id, category.Name } into grouped
+            orderby grouped.Count() descending, grouped.Key.Name
+            select new TopCategoryReportItemDto(grouped.Key.Id, grouped.Key.Name, grouped.Count()))
+            .Take(5)
+            .ToListAsync(ct);
 }

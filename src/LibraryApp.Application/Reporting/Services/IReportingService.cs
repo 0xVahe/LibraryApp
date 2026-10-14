@@ -11,4 +11,9 @@ public interface IReportingService
         CancellationToken ct = default);
 
     Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default);
+
+    Task<TopBooksAndCategoriesReportDto> GetTopBooksAndCategoriesAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
 }

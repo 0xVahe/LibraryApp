@@ -34,4 +34,18 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     [ProducesResponseType<DashboardReportDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<DashboardReportDto>> GetDashboard(CancellationToken ct) =>
         Ok(await reporting.GetDashboardAsync(ct));
+
+    [HttpGet("top-books-and-categories")]
+    [ProducesResponseType<TopBooksAndCategoriesReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<TopBooksAndCategoriesReportDto>> GetTopBooksAndCategories(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken ct)
+    {
+        if (from == default || to == default || from > to)
+            return BadRequest(new ProblemDetails { Title = "A valid date range is required", Status = StatusCodes.Status400BadRequest });
+
+        return Ok(await reporting.GetTopBooksAndCategoriesAsync(from, to, ct));
+    }
 }

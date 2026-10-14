@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Caching.Memory;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace LibraryApp.Application.Reporting.Services;
 
@@ -78,5 +78,21 @@ public sealed class ReportingService(
 
         cache.Set(cacheKey, report, TimeSpan.FromMinutes(5));
         return report;
+    }
+
+    public async Task<TopBooksAndCategoriesReportDto> GetTopBooksAndCategoriesAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        if (from > to)
+            throw new ArgumentException("The start date must be on or before the end date.");
+
+        DateTime fromUtc = clock.StartOfLocalDayUtc(from);
+        DateTime toUtc = clock.EndOfLocalDayUtc(to);
+        IReadOnlyList<TopBookReportItemDto> books = await repository.GetTopBooksAsync(fromUtc, toUtc, ct);
+        IReadOnlyList<TopCategoryReportItemDto> categories = await repository.GetTopCategoriesAsync(fromUtc, toUtc, ct);
+
+        return new TopBooksAndCategoriesReportDto(from, to, clock.UtcNow, books, categories);
     }
 }
