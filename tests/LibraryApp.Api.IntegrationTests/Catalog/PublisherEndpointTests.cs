@@ -229,11 +229,12 @@ public abstract class PublisherEndpointChecks<TFactory>(TFactory factory) where 
         Check(item.GetProperty("get"), "Gets a publisher.", ["200", "401", "404"]);
         Check(item.GetProperty("put"), "Renames a publisher.", ["204", "400", "401", "403", "404"]);
         Check(item.GetProperty("delete"), "Deletes a publisher only when no book references it, deleted books included.", ["204", "401", "403", "404", "409"]);
-        Assert.True(swagger.GetProperty("security")[0].TryGetProperty("Bearer", out _));
+        Assert.False(swagger.TryGetProperty("security", out _));
 
         static void Check(JsonElement operation, string summary, string[] statuses)
         {
             Assert.Equal(summary, operation.GetProperty("summary").GetString());
+            Assert.True(operation.GetProperty("security")[0].TryGetProperty("Bearer", out _));
             foreach (var status in statuses) Assert.True(operation.GetProperty("responses").TryGetProperty(status, out _));
         }
     }
