@@ -1,4 +1,3 @@
-using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Ports;
@@ -7,7 +6,6 @@ using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -30,10 +28,6 @@ public static class CatalogRegistrationExtensions
         // Copies (CAT-04)
         services.AddScoped<IBookCopyRepository, BookCopyRepository>();
         services.AddScoped<IBookCopyService, BookCopyService>();
-
-        // Temporary provider of Borrowing's queue contract (BQ-G1-10): offers nothing until Group 3 registers the real
-        // implementation with AddScoped (or deletes this stub). Remove before the code freeze.
-        services.TryAddScoped<IReservationQueueService, ReservationQueueServiceStub>();
 
         // Contract for other modules: available copy, copy status, book lookup (CAT-07, INT-01, INT-02).
         // Scoped: SetCopyStatusAsync changes the copy in the caller's DbContext, so the caller's unit of work saves it.
