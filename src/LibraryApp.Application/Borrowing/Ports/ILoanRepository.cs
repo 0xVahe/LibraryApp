@@ -20,4 +20,7 @@ public interface ILoanRepository
 
     /// <summary>The loan with this id, read only; null when there is none.</summary>
     Task<Loan?> FindAsync(Guid loanId, CancellationToken ct = default);
+
+    /// <summary>Copy ids of the employee's open (Active or Overdue) loans (BOR-07, BR-BOR-2).</summary>
+    Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default);
 }

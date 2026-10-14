@@ -1,7 +1,9 @@
 using LibraryApp.Application.Abstractions.Borrowing;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Infrastructure.Persistence.Repositories.Borrowing;
+using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,12 +21,17 @@ public static class BorrowingRegistrationExtensions
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
         services.AddScoped<ILoanService, LoanService>();
+        services.AddScoped<IReservationRepository, ReservationRepository>();
+        services.AddScoped<IReservationService, ReservationService>();
 
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
 
         // Contract for Catalog: next expected return date of a book (CAT-08)
         services.AddScoped<ILoanQueryService, LoanQueryService>();
+
+        // Demo data, Development only (SD-17)
+        services.AddScoped<IModuleSeeder, BorrowingSeeder>();
 
         return services;
     }
