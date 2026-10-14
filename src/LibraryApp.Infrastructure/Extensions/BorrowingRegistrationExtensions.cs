@@ -24,6 +24,9 @@ public static class BorrowingRegistrationExtensions
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();
 
+        // Contract for Catalog: a new or repaired copy goes to the reservation queue (BOR-07, BQ-G1-10)
+        services.AddScoped<IReservationQueueService, ReservationQueueService>();
+
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
 
