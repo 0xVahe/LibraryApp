@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LibraryApp.Application.Abstractions.Common;
@@ -44,6 +45,89 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         var response = await Login($"nobody.{Guid.NewGuid():N}@ameriabank.am");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(Password, HttpStatusCode.Forbidden, "staff.account_deactivated")]
+    [InlineData("WrongPass1", HttpStatusCode.Unauthorized, "staff.invalid_credentials")]
+    public async Task Deactivated_account_checks_the_password_before_revealing_its_status(
+        string password, HttpStatusCode status, string code)
+    {
+        using var administrator = await AdministratorClient();
+        var member = await Enrol(administrator);
+        using var initialLogin = await Login(member.CorporateEmail);
+        Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
+
+        using var deactivation = await administrator.PostAsJsonAsync(
+            $"/api/staff-members/{member.Id}/deactivate", new DeactivateStaffMemberRequest("Employee left the bank."));
+        Assert.Equal(HttpStatusCode.NoContent, deactivation.StatusCode);
+
+        using var response = await Login(member.CorporateEmail, password);
+
+        await AssertLoginError(response, status, code);
+    }
+
+    [Fact]
+    public async Task Wrong_passwords_lock_the_account_at_the_configured_limit_and_reject_the_right_password()
+    {
+        using var administrator = await AdministratorClient();
+        var member = await Enrol(administrator);
+        using var initialLogin = await Login(member.CorporateEmail);
+        Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
+
+        using var settingsScope = factory.Services.CreateScope();
+        var maxAttempts = settingsScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>()
+            .Options.Lockout.MaxFailedAccessAttempts;
+        Assert.True(maxAttempts > 0);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            using var response = await Login(member.CorporateEmail, "WrongPass1");
+            await AssertLoginError(response, HttpStatusCode.Unauthorized, "staff.invalid_credentials");
+
+            using var scope = factory.Services.CreateScope();
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = await users.FindByEmailAsync(member.CorporateEmail);
+            Assert.NotNull(user);
+            Assert.Equal(attempt == maxAttempts, await users.IsLockedOutAsync(user));
+        }
+
+        using var lockedLogin = await Login(member.CorporateEmail);
+        await AssertLoginError(lockedLogin, HttpStatusCode.Unauthorized, "staff.invalid_credentials");
+    }
+
+    private async Task<HttpClient> AdministratorClient()
+    {
+        var administrator = StaffSeedData.People.Single(x => x.Role == StaffRoles.LibraryAdministrator);
+        using var login = await Login(administrator.Email, StaffSeedData.Password);
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var token = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(token);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return client;
+    }
+
+    private static async Task<StaffMemberDto> Enrol(HttpClient administrator)
+    {
+        var unique = Guid.NewGuid().ToString("N");
+        var request = new EnrolStaffMemberRequest($"AUTH-{unique}", "Demo", "Employee",
+            $"auth.{unique}@ameriabank.am", StaffSeedIds.Departments.InformationTechnology,
+            "Engineer", null, StaffSeedIds.Categories.Employee, Password);
+        using var response = await administrator.PostAsJsonAsync("/api/staff-members", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<StaffMemberDto>())!;
+    }
+
+    private static async Task AssertLoginError(HttpResponseMessage response, HttpStatusCode status, string code)
+    {
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal((int)status, body.GetProperty("status").GetInt32());
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("traceId").GetString()));
     }
 
     [Theory]
