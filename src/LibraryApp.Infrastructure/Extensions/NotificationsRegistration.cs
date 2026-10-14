@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Notifications;
+using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Infrastructure.Mail;
 using LibraryApp.Infrastructure.Persistence.Seed.Notifications;
 using Microsoft.Extensions.Configuration;
@@ -21,6 +22,9 @@ public static class NotificationsRegistrationExtensions
 
         // Default notification templates, development seed (NOT-02).
         services.AddScoped<IModuleSeeder, NotificationTemplateSeeder>();
+
+        // Template renderer (NOT-02): stateless, so one instance.
+        services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();
 
         return services;
     }
