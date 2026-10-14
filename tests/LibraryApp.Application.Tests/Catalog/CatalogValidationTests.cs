@@ -1,6 +1,8 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Tests.Fakes;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -43,5 +45,54 @@ public class CatalogValidationTests
         var validator = new CategoryRequestValidator();
         Assert.True(validator.Validate(new CategoryRequest("Root", null)).IsValid);
         Assert.False(validator.Validate(new CategoryRequest("Child", Guid.Empty)).IsValid);
+    }
+
+    [Fact]
+    public void Create_book_requires_at_least_one_author()
+    {
+        var validator = new CreateBookRequestValidator(
+            new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)));
+
+        var request = new CreateBookRequest(
+            "Test book",
+            "9780306406157",
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            null!);
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.AuthorIds));
+    }
+
+    [Theory]
+    [InlineData("4006381333931")]
+    [InlineData("5901234123457")]
+    [InlineData("0000000000000")]
+    public void Create_book_rejects_thirteen_digit_values_without_isbn_prefix(
+        string isbn)
+    {
+        var validator = new CreateBookRequestValidator(new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)));
+
+        var request = new CreateBookRequest(
+            "Test book",
+            isbn,
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            [Guid.NewGuid()]);
+
+        var result = validator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.Isbn));
     }
 }

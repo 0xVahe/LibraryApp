@@ -279,6 +279,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await ReadAsync(response);
+        Assert.Equal("not_found", body.GetProperty("code").GetString());
+        Assert.Equal("urn:library:error:not_found", body.GetProperty("type").GetString());
     }
 
     /// <summary>
@@ -286,9 +289,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     /// ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
     /// </summary>
     [Theory]
-    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound)]
-    [InlineData("/test-secured", HttpStatusCode.Unauthorized)]
-    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status)
+    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound, "not_found")]
+    [InlineData("/test-secured", HttpStatusCode.Unauthorized, "unauthorized")]
+    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status, string code)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Accept.ParseAdd("text/plain");
@@ -300,6 +303,8 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal((int)status, body.GetProperty("status").GetInt32());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("title").GetString()));
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 
