@@ -1,14 +1,29 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Identity;
+using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
-public class AuthEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
+/// <summary>API host with the Staff demo accounts, so the tests log in as real seeded users.</summary>
+public sealed class AuthFactory : ApiHostFactory, IAsyncLifetime
+{
+    public new async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        using var scope = Services.CreateScope();
+        var seeder = scope.ServiceProvider.GetServices<IModuleSeeder>().OfType<StaffSeeder>().Single();
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(seeder.SeedAsync);
+    }
+}
+
+public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
 {
     private const string Password = "Passw0rd1";
 
@@ -31,28 +46,40 @@ public class AuthEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Valid_credentials_return_a_token_with_the_role()
+    [Theory]
+    [InlineData("lilit.grigoryan@ameriabank.am", StaffRoles.LibraryAdministrator)]
+    [InlineData("aram.sargsyan@ameriabank.am", StaffRoles.Librarian)]
+    [InlineData("anna.petrosyan@ameriabank.am", StaffRoles.StaffMember)]
+    public async Task Seeded_accounts_return_a_token_with_the_role(string email, string role)
     {
-        var email = $"librarian.{Guid.NewGuid():N}@ameriabank.am";
-        using (var scope = factory.Services.CreateScope())
-        {
-            var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-            if (!await roles.RoleExistsAsync(StaffRoles.Librarian))
-                await roles.CreateAsync(new IdentityRole<Guid>(StaffRoles.Librarian) { Id = Guid.NewGuid() });
-
-            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-            var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
-            Assert.True((await users.CreateAsync(user, Password)).Succeeded);
-            Assert.True((await users.AddToRoleAsync(user, StaffRoles.Librarian)).Succeeded);
-        }
-
-        var response = await Login(email);
+        var response = await Login(email, StaffSeedData.Password);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.Equal("Bearer", body!.TokenType);
-        Assert.Equal(StaffRoles.Librarian, Assert.Single(body.Roles));
+        Assert.Equal(role, Assert.Single(body.Roles));
         Assert.False(string.IsNullOrWhiteSpace(body.AccessToken));
+    }
+
+    [Theory]
+    [InlineData(StaffRoles.Librarian)]
+    [InlineData(StaffRoles.LibraryAdministrator)]
+    public async Task Account_without_a_staff_profile_returns_401_invalid_credentials(string role)
+    {
+        var email = $"no-profile.{Guid.NewGuid():N}@ameriabank.am";
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
+            Assert.True((await users.CreateAsync(user, Password)).Succeeded);
+            Assert.True((await users.AddToRoleAsync(user, role)).Succeeded);
+        }
+
+        var response = await Login(email);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(StaffErrors.InvalidCredentials.Code, body.GetProperty("code").GetString());
     }
 }

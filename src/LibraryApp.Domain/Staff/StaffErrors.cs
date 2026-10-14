@@ -109,8 +109,8 @@ public static class StaffErrors
         Error.Validation("staff.email_not_corporate", "Only Ameriabank staff can log in.");
 
     /// <summary>
-    /// Same message for unknown email and wrong password, so accounts cannot be guessed. Never thrown:
-    /// 401 is not an ErrorKind, AuthController answers it with this code.
+    /// Same message for unknown email, wrong password and an account without a staff profile, so accounts cannot be
+    /// guessed. Never thrown: 401 is not an ErrorKind, AuthController answers it with this code.
     /// </summary>
     public static readonly Error InvalidCredentials =
         Error.Validation("staff.invalid_credentials", "Invalid email or password.");

@@ -10,7 +10,10 @@ public interface ICurrentUser
     /// <summary>AppUser.Id (the "sub" claim).</summary>
     Guid UserId { get; }
 
-    /// <summary>StaffMember.Id of the caller, for "own data only" checks (NFR-03). Null for an account without a staff profile.</summary>
+    /// <summary>
+    /// StaffMember.Id of the caller, for "own data only" checks (NFR-03). Set in every token issued by
+    /// POST /api/auth/login (MEM-02); null only for a principal that was not issued by login.
+    /// </summary>
     Guid? StaffMemberId { get; }
 
     string Email { get; }
