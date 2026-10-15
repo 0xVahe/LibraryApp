@@ -16,6 +16,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 using LibraryApp.Application.Common;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
@@ -384,6 +385,8 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         var loginResult = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
         Assert.True(loginResult.PasswordChangeRequired);
+        var importedToken = new JsonWebToken(loginResult.AccessToken);
+        Assert.Equal(imported.Member.Id.ToString(), importedToken.GetClaim(LibraryClaimTypes.StaffMemberId).Value);
 
         using var restrictedClient = factory.CreateClient();
         restrictedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);

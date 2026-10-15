@@ -31,7 +31,7 @@ public sealed class StaffMembersController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<StaffImportResult>> Import([FromForm] IFormFile file, CancellationToken ct)
+    public async Task<ActionResult<StaffImportResult>> Import(IFormFile file, CancellationToken ct)
     {
         if (file.Length > StaffImportLimits.MaximumFileBytes)
             throw ImportFailure([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
