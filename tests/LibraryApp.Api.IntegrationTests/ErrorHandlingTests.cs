@@ -44,6 +44,7 @@ public sealed class TestErrorsController : ControllerBase
     {
         "business" => throw new DomainException(Error.BusinessRule("test.rule", "Maximum renewals reached")),
         "validation" => throw new DomainException(Error.Validation("test.invalid", "Invalid")),
+        "unauthorized" => throw new DomainException(Error.Unauthorized("test.unauthorized", "Login required")),
         "forbidden" => throw new DomainException(Error.Forbidden("test.forbidden", "Not yours")),
         "notfound" => throw new DomainException(Error.NotFound("test.not_found", "No such loan")),
         "conflict" => throw new DomainException(Error.Conflict("test.conflict", "Already returned")),
@@ -90,6 +91,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Theory]
     [InlineData("business", HttpStatusCode.UnprocessableEntity, "test.rule")]
     [InlineData("validation", HttpStatusCode.BadRequest, "test.invalid")]
+    [InlineData("unauthorized", HttpStatusCode.Unauthorized, "test.unauthorized")]
     [InlineData("forbidden", HttpStatusCode.Forbidden, "test.forbidden")]
     [InlineData("notfound", HttpStatusCode.NotFound, "test.not_found")]
     [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
@@ -101,6 +103,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal(status, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 
@@ -276,6 +279,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await ReadAsync(response);
+        Assert.Equal("not_found", body.GetProperty("code").GetString());
+        Assert.Equal("urn:library:error:not_found", body.GetProperty("type").GetString());
     }
 
     /// <summary>
@@ -283,9 +289,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     /// ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
     /// </summary>
     [Theory]
-    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound)]
-    [InlineData("/test-secured", HttpStatusCode.Unauthorized)]
-    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status)
+    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound, "not_found")]
+    [InlineData("/test-secured", HttpStatusCode.Unauthorized, "unauthorized")]
+    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status, string code)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Accept.ParseAdd("text/plain");
@@ -297,6 +303,8 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal((int)status, body.GetProperty("status").GetInt32());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("title").GetString()));
+        Assert.Equal(code, body.GetProperty("code").GetString());
+        Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
     }
 

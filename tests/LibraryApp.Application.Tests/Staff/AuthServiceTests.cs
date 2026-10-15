@@ -98,4 +98,17 @@ public class AuthServiceTests
         Assert.NotNull(response);
         Assert.Equal(account.Email, Assert.Single(_accounts.LookedUpEmails));
     }
+
+    [Theory]
+    [InlineData(StaffRoles.StaffMember)]
+    [InlineData(StaffRoles.LibraryAdministrator)]
+    public async Task Login_returns_null_for_an_account_without_a_staff_profile(string role)
+    {
+        var account = _accounts.Add(status: null, role: role);
+
+        var response = await _service.LoginAsync(Request(account.Email));
+
+        Assert.Null(response);
+        Assert.Empty(_tokens.Issued);
+    }
 }

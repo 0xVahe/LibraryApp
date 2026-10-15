@@ -2,7 +2,7 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Staff.Ports;
 
-/// <summary>Login account plus its StaffMember (null if the account has none).</summary>
+/// <summary>Login account plus its StaffMember (null if the account has none; AuthService then rejects the login).</summary>
 public sealed record LoginAccount(
     Guid UserId,
     string Email,

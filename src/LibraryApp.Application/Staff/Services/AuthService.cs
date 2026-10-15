@@ -22,6 +22,11 @@ public sealed class AuthService(
         if (account is null)
             return null;
 
+        // MEM-02: only staff members log in. Every token then has staff_member_id (MEM-08, Borrowing).
+        // Same 401 as a wrong password, so the answer does not reveal that the account exists.
+        if (account.StaffMemberId is null)
+            return null;
+
         // Restricted and Suspended members may still log in to see their standing (MEM-08).
         if (account.StaffStatus == StaffMemberStatus.Deactivated)
             throw new DomainException(StaffErrors.AccountDeactivated);

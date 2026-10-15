@@ -25,6 +25,7 @@ public static class StaffRegistrationExtensions
         services.AddScoped<IStaffCsvParser, StaffCsvParser>();
         services.AddScoped<IStaffImportService, StaffImportService>();
         services.AddScoped<IStaffDeactivationService, StaffDeactivationService>();
+        services.AddScoped<IMyLibraryService, MyLibraryService>();
 
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IDepartmentService, DepartmentService>();
