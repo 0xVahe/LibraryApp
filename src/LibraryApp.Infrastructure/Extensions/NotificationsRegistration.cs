@@ -29,6 +29,9 @@ public static class NotificationsRegistrationExtensions
         // Default notification templates, development seed (NOT-02).
         services.AddScoped<IModuleSeeder, NotificationTemplateSeeder>();
 
+        // Template renderer (NOT-02): stateless, so one instance.
+        services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();
+
         return services;
     }
 }

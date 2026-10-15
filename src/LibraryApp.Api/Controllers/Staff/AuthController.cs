@@ -1,8 +1,7 @@
-using System.Diagnostics;
 using LibraryApp.Api.Auth;
-using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Services;
+using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,17 +25,9 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request, CancellationToken ct)
     {
         var response = await authService.LoginAsync(request, ct);
-        if (response is not null)
-            return Ok(response);
+        if (response is null)
+            throw new DomainException(StaffErrors.InvalidCredentials);
 
-        var error = StaffErrors.InvalidCredentials;
-        var problem = GlobalExceptionHandler.Problem(StatusCodes.Status401Unauthorized, "Unauthorized", error.Message, error.Code);
-        problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
-
-        return new ObjectResult(problem)
-        {
-            StatusCode = StatusCodes.Status401Unauthorized,
-            ContentTypes = { "application/problem+json" },
-        };
+        return Ok(response);
     }
 }

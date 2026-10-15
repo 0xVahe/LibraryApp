@@ -1,3 +1,5 @@
+using LibraryApp.Application.Abstractions.Borrowing;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
@@ -15,7 +17,8 @@ public sealed class BookDetailsServiceTests
     [Fact]
     public async Task Returns_the_book_with_N_of_M_available()
     {
-        var service = new BookDetailsService(new StubQuery(Book(total: 3, available: 2)));
+        var due = new DateTime(2026, 10, 12, 20, 0, 0, DateTimeKind.Utc);
+        var service = Service(Book(total: 3, available: 2), due);
 
         var details = await service.GetBookDetailsAsync(BookId);
 
@@ -33,22 +36,24 @@ public sealed class BookDetailsServiceTests
         Assert.Equal(3, details.TotalCopies);
         Assert.Equal(2, details.AvailableCopies);
         Assert.Equal("2 of 3 available", details.Availability);
+        Assert.Equal(new DateOnly(2026, 10, 13), details.NextExpectedReturnDate);
     }
 
     [Fact]
     public async Task A_book_without_copies_shows_0_of_0_available()
     {
-        var service = new BookDetailsService(new StubQuery(Book(total: 0, available: 0)));
+        var service = Service(Book(total: 0, available: 0), null);
 
         var details = await service.GetBookDetailsAsync(BookId);
 
         Assert.Equal("0 of 0 available", details.Availability);
+        Assert.Null(details.NextExpectedReturnDate);
     }
 
     [Fact]
     public async Task An_unknown_book_is_not_found()
     {
-        var service = new BookDetailsService(new StubQuery(null));
+        var service = Service(null, null);
 
         var error = await Assert.ThrowsAsync<DomainException>(() => service.GetBookDetailsAsync(Guid.NewGuid()));
 
@@ -58,7 +63,7 @@ public sealed class BookDetailsServiceTests
     [Fact]
     public async Task A_deleted_book_is_not_found()
     {
-        var service = new BookDetailsService(new StubQuery(Book(total: 1, available: 1) with { IsDeleted = true }));
+        var service = Service(Book(total: 1, available: 1) with { IsDeleted = true }, null);
 
         var error = await Assert.ThrowsAsync<DomainException>(() => service.GetBookDetailsAsync(BookId));
 
@@ -70,10 +75,29 @@ public sealed class BookDetailsServiceTests
         CategoryId, "IT & Software Engineering", PublisherId, "Prentice Hall",
         ["Robert C. Martin"], total, available, IsDeleted: false);
 
+    private static BookDetailsService Service(BookDto? book, DateTime? dueDateUtc) =>
+        new(new StubQuery(book), new FakeLoanQuery(dueDateUtc), new YerevanClock());
+
     /// <summary>Returns the same book (or null) for any id.</summary>
     private sealed class StubQuery(BookDto? book) : IBookDetailsQuery
     {
         public Task<BookDto?> GetBookAsync(Guid bookId, CancellationToken cancellationToken = default) =>
             Task.FromResult(book);
+    }
+
+    private sealed class FakeLoanQuery(DateTime? dueDateUtc) : ILoanQueryService
+    {
+        public Task<DateTime?> GetNextDueDateAsync(Guid bookId, CancellationToken ct = default) =>
+            Task.FromResult(dueDateUtc);
+    }
+
+    private sealed class YerevanClock : IClock
+    {
+        public DateTime UtcNow => throw new NotSupportedException();
+        public DateOnly LocalToday => throw new NotSupportedException();
+        public DateTime ToLocal(DateTime utc) => utc.AddHours(4);
+        public DateOnly ToLocalDate(DateTime utc) => DateOnly.FromDateTime(ToLocal(utc));
+        public DateTime StartOfLocalDayUtc(DateOnly localDate) => throw new NotSupportedException();
+        public DateTime EndOfLocalDayUtc(DateOnly localDate) => throw new NotSupportedException();
     }
 }
