@@ -9,5 +9,5 @@ public interface IAuthService
     /// Throws <c>staff.email_not_corporate</c> (400) and <c>staff.account_deactivated</c> (403).
     /// </summary>
     Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken ct = default);
-    Task<bool> ChangeInitialPasswordAsync(Guid userId, ChangeInitialPasswordRequest request, CancellationToken ct = default);
+    Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default);
 }

@@ -57,7 +57,7 @@ public sealed class UserAccountStore(
         return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList(), mustChangePassword);
     }
 
-    public async Task<bool> ChangeInitialPasswordAsync(Guid userId, string currentPassword, string newPassword,
+    public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -68,25 +68,25 @@ public sealed class UserAccountStore(
                 token.ThrowIfCancellationRequested();
                 var user = await userManager.FindByIdAsync(userId.ToString());
                 if (user is null)
-                    throw new InitialPasswordChangeRejectedException();
+                    throw new PasswordChangeRejectedException();
 
                 var marker = (await userManager.GetClaimsAsync(user)).FirstOrDefault(claim =>
                     claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
-                if (marker is null)
-                    throw new InitialPasswordChangeRejectedException();
-
                 var changed = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
                 if (!changed.Succeeded)
-                    throw new InitialPasswordChangeRejectedException();
+                    throw new PasswordChangeRejectedException();
 
-                var removed = await userManager.RemoveClaimAsync(user, marker);
-                if (!removed.Succeeded)
-                    throw new InitialPasswordChangeRejectedException();
+                if (marker is not null)
+                {
+                    var removed = await userManager.RemoveClaimAsync(user, marker);
+                    if (!removed.Succeeded)
+                        throw new PasswordChangeRejectedException();
+                }
 
                 return true;
             }, ct);
         }
-        catch (InitialPasswordChangeRejectedException)
+        catch (PasswordChangeRejectedException)
         {
             return false;
         }
@@ -134,5 +134,5 @@ public sealed class UserAccountStore(
         passwordHasher.VerifyHashedPassword(new AppUser(), hash, password);
     }
 
-    private sealed class InitialPasswordChangeRejectedException : Exception { }
+    private sealed class PasswordChangeRejectedException : Exception { }
 }

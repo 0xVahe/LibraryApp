@@ -31,16 +31,17 @@ public sealed class AuthController(IAuthService authService, ICurrentUser curren
 
         return Ok(response);
     }
-    /// <summary>Changes the generated initial password before an imported staff account can use the API.</summary>
+    /// <summary>Changes the authenticated user's password.</summary>
+    /// <remarks>The client must log in again after the change to obtain a new access token.</remarks>
     [HttpPost("change-password")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> ChangeInitialPassword(ChangeInitialPasswordRequest request, CancellationToken ct)
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
     {
-        if (!await authService.ChangeInitialPasswordAsync(currentUser.UserId, request, ct))
+        if (!await authService.ChangePasswordAsync(currentUser.UserId, request, ct))
             throw new DomainException(StaffErrors.InitialPasswordChangeFailed);
 
         return NoContent();

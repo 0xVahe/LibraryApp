@@ -47,9 +47,9 @@ public sealed class UpdateStaffMemberRequestValidator : AbstractValidator<Update
     }
 }
 
-public sealed class ChangeInitialPasswordRequestValidator : AbstractValidator<ChangeInitialPasswordRequest>
+public sealed class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
-    public ChangeInitialPasswordRequestValidator()
+    public ChangePasswordRequestValidator()
     {
         RuleFor(x => x.CurrentPassword).NotEmpty().MaximumLength(128);
         RuleFor(x => x.NewPassword).Cascade(CascadeMode.Stop).NotEmpty().MinimumLength(8).MaximumLength(128)

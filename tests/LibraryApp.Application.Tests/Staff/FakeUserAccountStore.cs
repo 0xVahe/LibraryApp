@@ -27,6 +27,6 @@ internal sealed class FakeUserAccountStore : IUserAccountStore
         return Task.FromResult(password == Password ? _accounts.GetValueOrDefault(email) : null);
     }
 
-    public Task<bool> ChangeInitialPasswordAsync(Guid userId, string currentPassword, string newPassword,
+    public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
         CancellationToken ct) => Task.FromResult(false);
 }

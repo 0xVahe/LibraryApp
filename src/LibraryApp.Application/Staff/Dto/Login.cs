@@ -3,7 +3,7 @@ namespace LibraryApp.Application.Staff.Dto;
 /// <summary>Credentials for POST /api/auth/login.</summary>
 public sealed record LoginRequest(string? Email, string? Password);
 
-public sealed record ChangeInitialPasswordRequest(string? CurrentPassword, string? NewPassword);
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
 public sealed record LoginResponse(
     string AccessToken,

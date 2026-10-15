@@ -21,5 +21,5 @@ public interface IUserAccountStore
     /// </summary>
     Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct);
 
-    Task<bool> ChangeInitialPasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct);
+    Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct);
 }

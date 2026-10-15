@@ -121,13 +121,13 @@ public class UserAccountStoreTests(UserAccountStoreFixture fixture) : IClassFixt
     }
 
     [Fact]
-    public async Task Initial_password_change_requires_marker_and_correct_current_password()
+    public async Task Password_change_requires_correct_current_password_and_removes_marker_when_present()
     {
         var user = await CreateUserAsync();
         await AddPasswordChangeMarkerAsync(user.Id);
 
-        Assert.False(await ChangeInitialPasswordAsync(user.Id, "WrongPass1", "NewSecurePass9!"));
-        Assert.True(await ChangeInitialPasswordAsync(user.Id, Password, "NewSecurePass9!"));
+        Assert.False(await ChangePasswordAsync(user.Id, "WrongPass1", "NewSecurePass9!"));
+        Assert.True(await ChangePasswordAsync(user.Id, Password, "NewSecurePass9!"));
 
         using var scope = fixture.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
@@ -139,23 +139,23 @@ public class UserAccountStoreTests(UserAccountStoreFixture fixture) : IClassFixt
     }
 
     [Fact]
-    public async Task Initial_password_change_is_rejected_when_account_has_no_marker()
+    public async Task Password_change_succeeds_when_account_has_no_marker()
     {
         var user = await CreateUserAsync();
 
-        Assert.False(await ChangeInitialPasswordAsync(user.Id, Password, "NewSecurePass9!"));
+        Assert.True(await ChangePasswordAsync(user.Id, Password, "NewSecurePass9!"));
 
         using var scope = fixture.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var reloaded = await users.FindByIdAsync(user.Id.ToString());
         Assert.NotNull(reloaded);
-        Assert.True(await users.CheckPasswordAsync(reloaded, Password));
+        Assert.True(await users.CheckPasswordAsync(reloaded, "NewSecurePass9!"));
     }
 
-    private async Task<bool> ChangeInitialPasswordAsync(Guid userId, string currentPassword, string newPassword)
+    private async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
     {
         using var scope = fixture.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<UserAccountStore>()
-            .ChangeInitialPasswordAsync(userId, currentPassword, newPassword, CancellationToken.None);
+            .ChangePasswordAsync(userId, currentPassword, newPassword, CancellationToken.None);
     }
 }
