@@ -84,9 +84,9 @@ public static class BorrowingErrors
         "A copy of this book is available; reservation is not required.");
 
     /// <summary>The employee already has the maximum number of active reservations.</summary>
-    public static readonly Error ReservationLimitReached = Error.BusinessRule(
+    public static Error ReservationLimitReached(int maxActive) => Error.BusinessRule(
         "borrowing.reservation_limit_reached",
-        "The employee already has the maximum of three active reservations.");
+        $"The employee already has the maximum of {maxActive} active reservations.");
 
     /// <summary>The employee already has an active reservation for this book (a conflict with the current queue).</summary>
     public static readonly Error DuplicateActiveReservation = Error.Conflict(
@@ -169,6 +169,11 @@ public static class BorrowingErrors
     public static readonly Error InvalidPenaltyPoints = Error.Validation(
         "borrowing.invalid_penalty_points",
         "Penalty points must be between zero and ten.");
+
+    /// <summary>A penalty record would stop counting at or before the moment it is created.</summary>
+    public static readonly Error PenaltyExpiryNotAfterCreation = Error.Validation(
+        "borrowing.penalty_expiry_not_after_creation",
+        "A penalty must expire after it is created.");
 
     /// <summary>
     /// A penalty requires an explanation.

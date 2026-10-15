@@ -71,7 +71,7 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
     [Fact]
     public async Task Penalty_points_match_the_staff_statuses_of_the_staff_seed()
     {
-        var policy = new PenaltyPolicy();
+        var policy = factory.Services.GetRequiredService<PenaltyPolicy>();
         foreach (var (member, points) in new[] { (Members.GorMkrtchyan, 6), (Members.SonaVardanyan, 10), (Members.AnnaPetrosyan, 0), (Members.DavitHakobyan, 0) })
         {
             var summary = await Read(s => s.GetRequiredService<IBorrowingReadService>().GetStaffSummaryAsync(member));
