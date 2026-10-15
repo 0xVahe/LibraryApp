@@ -1,0 +1,3 @@
+EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category,Role
+HR-10001,Example,Employee,employee10001@ameriabank.am,Information Technology,Software Engineer,manager.it@example.invalid,Employee,
+HR-10002,Sample,Employee,employee10002@ameriabank.am,Finance,Financial Analyst,,Manager / Senior Specialist,

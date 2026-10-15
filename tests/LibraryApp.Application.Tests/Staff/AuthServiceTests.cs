@@ -98,7 +98,7 @@ public class AuthServiceTests
         Assert.NotNull(response);
         Assert.Equal(account.Email, Assert.Single(_accounts.LookedUpEmails));
     }
-    
+
     [Theory]
     [InlineData(StaffRoles.StaffMember)]
     [InlineData(StaffRoles.LibraryAdministrator)]

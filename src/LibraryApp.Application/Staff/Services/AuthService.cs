@@ -32,6 +32,13 @@ public sealed class AuthService(
             throw new DomainException(StaffErrors.AccountDeactivated);
 
         var token = tokens.Issue(account);
-        return new LoginResponse(token.Token, "Bearer", token.ExpiresAtUtc, account.Email, account.Roles);
+        return new LoginResponse(token.Token, "Bearer", token.ExpiresAtUtc, account.Email,
+            account.MustChangePassword ? [] : account.Roles,
+            account.MustChangePassword);
     }
+
+    public Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequest request,
+        CancellationToken ct = default) =>
+        accounts.ChangePasswordAsync(userId, request.CurrentPassword ?? string.Empty,
+            request.NewPassword ?? string.Empty, ct);
 }

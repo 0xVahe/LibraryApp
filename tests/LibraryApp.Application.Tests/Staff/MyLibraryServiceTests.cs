@@ -139,6 +139,18 @@ public class MyLibraryServiceTests
         public Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> GetCategoryNameAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Department>> GetDepartmentsByNamesAsync(IReadOnlyCollection<string> names,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<StaffCategory>> GetCategoriesByNamesAsync(IReadOnlyCollection<string> names,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyCollection<string>> GetExistingEmployeeIdsAsync(IReadOnlyCollection<string> employeeIds,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyCollection<string>> GetExistingEmailsAsync(IReadOnlyCollection<string> emails,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyDictionary<Guid, string>> GetDepartmentNamesAsync(IReadOnlyCollection<Guid> ids,
+            CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyDictionary<Guid, string>> GetCategoryNamesAsync(IReadOnlyCollection<Guid> ids,
+            CancellationToken ct) => throw new NotSupportedException();
         public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchFilter filter, PageRequest paging,
             CancellationToken ct) => throw new NotSupportedException();
         public void Add(StaffMember member) => throw new NotSupportedException();

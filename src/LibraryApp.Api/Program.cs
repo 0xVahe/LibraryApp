@@ -127,6 +127,7 @@ if (app.Configuration.GetValue("UseHttpsRedirection", true))
 app.UseRateLimiter();
 
 app.UseAuthentication();
+app.UseMiddleware<InitialPasswordChangeMiddleware>();
 app.UseAuthorization();
 
 // NFR-02: every controller endpoint needs a valid JWT unless it is marked [AllowAnonymous] (login).
