@@ -8,6 +8,7 @@ namespace LibraryApp.Application.Staff.Services;
 public interface IStaffManagementService
 {
     Task<StaffMemberDto> EnrolAsync(EnrolStaffMemberRequest request, CancellationToken ct = default);
+    Task<IReadOnlyList<StaffMemberDto>> EnrolBatchAsync(IReadOnlyList<EnrolStaffMemberRequest> requests, CancellationToken ct = default);
     Task<StaffMemberDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<StaffMemberDto> UpdateAsync(Guid id, UpdateStaffMemberRequest request, CancellationToken ct = default);
     Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchRequest request, CancellationToken ct = default);

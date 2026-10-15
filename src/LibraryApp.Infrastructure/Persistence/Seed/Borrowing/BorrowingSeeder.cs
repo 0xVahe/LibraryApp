@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
@@ -82,7 +83,7 @@ public sealed class BorrowingSeeder(
 
         // The copy freed for the queue is held for Mariam for 3 working days (BOR-07).
         var ready = Reservation.Create(Ids.Reservation(3), CatalogSeedIds.Book(15), Members.MariamAvetisyan, now.AddDays(-1), 1);
-        ready.MarkReady(CatalogSeedIds.Copy(15, 4), clock.EndOfLocalDayUtc(calendar.AddWorkingDays(clock.LocalToday, 3)));
+        ready.MarkReady(CatalogSeedIds.Copy(15, 4), clock.EndOfLocalDayUtc(calendar.AddWorkingDays(clock.LocalToday, ReservationQueueService.PickupWorkingDays)));
         db.Reservations.Add(ready);
         await catalog.SetCopyStatusAsync(CatalogSeedIds.Copy(15, 4), BookCopyStatus.Reserved, ct);
 

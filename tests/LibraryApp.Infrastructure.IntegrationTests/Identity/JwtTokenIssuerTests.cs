@@ -68,6 +68,16 @@ public class JwtTokenIssuerTests
     }
 
     [Fact]
+    public void Password_change_token_keeps_staff_member_claim_but_omits_roles()
+    {
+        var token = new JsonWebToken(Issuer().Issue(Account with { MustChangePassword = true }).Token);
+
+        Assert.Equal(Account.StaffMemberId.ToString(), token.GetClaim(LibraryClaimTypes.StaffMemberId).Value);
+        Assert.Equal(bool.TrueString, token.GetClaim(LibraryClaimTypes.PasswordChangeRequired).Value);
+        Assert.DoesNotContain(token.Claims, claim => claim.Type == LibraryClaimTypes.Role);
+    }
+
+    [Fact]
     public async Task Token_is_valid_with_the_same_key()
     {
         var result = await new JsonWebTokenHandler().ValidateTokenAsync(Issuer().Issue(Account).Token, Validation(Settings.SigningKey));

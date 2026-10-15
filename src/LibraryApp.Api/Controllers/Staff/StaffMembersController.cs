@@ -1,6 +1,8 @@
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Exceptions;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LibraryApp.Application.Common;
@@ -11,8 +13,47 @@ namespace LibraryApp.Api.Controllers.Staff;
 [Tags("Staff Members")]
 [Route("api/staff-members")]
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
-public sealed class StaffMembersController(IStaffManagementService staff, IStaffDeactivationService deactivation) : ControllerBase
+public sealed class StaffMembersController(
+    IStaffManagementService staff,
+    IStaffDeactivationService deactivation,
+    IStaffImportService import) : ControllerBase
 {
+    /// <summary>Imports up to 200 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
+    /// <remarks>
+    /// Upload multipart/form-data using the <c>file</c> field. A successful response contains each member and a
+    /// one-time temporary password. Imported accounts must change that password at their first sign-in.
+    /// </remarks>
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(1_100_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 1_100_000)]
+    [ProducesResponseType<StaffImportResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<StaffImportResult>> Import(IFormFile file, CancellationToken ct)
+    {
+        if (file.Length > StaffImportLimits.MaximumFileBytes)
+            throw ImportFailure([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
+
+        try
+        {
+            await using var stream = file.OpenReadStream();
+            return Ok(await import.ImportAsync(stream, ct));
+        }
+        catch (StaffImportException ex)
+        {
+            throw ImportFailure(ex.Errors);
+        }
+        catch (StaffCsvFormatException ex)
+        {
+            throw ImportFailure([new StaffImportError(ex.RowNumber, ex.Field, ex.Message)]);
+        }
+    }
+
+    private static DomainException ImportFailure(IReadOnlyList<StaffImportError> rows) =>
+        new(StaffErrors.ImportInvalid, extensions: new Dictionary<string, object?> { ["rows"] = rows });
+
     /// <summary>Deactivates an employee who has no outstanding loans (MEM-01, BR-MEM-4).</summary>
     /// <remarks>A 409 staff.has_active_loans response lists titles and barcodes in outstandingBooks.
     /// Success locks the login account and publishes StaffStatusChanged. Repeating deactivation returns 422.</remarks>

@@ -26,4 +26,7 @@ internal sealed class FakeUserAccountStore : IUserAccountStore
         LookedUpEmails.Add(email);
         return Task.FromResult(password == Password ? _accounts.GetValueOrDefault(email) : null);
     }
+
+    public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
+        CancellationToken ct) => Task.FromResult(false);
 }

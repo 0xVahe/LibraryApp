@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentValidation;
+using LibraryApp.Api.ErrorHandling;
+using LibraryApp.Application.Common;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Notifications;
 using LibraryApp.Infrastructure.Persistence;
@@ -209,6 +211,30 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.DoesNotContain("secret internal detail", text);
     }
 
+    /// <summary>Pipeline codes are platform codes: no module prefix, one per status, never the same as a CommonErrors code.</summary>
+    [Fact]
+    public void Pipeline_errors_have_unique_platform_codes()
+    {
+        var codes = HttpErrors.All.Select(error => error.Code).ToList();
+        var platformCodes = typeof(CommonErrors).GetFields().Select(field => ((Error)field.GetValue(null)!).Code);
+
+        Assert.All(codes, code => Assert.Matches("^[a-z][a-z0-9_]*$", code));
+        Assert.Equal(codes.Count, codes.Distinct().Count());
+        Assert.Empty(codes.Intersect(platformCodes));
+    }
+
+    [Theory]
+    [InlineData(413, "payload_too_large")]
+    [InlineData(418, "http_418")]
+    [InlineData(503, "http_503")]
+    public void Every_error_status_gets_a_code(int status, string code)
+    {
+        var error = HttpErrors.For(status);
+
+        Assert.Equal(code, error.Code);
+        Assert.False(string.IsNullOrEmpty(error.Title));
+    }
+
     [Fact]
     public async Task A_unique_index_violation_is_409_without_the_duplicate_value()
     {
@@ -216,7 +242,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         var text = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal("duplicate_value", JsonDocument.Parse(text).RootElement.GetProperty("code").GetString());
+        Assert.Equal("unique_violation", JsonDocument.Parse(text).RootElement.GetProperty("code").GetString());
         Assert.DoesNotContain("UX_NotificationTemplates", text);
     }
 
@@ -285,15 +311,20 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     }
 
     /// <summary>
-    /// Empty answers (no route, no token) get their body from the status code pages. With Accept: text/plain no
-    /// ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
+    /// Empty answers (no route, no token, wrong method, wrong content type) get their body from the status code pages.
+    /// With Accept: text/plain no ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
     /// </summary>
     [Theory]
-    [InlineData("/no-such-endpoint", HttpStatusCode.NotFound, "not_found")]
-    [InlineData("/test-secured", HttpStatusCode.Unauthorized, "unauthorized")]
-    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(string path, HttpStatusCode status, string code)
+    [InlineData("GET", "/no-such-endpoint", null, HttpStatusCode.NotFound, "not_found")]
+    [InlineData("GET", "/test-secured", null, HttpStatusCode.Unauthorized, "unauthorized")]
+    [InlineData("DELETE", "/test-errors", null, HttpStatusCode.MethodNotAllowed, "method_not_allowed")]
+    [InlineData("POST", "/test-errors", "text/plain", HttpStatusCode.UnsupportedMediaType, "unsupported_media_type")]
+    public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(
+        string method, string path, string? contentType, HttpStatusCode status, string code)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, path);
+        var request = new HttpRequestMessage(new HttpMethod(method), path);
+        if (contentType is not null)
+            request.Content = new StringContent("name=x", System.Text.Encoding.UTF8, contentType);
         request.Headers.Accept.ParseAdd("text/plain");
 
         var response = await factory.CreateClient().SendAsync(request);
@@ -302,7 +333,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         Assert.Equal(status, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal((int)status, body.GetProperty("status").GetInt32());
-        Assert.False(string.IsNullOrEmpty(body.GetProperty("title").GetString()));
+        Assert.Equal(HttpErrors.For((int)status).Title, body.GetProperty("title").GetString());   // one title per status
         Assert.Equal(code, body.GetProperty("code").GetString());
         Assert.Equal($"urn:library:error:{code}", body.GetProperty("type").GetString());
         Assert.False(string.IsNullOrEmpty(body.GetProperty("traceId").GetString()));
