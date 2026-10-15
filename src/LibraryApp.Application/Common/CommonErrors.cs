@@ -2,7 +2,11 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Common;
 
-/// <summary>Errors raised by the platform (unit of work, locks), not by a module rule: no module prefix in the code.</summary>
+/// <summary>
+/// Errors raised by the platform (unit of work, locks, validation), not by a module rule: no module prefix in the code.
+/// Modules may throw or catch them; they add their own errors to <c>&lt;Module&gt;Errors</c>, never here. Errors of the
+/// HTTP pipeline itself (no token, unknown route …) are in <c>HttpErrors</c> of the API project.
+/// </summary>
 public static class CommonErrors
 {
     public static readonly Error ValidationFailed =
