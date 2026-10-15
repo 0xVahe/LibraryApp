@@ -53,6 +53,66 @@ public sealed class StaffManagementService(
         }, ct);
     }
 
+    public async Task<IReadOnlyList<StaffMemberDto>> EnrolBatchAsync(
+        IReadOnlyList<EnrolStaffMemberRequest> requests, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0)
+            return [];
+
+        foreach (var request in requests)
+        {
+            RequireCorporateEmail(request.CorporateEmail);
+            var role = request.Role ?? StaffRoles.StaffMember;
+            if (role != StaffRoles.StaffMember && !currentUser.IsInRole(StaffRoles.LibraryAdministrator))
+                throw new DomainException(StaffErrors.RoleAssignmentForbidden);
+        }
+
+        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            var employeeIds = requests.Select(request => request.EmployeeId.Trim()).ToArray();
+            var emails = requests.Select(request => request.CorporateEmail.Trim().ToLowerInvariant()).ToArray();
+            if (employeeIds.Distinct(StringComparer.OrdinalIgnoreCase).Count() != employeeIds.Length)
+                throw new DomainException(StaffErrors.EmployeeIdTaken);
+            if (emails.Distinct(StringComparer.OrdinalIgnoreCase).Count() != emails.Length)
+                throw new DomainException(StaffErrors.EmailTaken);
+
+            if ((await members.GetExistingEmployeeIdsAsync(employeeIds, token)).Count > 0)
+                throw new DomainException(StaffErrors.EmployeeIdTaken);
+            if ((await members.GetExistingEmailsAsync(emails, token)).Count > 0 ||
+                (await accounts.GetExistingEmailsAsync(emails, token)).Count > 0)
+                throw new DomainException(StaffErrors.EmailTaken);
+
+            var departmentIds = requests.Select(request => request.DepartmentId).Distinct().ToArray();
+            var categoryIds = requests.Select(request => request.StaffCategoryId).Distinct().ToArray();
+            var departmentNames = await members.GetDepartmentNamesAsync(departmentIds, token);
+            var categoryNames = await members.GetCategoryNamesAsync(categoryIds, token);
+            if (departmentNames.Count != departmentIds.Length)
+                throw new DomainException(StaffErrors.DepartmentInvalid);
+            if (categoryNames.Count != categoryIds.Length)
+                throw new DomainException(StaffErrors.CategoryNotFound);
+
+            var results = new List<StaffMemberDto>(requests.Count);
+
+            foreach (var (request, index) in requests.Select((request, index) => (request, index)))
+            {
+                var email = emails[index];
+                var employeeId = employeeIds[index];
+                var role = request.Role ?? StaffRoles.StaffMember;
+                var userId = ids.NewId();
+                await accounts.CreateAsync(userId, email, request.Password, role, token, requirePasswordChange: true);
+                var member = new StaffMember(ids.NewId(), userId, employeeId, request.FirstName, request.LastName,
+                    email, request.DepartmentId, request.Position, request.LineManagerEmail, request.StaffCategoryId,
+                    clock.UtcNow);
+                members.Add(member);
+                await events.PublishAsync(new StaffEnrolled(ids.NewId(), clock.UtcNow, member.Id), token);
+                results.Add(ToDto(member, departmentNames[request.DepartmentId], categoryNames[request.StaffCategoryId], role));
+            }
+
+            return results;
+        }, ct);
+    }
+
     public async Task<StaffMemberDto> GetAsync(Guid id, CancellationToken ct = default) =>
         await members.GetDetailsAsync(id, ct) ?? throw new DomainException(StaffErrors.NotFound);
 

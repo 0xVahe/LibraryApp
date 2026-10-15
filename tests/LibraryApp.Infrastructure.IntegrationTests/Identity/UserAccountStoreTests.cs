@@ -20,6 +20,7 @@ public sealed class UserAccountStoreFixture : IAsyncLifetime
         services.AddDbContext<LibraryDbContext>(options => options.UseLibrarySqlServer(connectionString));
         services.AddLibraryIdentity();
         services.AddSingleton<IClock>(new FixedClock(DateTime.UtcNow));
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<UserAccountStore>();
         return services.BuildServiceProvider();
     }
@@ -50,6 +51,17 @@ public class UserAccountStoreTests(UserAccountStoreFixture fixture) : IClassFixt
         var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
         Assert.True((await scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>().CreateAsync(user, Password)).Succeeded);
         return user;
+    }
+
+    private async Task AddPasswordChangeMarkerAsync(Guid userId)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var user = await users.FindByIdAsync(userId.ToString());
+        Assert.NotNull(user);
+        var result = await users.AddClaimAsync(user, new System.Security.Claims.Claim(
+            LibraryClaimTypes.PasswordChangeRequired, bool.TrueString));
+        Assert.True(result.Succeeded);
     }
 
     /// <summary>Own scope per call, like one HTTP request each.</summary>
@@ -106,5 +118,44 @@ public class UserAccountStoreTests(UserAccountStoreFixture fixture) : IClassFixt
         Assert.Equal(0, stored.AccessFailedCount);  
         Assert.True(stored.LockoutEnd > DateTimeOffset.UtcNow);
         Assert.Null(await VerifyAsync(user.Email!, Password));
+    }
+
+    [Fact]
+    public async Task Password_change_requires_correct_current_password_and_removes_marker_when_present()
+    {
+        var user = await CreateUserAsync();
+        await AddPasswordChangeMarkerAsync(user.Id);
+
+        Assert.False(await ChangePasswordAsync(user.Id, "WrongPass1", "NewSecurePass9!"));
+        Assert.True(await ChangePasswordAsync(user.Id, Password, "NewSecurePass9!"));
+
+        using var scope = fixture.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var reloaded = await users.FindByIdAsync(user.Id.ToString());
+        Assert.NotNull(reloaded);
+        Assert.True(await users.CheckPasswordAsync(reloaded, "NewSecurePass9!"));
+        Assert.DoesNotContain(await users.GetClaimsAsync(reloaded), claim =>
+            claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
+    }
+
+    [Fact]
+    public async Task Password_change_succeeds_when_account_has_no_marker()
+    {
+        var user = await CreateUserAsync();
+
+        Assert.True(await ChangePasswordAsync(user.Id, Password, "NewSecurePass9!"));
+
+        using var scope = fixture.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var reloaded = await users.FindByIdAsync(user.Id.ToString());
+        Assert.NotNull(reloaded);
+        Assert.True(await users.CheckPasswordAsync(reloaded, "NewSecurePass9!"));
+    }
+
+    private async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)
+    {
+        using var scope = fixture.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<UserAccountStore>()
+            .ChangePasswordAsync(userId, currentPassword, newPassword, CancellationToken.None);
     }
 }

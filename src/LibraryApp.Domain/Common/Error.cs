@@ -29,6 +29,17 @@ public enum ErrorKind
 /// An error with a stable machine-readable code and a human-readable message, defined once (SD-04, option B).
 /// Code format: <c>&lt;module&gt;.&lt;what_happened&gt;</c> in lower snake case, for example <c>borrowing.renew_max</c>.
 /// The code never changes; the message may be reworded.
+/// <para>
+/// <b>Adding an error</b> (no shared file changes):
+/// 1) a <c>public static readonly Error</c> field in the module's own class, <c>Domain/&lt;Module&gt;/&lt;Module&gt;Errors.cs</c>,
+/// created with the factory of its kind (<see cref="BusinessRule"/> 422, <see cref="Validation"/> 400,
+/// <see cref="Unauthorized"/> 401, <see cref="Forbidden"/> 403, <see cref="NotFound"/> 404, <see cref="Conflict"/> 409);
+/// 2) <c>throw new DomainException(&lt;Module&gt;Errors.X)</c> — the API answers with the status of the kind, the code
+/// and the message; data the client needs (ids, lists) goes into the exception's <c>extensions</c>.
+/// Platform errors without a module prefix live in <c>CommonErrors</c> (Application) and in <c>HttpErrors</c> (API);
+/// both, like a new <see cref="ErrorKind"/>, are changed by the Integration Owner only. <c>ErrorCatalogTests</c> checks
+/// the format and that no code is defined twice.
+/// </para>
 /// </summary>
 public sealed record Error(string Code, string Message, ErrorKind Kind = ErrorKind.BusinessRule)
 {

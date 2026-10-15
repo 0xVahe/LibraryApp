@@ -16,6 +16,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 using LibraryApp.Application.Common;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
@@ -347,6 +348,168 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         Assert.Equal("demo.employee@ameriabank.am", example.GetProperty("corporateEmail").GetString());
         Assert.Equal(StaffSeedIds.Departments.InformationTechnology, example.GetProperty("departmentId").GetGuid());
         Assert.Equal(StaffSeedIds.Categories.Employee, example.GetProperty("staffCategoryId").GetGuid());
+    }
+
+    [Fact]
+    public async Task Import_creates_all_members_and_requires_each_initial_password_to_be_changed()
+    {
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category,Role\n" +
+                  $"IMP-{Guid.NewGuid():N},Mane,One,mane.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee,\n" +
+                  $"IMP-{Guid.NewGuid():N},Mane,Two,mane.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Analyst,,Employee,\n";
+        int before;
+        int outboxBefore;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            before = await db.StaffMembers.CountAsync();
+            outboxBefore = await db.OutboxMessages.CountAsync(x => x.Type == "StaffEnrolled");
+        }
+
+        using var content = CsvUpload(csv);
+        var response = await Client(StaffRoles.LibraryAdministrator).PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<StaffImportResult>())!;
+        Assert.Equal(2, result.Members.Count);
+        Assert.All(result.Members, member => Assert.False(string.IsNullOrWhiteSpace(member.TemporaryPassword)));
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            Assert.Equal(before + 2, await db.StaffMembers.CountAsync());
+            Assert.Equal(outboxBefore + 2, await db.OutboxMessages.CountAsync(x => x.Type == "StaffEnrolled"));
+        }
+
+        var imported = result.Members[0];
+        var login = await factory.CreateClient().PostAsJsonAsync("/api/auth/login",
+            new LoginRequest(imported.Member.CorporateEmail, imported.TemporaryPassword));
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var loginResult = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
+        Assert.True(loginResult.PasswordChangeRequired);
+        var importedToken = new JsonWebToken(loginResult.AccessToken);
+        Assert.Equal(imported.Member.Id.ToString(), importedToken.GetClaim(LibraryClaimTypes.StaffMemberId).Value);
+
+        using var restrictedClient = factory.CreateClient();
+        restrictedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+        var blocked = await restrictedClient.GetAsync(Route);
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        var blockedProblem = await blocked.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("staff.password_change_required", blockedProblem.GetProperty("code").GetString());
+        Assert.True(blockedProblem.TryGetProperty("traceId", out _));
+        var failedPasswordChange = await restrictedClient.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest("incorrect", "SecureChange9"));
+        Assert.Equal(HttpStatusCode.BadRequest, failedPasswordChange.StatusCode);
+        var failedPasswordProblem = await failedPasswordChange.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("staff.initial_password_change_failed", failedPasswordProblem.GetProperty("code").GetString());
+        Assert.True(failedPasswordProblem.TryGetProperty("traceId", out _));
+        Assert.Equal(HttpStatusCode.NoContent, (await restrictedClient.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(imported.TemporaryPassword, "SecureChange9"))).StatusCode);
+        var newLogin = await factory.CreateClient().PostAsJsonAsync("/api/auth/login",
+            new LoginRequest(imported.Member.CorporateEmail, "SecureChange9"));
+        Assert.Equal(HttpStatusCode.OK, newLogin.StatusCode);
+        Assert.False((await newLogin.Content.ReadFromJsonAsync<LoginResponse>())!.PasswordChangeRequired);
+    }
+
+    [Fact]
+    public async Task Import_with_one_bad_row_creates_nothing_and_reports_row_and_field()
+    {
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category\n" +
+                  $"IMP-{Guid.NewGuid():N},Valid,Employee,valid.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee\n" +
+                  $"IMP-{Guid.NewGuid():N},,Invalid,bad.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client().PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("staff.import_invalid", body.GetProperty("code").GetString());
+        Assert.True(body.TryGetProperty("traceId", out _));
+        var error = Assert.Single(body.GetProperty("rows").EnumerateArray());
+        Assert.Equal(3, error.GetProperty("rowNumber").GetInt32());
+        Assert.Equal("FirstName", error.GetProperty("field").GetString());
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Import_does_not_allow_librarian_to_assign_a_privileged_role()
+    {
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category,Role\n" +
+                  $"IMP-{Guid.NewGuid():N},Valid,Employee,valid.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee,Librarian\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client(StaffRoles.Librarian).PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var error = Assert.Single(body.GetProperty("rows").EnumerateArray());
+        Assert.Equal(2, error.GetProperty("rowNumber").GetInt32());
+        Assert.Equal("Role", error.GetProperty("field").GetString());
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Import_reports_employee_id_and_email_that_already_exist_in_the_database()
+    {
+        var existing = await Enrol(Request());
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category\n" +
+                  $"{existing.EmployeeId},Other,Employee,other.{Guid.NewGuid():N}@ameriabank.am,Information Technology,Engineer,,Employee\n" +
+                  $"IMP-{Guid.NewGuid():N},Other,Employee,{existing.CorporateEmail},Information Technology,Engineer,,Employee\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client().PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var rows = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "EmployeeId");
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "CorporateEmail");
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Import_reports_unknown_department_and_category_without_creating_members()
+    {
+        var csv = "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category\n" +
+                  $"IMP-{Guid.NewGuid():N},Valid,Employee,valid.{Guid.NewGuid():N}@ameriabank.am,Unknown Department,Engineer,,Unknown Category\n";
+        int before;
+        using (var scope = factory.Services.CreateScope())
+            before = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync();
+
+        using var content = CsvUpload(csv);
+        var response = await Client().PostAsync($"{Route}/import", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var rows = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "Department");
+        Assert.Contains(rows, row => row.GetProperty("field").GetString() == "Category");
+        using var verify = factory.Services.CreateScope();
+        Assert.Equal(before, await verify.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.CountAsync());
+    }
+
+    [Fact]
+    public async Task Swagger_documents_multipart_staff_import()
+    {
+        var spec = await factory.CreateClient().GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
+        var operation = spec.GetProperty("paths").GetProperty(Route + "/import").GetProperty("post");
+        Assert.True(operation.GetProperty("requestBody").GetProperty("content").TryGetProperty("multipart/form-data", out _));
+        Assert.True(operation.GetProperty("responses").TryGetProperty("200", out _));
+    }
+
+    private static MultipartFormDataContent CsvUpload(string csv)
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent(csv, System.Text.Encoding.UTF8, "text/csv"), "file", "staff-import.csv");
+        return content;
     }
 
     [Fact]

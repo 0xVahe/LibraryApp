@@ -52,7 +52,7 @@ public sealed class ValidationFilter(IServiceProvider services) : IAsyncActionFi
             Status = StatusCodes.Status400BadRequest,
             Title = "Validation failed",
             Detail = CommonErrors.ValidationFailed.Message,
-            Type = $"urn:library:error:{CommonErrors.ValidationFailed.Code}",
+            Type = HttpErrors.TypeFor(CommonErrors.ValidationFailed.Code),
         };
         problem.Extensions["code"] = CommonErrors.ValidationFailed.Code;
         problem.Extensions["traceId"] = Activity.Current?.Id ?? httpContext.TraceIdentifier;

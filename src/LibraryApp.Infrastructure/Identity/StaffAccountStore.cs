@@ -3,6 +3,7 @@ using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,12 +17,24 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
         return db.Users.AnyAsync(x => x.NormalizedEmail == normalized && (!exceptUserId.HasValue || x.Id != exceptUserId.Value), ct);
     }
 
-    public async Task CreateAsync(Guid userId, string email, string password, string role, CancellationToken ct)
+    public async Task<IReadOnlyCollection<string>> GetExistingEmailsAsync(IReadOnlyCollection<string> emails,
+        CancellationToken ct)
+    {
+        var normalizedEmails = emails.Select(users.NormalizeEmail).ToArray();
+        return await db.Users.Where(x => x.NormalizedEmail != null && normalizedEmails.Contains(x.NormalizedEmail))
+            .Select(x => x.Email!).ToListAsync(ct);
+    }
+
+    public async Task CreateAsync(Guid userId, string email, string password, string role, CancellationToken ct,
+        bool requirePasswordChange = false)
     {
         RequireTransaction(ct);
         var user = new AppUser { Id = userId, Email = email, UserName = email };
         Ensure(await users.CreateAsync(user, password));
         Ensure(await users.AddToRoleAsync(user, role));
+        if (requirePasswordChange)
+            Ensure(await users.AddClaimAsync(user,
+                new Claim(LibraryClaimTypes.PasswordChangeRequired, bool.TrueString)));
     }
 
     public async Task UpdateEmailAsync(Guid userId, string email, CancellationToken ct)

@@ -118,6 +118,33 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         await AssertLoginError(lockedLogin, HttpStatusCode.Unauthorized, "staff.invalid_credentials");
     }
 
+    [Fact]
+    public async Task Enrolled_staff_can_change_password_and_must_log_in_again()
+    {
+        using var administrator = await AdministratorClient();
+        var member = await Enrol(administrator);
+        using var initialLogin = await Login(member.CorporateEmail);
+        Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
+        var login = await initialLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+        Assert.False(login.PasswordChangeRequired);
+
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+        using var change = await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(Password, "ChangedPass9"));
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+
+        using var oldPasswordLogin = await Login(member.CorporateEmail, Password);
+        Assert.Equal(HttpStatusCode.Unauthorized, oldPasswordLogin.StatusCode);
+
+        using var newPasswordLogin = await Login(member.CorporateEmail, "ChangedPass9");
+        Assert.Equal(HttpStatusCode.OK, newPasswordLogin.StatusCode);
+        var updatedLogin = await newPasswordLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(updatedLogin);
+        Assert.False(updatedLogin.PasswordChangeRequired);
+    }
+
     private async Task<HttpClient> AdministratorClient()
     {
         var administrator = StaffSeedData.People.Single(x => x.Role == StaffRoles.LibraryAdministrator);
