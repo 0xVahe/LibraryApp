@@ -90,13 +90,7 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Log in with POST /api/auth/login, then paste the accessToken here (without \"Bearer \")."
     });
 
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecurityScheme
-        {
-            Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-        }] = Array.Empty<string>()
-    });
+    options.OperationFilter<AuthorizeOperationFilter>();
 });
 
 var app = builder.Build();
