@@ -49,8 +49,7 @@ public static class LoginRateLimiting
 
             options.OnRejected = async (context, ct) =>
             {
-                var problem = GlobalExceptionHandler.Problem(StatusCodes.Status429TooManyRequests, "Too many requests",
-                    "Too many login attempts. Try again later.", "too_many_requests");
+                var problem = GlobalExceptionHandler.Problem(HttpErrors.TooManyRequests, "Too many login attempts. Try again later.");
                 problem.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
 
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
