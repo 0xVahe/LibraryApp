@@ -1,0 +1,69 @@
+@{
+    var nav = UiNavigation.For(User);
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var path = Context.Request.Path;
+    var alert = TempData.TakeAlert();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@(ViewData["Title"] is string title ? $"{title} · Ameria Library" : "Ameria Library")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+</head>
+<body>
+<a class="visually-hidden" href="#main">Skip to content</a>
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="/"><span class="logo-mark" aria-hidden="true">A</span>AMERIA <span class="light">LIBRARY</span></a>
+        @if (nav.Count > 0)
+        {
+            <nav class="nav" aria-label="Main">
+                @foreach (var item in nav)
+                {
+                    <a href="@item.Path" aria-current="@(UiNavigation.IsCurrent(item, path) ? "page" : null)">@item.Text</a>
+                }
+            </nav>
+        }
+        @if (signedIn)
+        {
+            <a class="user" href="@UiNavigation.Profile">
+                <span class="avatar" aria-hidden="true">@UiNavigation.Initials(User)</span>
+                <span class="user-name">@UiNavigation.DisplayName(User)<span class="small">@UiNavigation.RoleName(User)</span></span>
+            </a>
+            <form class="signout" method="post" action="@UiPaths.Logout" asp-antiforgery="true">
+                <button class="btn btn-secondary btn-sm" type="submit">Sign out</button>
+            </form>
+            <details class="menu">
+                <summary>Menu</summary>
+                <nav aria-label="Main">
+                    @foreach (var item in nav)
+                    {
+                        <a href="@item.Path" aria-current="@(UiNavigation.IsCurrent(item, path) ? "page" : null)">@item.Text</a>
+                    }
+                    @if (nav.Count > 0)
+                    {
+                        <a href="@UiNavigation.Profile">My profile</a>
+                    }
+                    <form method="post" action="@UiPaths.Logout" asp-antiforgery="true"><button type="submit">Sign out</button></form>
+                </nav>
+            </details>
+        }
+    </div>
+</header>
+<main id="main">
+    @if (alert is not null)
+    {
+        <div class="page-alert"><partial name="_Alert" model="alert" /></div>
+    }
+    @RenderBody()
+</main>
+<footer class="footer">
+    <div class="footer-inner">
+        <span>© 2026 Ameriabank Library · internal service for bank staff</span>
+        <span>Questions: <a href="mailto:library@ameriabank.am">library@ameriabank.am</a></span>
+    </div>
+</footer>
+</body>
+</html>

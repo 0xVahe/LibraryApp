@@ -1,0 +1,6 @@
+@page "/forbidden"
+@model ForbiddenModel
+@{
+    ViewData["Title"] = "No access";
+}
+<partial name="_StatusMessage" model="StatusMessageModel.Forbidden()" />

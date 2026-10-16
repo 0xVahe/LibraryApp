@@ -4,6 +4,7 @@ using FluentValidation;
 using LibraryApp.Api.Auth;
 using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Api.OpenApi;
+using LibraryApp.Api.Ui;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Identity;
@@ -72,6 +73,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddLoginRateLimiting(builder.Configuration);   // Group 2 — POST /api/auth/login per client IP
 builder.Services.AddCurrentUser();
 
+// Browser UI (Razor Pages): cookie sign-in for pages, JWT for /api, chosen by path (Integration Owner).
+builder.Services.AddUi(builder.Configuration, builder.Environment);
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -105,8 +109,7 @@ _ = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 // closes the static one when it stops.
 app.UseSerilogRequestLogging(options => options.Logger = app.Services.GetRequiredService<Serilog.ILogger>());
 
-app.UseExceptionHandler();
-app.UseStatusCodePages();   // empty 401/403/404 answers get a ProblemDetails body as well
+app.UseErrorAnswers();   // /api: ProblemDetails, also for empty 401/403/404 answers; pages: the Error and Not found pages
 
 if (app.Environment.IsDevelopment())
 {
@@ -118,6 +121,8 @@ if (app.Environment.IsDevelopment())
 if (app.Configuration.GetValue("UseHttpsRedirection", true))
     app.UseHttpsRedirection();
 
+app.UseUi();   // static files and the security headers of the pages
+
 app.UseRateLimiter();
 
 app.UseAuthentication();
@@ -127,6 +132,7 @@ app.UseAuthorization();
 // NFR-02: every controller endpoint needs a valid JWT unless it is marked [AllowAnonymous] (login).
 // Not a fallback policy: that would also answer 401 instead of 404 for unknown routes.
 app.MapControllers().RequireAuthorization();
+app.MapUi();   // every page needs a signed-in user unless it is [AllowAnonymous] (sign-in, error pages)
 
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();                                  // the process is up
 app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();   // SQL Server answers
