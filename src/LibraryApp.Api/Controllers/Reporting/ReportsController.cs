@@ -22,11 +22,6 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
         [FromQuery] int? maximumDaysOverdue,
         CancellationToken ct)
     {
-        if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0 ||
-            (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue && minimumDaysOverdue > maximumDaysOverdue) ||
-            departmentId == Guid.Empty)
-            return BadRequest(new ProblemDetails { Title = "Invalid report filters", Status = StatusCodes.Status400BadRequest });
-
         return Ok(await reporting.GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, ct));
     }
 
@@ -43,9 +38,6 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
         [FromQuery] DateOnly to,
         CancellationToken ct)
     {
-        if (from == default || to == default || from > to)
-            return BadRequest(new ProblemDetails { Title = "A valid date range is required", Status = StatusCodes.Status400BadRequest });
-
         return Ok(await reporting.GetTopBooksAndCategoriesAsync(from, to, ct));
     }
 }

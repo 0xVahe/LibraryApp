@@ -1,8 +1,10 @@
-using LibraryApp.Domain.Borrowing;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
 using Microsoft.Extensions.Caching.Memory;
+using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Reporting;
 
 namespace LibraryApp.Application.Reporting.Services;
 
@@ -19,14 +21,16 @@ public sealed class ReportingService(
         int? maximumDaysOverdue,
         CancellationToken ct = default)
     {
-        if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0)
-            throw new ArgumentOutOfRangeException(nameof(minimumDaysOverdue), "Overdue day filters cannot be negative.");
+        if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0 ||
+               (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue && minimumDaysOverdue > maximumDaysOverdue))
+	{
+            throw new DomainException(ReportingErrors.InvalidOverdueFilter);
+	}
 
-        if (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue && minimumDaysOverdue > maximumDaysOverdue)
-            throw new ArgumentException("Minimum overdue days cannot exceed maximum overdue days.");
-
-        if (departmentId == Guid.Empty)
-            throw new ArgumentException("Department ID cannot be empty.", nameof(departmentId));
+	if (departmentId == Guid.Empty)
+	{
+            throw new DomainException(ReportingErrors.InvalidDepartmentId);
+	}
 
         DateTime nowUtc = clock.UtcNow;
         DateOnly today = clock.LocalToday;
@@ -95,8 +99,10 @@ public sealed class ReportingService(
         DateOnly to,
         CancellationToken ct = default)
     {
-        if (from > to)
-            throw new ArgumentException("The start date must be on or before the end date.");
+        if (from == default || to == default || from > to)
+	{
+            throw new DomainException(ReportingErrors.InvalidDateRange);
+	}
 
         DateTime fromUtc = clock.StartOfLocalDayUtc(from);
         DateTime toUtc = clock.EndOfLocalDayUtc(to);
