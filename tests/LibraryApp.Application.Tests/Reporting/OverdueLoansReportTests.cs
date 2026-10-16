@@ -1,4 +1,4 @@
-
+using LibraryApp.Application.Common;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
@@ -145,6 +145,93 @@ public sealed class OverdueLoansReportTests
 
         Assert.Equal(ReportingErrors.InvalidDepartmentId, exception.Error);
     }
+
+
+    [Fact]
+    public async Task Default_pagination_returns_first_twenty_items()
+    {
+        for (int i = 0; i < 25; i++)
+            AddLoan(new DateOnly(2026, 10, 9));
+
+        OverdueLoansReportDto report =
+            await CreateService().GetOverdueLoansAsync(null, null, null);
+
+        Assert.Equal(20, report.Items.Count);
+        Assert.Equal(25, report.TotalCount);
+        Assert.Equal(1, report.Page);
+        Assert.Equal(20, report.PageSize);
+        Assert.Equal(2, report.TotalPages);
+    }
+
+    [Fact]
+    public async Task Custom_pagination_returns_requested_page()
+    {
+        for (int i = 0; i < 12; i++)
+            AddLoan(new DateOnly(2026, 10, 9));
+
+        OverdueLoansReportDto report =
+            await CreateService().GetOverdueLoansAsync(
+                null, null, null, new PageRequest(2, 5));
+
+        Assert.Equal(5, report.Items.Count);
+        Assert.Equal(12, report.TotalCount);
+        Assert.Equal(2, report.Page);
+        Assert.Equal(5, report.PageSize);
+        Assert.Equal(3, report.TotalPages);
+    }
+
+    [Fact]
+    public async Task Page_beyond_available_results_returns_empty_items()
+    {
+        for (int i = 0; i < 3; i++)
+            AddLoan(new DateOnly(2026, 10, 9));
+
+        OverdueLoansReportDto report =
+            await CreateService().GetOverdueLoansAsync(
+                null, null, null, new PageRequest(5, 2));
+
+        Assert.Empty(report.Items);
+        Assert.Equal(3, report.TotalCount);
+        Assert.Equal(5, report.Page);
+        Assert.Equal(2, report.TotalPages);
+    }
+
+    [Fact]
+    public async Task Filters_before_paginating()
+    {
+        AddLoan(new DateOnly(2026, 10, 14));
+        AddLoan(new DateOnly(2026, 10, 13));
+        AddLoan(new DateOnly(2026, 10, 12));
+        AddLoan(new DateOnly(2026, 10, 9));
+
+        OverdueLoansReportDto report =
+            await CreateService().GetOverdueLoansAsync(
+                null, 3, null, new PageRequest(1, 2));
+
+        Assert.Equal(2, report.Items.Count);
+        Assert.Equal(3, report.TotalCount);
+        Assert.Equal(2, report.TotalPages);
+        Assert.Equal(new[] { 5, 4 },
+            report.Items.Select(item => item.WorkingDaysOverdue));
+    }
+
+    [Fact]
+    public async Task Page_request_normalizes_invalid_sizes()
+    {
+        for (int i = 0; i < 25; i++)
+            AddLoan(new DateOnly(2026, 10, 9));
+
+        OverdueLoansReportDto report =
+            await CreateService().GetOverdueLoansAsync(
+                null, null, null, new PageRequest(0, 500));
+
+        Assert.Equal(1, report.Page);
+        Assert.Equal(PageRequest.MaxPageSize, report.PageSize);
+        Assert.Equal(25, report.Items.Count);
+        Assert.Equal(25, report.TotalCount);
+        Assert.Equal(1, report.TotalPages);
+    }
+
 
     private void AddLoan(DateOnly dueDate, Guid? departmentId = null)
     {

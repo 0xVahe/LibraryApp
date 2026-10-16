@@ -1,3 +1,5 @@
+using LibraryApp.Application.Common;
+
 namespace LibraryApp.Application.Reporting.Dto;
 
 public sealed record OverdueLoansReportDto(
@@ -6,7 +8,14 @@ public sealed record OverdueLoansReportDto(
     Guid? DepartmentId,
     int? MinimumDaysOverdue,
     int? MaximumDaysOverdue,
-    IReadOnlyList<OverdueLoanItemDto> Items);
+    IReadOnlyList<OverdueLoanItemDto> Items,
+    int TotalCount = 0,
+    int Page = 1,
+    int PageSize = 20)
+{
+    public int TotalPages =>
+        PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+}
 
 public sealed record OverdueLoanItemDto(
     Guid LoanId,

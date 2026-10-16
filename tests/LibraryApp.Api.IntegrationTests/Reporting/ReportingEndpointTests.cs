@@ -1,4 +1,4 @@
-
+using System.Net.Http.Json;
 using System.Net;
 using System.Net.Http.Headers;
 using LibraryApp.Application.Staff.Ports;
@@ -54,7 +54,7 @@ public sealed class ReportingEndpointTests(ApiHostFactory factory)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    
+
     [Theory]
     [InlineData("/api/reports/overdue-loans?minimumDaysOverdue=-1")]
     [InlineData("/api/reports/overdue-loans?maximumDaysOverdue=-1")]
@@ -103,6 +103,80 @@ public sealed class ReportingEndpointTests(ApiHostFactory factory)
             "/api/reports/top-books-and-categories?from=2026-01-01&to=2026-12-31");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+
+    [Fact]
+    public async Task Overdue_report_uses_default_pagination()
+    {
+        using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
+
+        using var response =
+            await client.GetAsync("/api/reports/overdue-loans");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var json = await response.Content.ReadFromJsonAsync<
+            System.Text.Json.JsonDocument>();
+
+        Assert.NotNull(json);
+
+        var root = json.RootElement;
+
+        Assert.Equal(1, root.GetProperty("page").GetInt32());
+        Assert.Equal(20, root.GetProperty("pageSize").GetInt32());
+        Assert.True(root.GetProperty("totalCount").GetInt32() >= 0);
+        Assert.True(root.GetProperty("totalPages").GetInt32() >= 0);
+        Assert.True(root.GetProperty("items").GetArrayLength() <= 20);
+    }
+
+    [Fact]
+    public async Task Overdue_report_accepts_custom_pagination()
+    {
+        using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
+
+        using var response = await client.GetAsync(
+            "/api/reports/overdue-loans?page=2&pageSize=5");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var json = await response.Content.ReadFromJsonAsync<
+            System.Text.Json.JsonDocument>();
+
+        Assert.NotNull(json);
+
+        var root = json.RootElement;
+
+        Assert.Equal(2, root.GetProperty("page").GetInt32());
+        Assert.Equal(5, root.GetProperty("pageSize").GetInt32());
+        Assert.True(root.GetProperty("items").GetArrayLength() <= 5);
+    }
+
+    [Theory]
+    [InlineData(0, 500, 1, 100)]
+    [InlineData(-5, 0, 1, 20)]
+    public async Task Overdue_report_normalizes_pagination(
+        int page,
+        int pageSize,
+        int expectedPage,
+        int expectedPageSize)
+    {
+        using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
+
+        using var response = await client.GetAsync(
+            $"/api/reports/overdue-loans?page={page}&pageSize={pageSize}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var json = await response.Content.ReadFromJsonAsync<
+            System.Text.Json.JsonDocument>();
+
+        Assert.NotNull(json);
+
+        var root = json.RootElement;
+
+        Assert.Equal(expectedPage, root.GetProperty("page").GetInt32());
+        Assert.Equal(expectedPageSize, root.GetProperty("pageSize").GetInt32());
     }
 
 

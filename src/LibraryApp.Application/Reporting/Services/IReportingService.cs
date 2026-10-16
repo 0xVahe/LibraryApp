@@ -1,4 +1,5 @@
 using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Reporting.Services;
 
@@ -8,6 +9,7 @@ public interface IReportingService
         Guid? departmentId,
         int? minimumDaysOverdue,
         int? maximumDaysOverdue,
+	PageRequest paging,
         CancellationToken ct = default);
 
     Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default);

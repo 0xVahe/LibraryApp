@@ -1,3 +1,4 @@
+using LibraryApp.Application.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Services;
 using LibraryApp.Domain.Staff;
@@ -20,9 +21,11 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
         [FromQuery] Guid? departmentId,
         [FromQuery] int? minimumDaysOverdue,
         [FromQuery] int? maximumDaysOverdue,
-        CancellationToken ct)
+	[FromQuery] int page = 1,
+        [FromQuery] int pageSize = PageRequest.DefaultPageSize,
+        CancellationToken ct = default)
     {
-        return Ok(await reporting.GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, ct));
+        return Ok(await reporting.GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, new PageRequest(page, pageSize), ct));
     }
 
     [HttpGet("dashboard")]
