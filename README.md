@@ -70,6 +70,17 @@ Databases left by an interrupted run (for example after stopping the test proces
 
 Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
 
+## Browser UI
+
+Razor Pages live in the API host (UI guide in the team docs): the shared shell in `src/LibraryApp.Api/Pages` and `Ui/`, each group's pages in `src/LibraryApp.Api/Areas/<Module>`.
+
+- **Two ways to sign in, chosen by path.** `/api/*` accepts only the JWT; every other path accepts only the UI cookie. The API never accepts the cookie (no cross-site requests), and pages never accept the JWT.
+- **Every page needs a signed-in user** unless its PageModel is `[AllowAnonymous]` (only sign-in, sign-out and the status pages). Library staff pages add `[Authorize(Policy = UiPolicies.LibraryStaff)]`.
+- **Errors.** `/api` answers ProblemDetails; pages show the Error, Not found and Forbidden pages. In a form, catch `DomainException` with `this.DomainError(ex)`; validators run before the handler and fill `ModelState`.
+- **Session.** The cookie ends with the access token (`Jwt:AccessTokenMinutes`) and is checked against the account's security stamp every `Ui:SecurityStampValidationInterval` (default 5 minutes): a password change or a deactivation ends it.
+- **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
+- **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
+
 ## Test accounts
 
 Synthetic demo data (C-2), created by the seed in Development only. Every account has the password `Library2026`.
