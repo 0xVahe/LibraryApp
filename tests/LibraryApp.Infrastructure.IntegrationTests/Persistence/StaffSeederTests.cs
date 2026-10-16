@@ -67,8 +67,9 @@ public class StaffSeederTests(StaffSeederFixture fixture) : IClassFixture<StaffS
         Assert.Equal(StaffRoleIds.All.Count, await db.Roles.CountAsync());
         Assert.Equal(6, await db.Departments.CountAsync());
         Assert.Equal(3, await db.StaffCategories.CountAsync());
-        Assert.Equal(StaffSeedData.People.Count, await db.StaffMembers.CountAsync());
-        Assert.Equal(StaffSeedData.People.Count, await db.Users.CountAsync());
+        Assert.Equal(30, StaffSeedData.People.Count);
+        Assert.Equal(30, await db.StaffMembers.CountAsync());
+        Assert.Equal(30, await db.Users.CountAsync());
     }
 
     [Fact]
@@ -84,6 +85,9 @@ public class StaffSeederTests(StaffSeederFixture fixture) : IClassFixture<StaffS
     [InlineData("lilit.grigoryan@ameriabank.am", StaffRoles.LibraryAdministrator)]
     [InlineData("aram.sargsyan@ameriabank.am", StaffRoles.Librarian)]
     [InlineData("anna.petrosyan@ameriabank.am", StaffRoles.StaffMember)]
+    [InlineData("narek.simonyan@ameriabank.am", StaffRoles.StaffMember)]
+    [InlineData("eva.hovsepyan@ameriabank.am", StaffRoles.StaffMember)]
+    [InlineData("tigran.melikyan@ameriabank.am", StaffRoles.StaffMember)]
     public async Task Accounts_have_the_dev_password_and_their_role(string email, string role)
     {
         using var scope = fixture.Services.CreateScope();
@@ -109,5 +113,94 @@ public class StaffSeederTests(StaffSeederFixture fixture) : IClassFixture<StaffS
             Assert.Equal(person.Status, member.Status);
             Assert.Equal(StaffSeederFixture.Now.AddDays(-person.JoinedDaysAgo), member.JoinedLibraryAtUtc);
         }
+    }
+
+    [Fact]
+    public async Task Every_department_has_five_staff_members_and_all_three_categories()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = Get<LibraryDbContext>(scope);
+        var departments = await db.Departments.AsNoTracking().ToListAsync();
+        var members = await db.StaffMembers.AsNoTracking().ToListAsync();
+        var categoryIds = await db.StaffCategories
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        Assert.Equal(6, departments.Count);
+        Assert.Equal(3, categoryIds.Count);
+
+        foreach (var department in departments)
+        {
+            var departmentMembers = members
+                .Where(x => x.DepartmentId == department.Id)
+                .ToList();
+
+            Assert.Equal(5, departmentMembers.Count);
+
+            foreach (var categoryId in categoryIds)
+                Assert.Contains(departmentMembers, x => x.StaffCategoryId == categoryId);
+        }
+    }
+
+    [Fact]
+    public async Task The_twenty_two_additional_staff_members_are_active_with_corporate_emails()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = Get<LibraryDbContext>(scope);
+
+        Guid[] originalIds =
+        [
+            StaffSeedIds.StaffMembers.LilitGrigoryan,
+            StaffSeedIds.StaffMembers.AramSargsyan,
+            StaffSeedIds.StaffMembers.AnnaPetrosyan,
+            StaffSeedIds.StaffMembers.DavitHakobyan,
+            StaffSeedIds.StaffMembers.MariamAvetisyan,
+            StaffSeedIds.StaffMembers.GorMkrtchyan,
+            StaffSeedIds.StaffMembers.SonaVardanyan,
+            StaffSeedIds.StaffMembers.HaykManukyan,
+        ];
+
+        var additionalMembers = await db.StaffMembers
+            .AsNoTracking()
+            .Where(x => !originalIds.Contains(x.Id))
+            .ToListAsync();
+
+        Assert.Equal(22, additionalMembers.Count);
+
+        Assert.All(additionalMembers, member =>
+        {
+            Assert.Equal(StaffMemberStatus.Active, member.Status);
+            Assert.EndsWith("@ameriabank.am", member.CorporateEmail);
+        });
+    }
+
+    [Theory]
+    [InlineData(1, "EMP-90001", "lilit.grigoryan@ameriabank.am", StaffMemberStatus.Active)]
+    [InlineData(2, "EMP-90002", "aram.sargsyan@ameriabank.am", StaffMemberStatus.Active)]
+    [InlineData(3, "EMP-10001", "anna.petrosyan@ameriabank.am", StaffMemberStatus.Active)]
+    [InlineData(4, "EMP-10002", "davit.hakobyan@ameriabank.am", StaffMemberStatus.Active)]
+    [InlineData(5, "EMP-10003", "mariam.avetisyan@ameriabank.am", StaffMemberStatus.Active)]
+    [InlineData(6, "EMP-10004", "gor.mkrtchyan@ameriabank.am", StaffMemberStatus.Restricted)]
+    [InlineData(7, "EMP-10005", "sona.vardanyan@ameriabank.am", StaffMemberStatus.Suspended)]
+    [InlineData(8, "EMP-10006", "hayk.manukyan@ameriabank.am", StaffMemberStatus.Deactivated)]
+    public async Task Original_staff_members_keep_their_ids_employee_ids_and_statuses(
+        int number,
+        string employeeId,
+        string email,
+        StaffMemberStatus status)
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = Get<LibraryDbContext>(scope);
+        var member = await db.StaffMembers
+            .AsNoTracking()
+            .SingleAsync(x => x.CorporateEmail == email);
+
+        var expectedStaffMemberId = new Guid($"20000000-0000-0000-0003-{number:D12}");
+        var expectedUserId = new Guid($"20000000-0000-0000-0004-{number:D12}");
+
+        Assert.Equal(expectedStaffMemberId, member.Id);
+        Assert.Equal(expectedUserId, member.UserId);
+        Assert.Equal(employeeId, member.EmployeeId);
+        Assert.Equal(status, member.Status);
     }
 }
