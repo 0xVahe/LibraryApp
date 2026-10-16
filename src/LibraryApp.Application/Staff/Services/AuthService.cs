@@ -36,9 +36,4 @@ public sealed class AuthService(
             account.MustChangePassword ? [] : account.Roles,
             account.MustChangePassword);
     }
-
-    public Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequest request,
-        CancellationToken ct = default) =>
-        accounts.ChangePasswordAsync(userId, request.CurrentPassword ?? string.Empty,
-            request.NewPassword ?? string.Empty, ct);
 }
