@@ -25,7 +25,14 @@ public sealed class TopBooksAndCategoriesReportTests
             _clock,
             new UnusedCalendar(),
             new MemoryCache(new MemoryCacheOptions()),
-            new PenaltyPolicy());
+            new PenaltyPolicy(new PenaltyRules(
+    		PointsPerLateWorkingDay: 1,
+    		MaxLatePoints: 10,
+    		DamagedPoints: 5,
+    		LostPoints: 10,
+    		LifetimeDays: 90,
+    		RestrictedFromPoints: 5,
+    		SuspendedFromPoints: 10)));
 
     [Fact]
     public async Task Returns_books_and_categories_from_repository()

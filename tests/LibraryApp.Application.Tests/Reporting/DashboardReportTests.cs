@@ -24,7 +24,14 @@ public sealed class DashboardReportTests
             _clock,
             new UnusedCalendar(),
             _cache,
-            new PenaltyPolicy());
+            new PenaltyPolicy(new PenaltyRules(
+    		PointsPerLateWorkingDay: 1,
+    		MaxLatePoints: 10,
+    		DamagedPoints: 5,
+    		LostPoints: 10,
+    		LifetimeDays: 90,
+    		RestrictedFromPoints: 5,
+    		SuspendedFromPoints: 10)));
 
     [Fact]
     public async Task Returns_dashboard_counts()

@@ -26,7 +26,14 @@ public sealed class OverdueLoansReportTests
             _clock,
             _calendar,
             new MemoryCache(new MemoryCacheOptions()),
-            new PenaltyPolicy());
+            new PenaltyPolicy(new PenaltyRules(
+    		PointsPerLateWorkingDay: 1,
+    		MaxLatePoints: 10,
+    		DamagedPoints: 5,
+    		LostPoints: 10,
+    		LifetimeDays: 90,
+    		RestrictedFromPoints: 5,
+    		SuspendedFromPoints: 10)));
 
     [Fact]
     public async Task Empty_report_returns_no_items()
@@ -74,7 +81,7 @@ public sealed class OverdueLoansReportTests
         OverdueLoanItemDto item = Assert.Single(report.Items);
 
         Assert.True(item.WorkingDaysOverdue > 10);
-        Assert.Equal(PenaltyPolicy.MaxLatePoints, item.PointsSoFar);
+        Assert.Equal(10, item.PointsSoFar);
     }
 
     [Fact]
