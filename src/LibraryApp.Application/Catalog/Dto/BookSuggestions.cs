@@ -12,6 +12,6 @@ public sealed record BookSuggestionListRequest(
     BookSuggestionStatus? Status = null, int Page = 1, int PageSize = PageRequest.DefaultPageSize);
 
 public sealed record BookSuggestionDto(
-    Guid Id, Guid StaffMemberId, string Title, string AuthorName, string? Isbn, string Reason,
+    Guid Id, Guid StaffMemberId, string StaffMemberName, string Title, string AuthorName, string? Isbn, string Reason,
     BookSuggestionStatus Status, DateTime CreatedAtUtc, DateTime? ReviewedAtUtc,
     Guid? ReviewedByUserId, string? ReviewComment);

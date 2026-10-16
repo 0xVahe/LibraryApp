@@ -1,7 +1,6 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
-using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Catalog;
@@ -16,7 +15,7 @@ public class BookSuggestionServiceTests
     private readonly TestClock _clock = new(new DateTime(2026, 10, 11, 8, 0, 0, DateTimeKind.Utc));
 
     private BookSuggestionService Service(Repository repository) =>
-        new(repository, _transaction, _transaction, _user, _clock, _transaction, new RejectBookSuggestionRequestValidator());
+        new(repository, _transaction, _transaction, _user, _clock, _transaction);
 
     [Fact]
     public async Task Creation_uses_current_staff_and_clock_inside_transaction()
@@ -25,6 +24,7 @@ public class BookSuggestionServiceTests
         var dto = await Service(repository).CreateAsync(new("Title", "Author", null, "Reason"));
         Assert.NotEqual(Guid.Empty, dto.Id);
         Assert.Equal(_user.StaffMemberId, dto.StaffMemberId);
+        Assert.Equal("Test Member", dto.StaffMemberName);
         Assert.Equal(_clock.UtcNow, dto.CreatedAtUtc);
         Assert.Equal(BookSuggestionStatus.Pending, dto.Status);
         Assert.Equal(dto.Id, repository.Suggestion!.Id);
@@ -79,8 +79,11 @@ public class BookSuggestionServiceTests
         var repository = new Repository(_transaction);
         var service = Service(repository);
         var created = await service.CreateAsync(new("Title", "Author", null, "Reason"));
+        _user.StaffMemberId = Guid.NewGuid();
         _clock.UtcNow = _clock.UtcNow.AddHours(1);
         var result = reject ? await service.RejectAsync(created.Id, new("Comment")) : await service.ApproveAsync(created.Id);
+        Assert.Equal(created.StaffMemberId, result.StaffMemberId);
+        Assert.Equal("Test Member", result.StaffMemberName);
         Assert.Equal(_user.UserId, result.ReviewedByUserId);
         Assert.Equal(_clock.UtcNow, result.ReviewedAtUtc);
         Assert.Equal(reject ? BookSuggestionStatus.Rejected : BookSuggestionStatus.Approved, result.Status);
@@ -116,6 +119,13 @@ public class BookSuggestionServiceTests
             Assert.True(transaction.Active);
             Assert.Equal($"catalog:book-suggestion:{id:N}", transaction.Locks.Last());
             return Task.FromResult(Suggestion?.Id == id ? Suggestion : null);
+        }
+
+        public Task<string> GetStaffMemberNameAsync(Guid staffMemberId, CancellationToken ct)
+        {
+            Assert.True(transaction.Active);
+            Assert.Equal(Suggestion!.StaffMemberId, staffMemberId);
+            return Task.FromResult("Test Member");
         }
 
         public Task<PagedResult<BookSuggestionDto>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,

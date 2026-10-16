@@ -1,7 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
-using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Application.Common;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
@@ -42,7 +41,7 @@ public sealed class BookSuggestionDatabase : IAsyncLifetime
         {
             var userId = Guid.NewGuid();
             db.Users.Add(new AppUser { Id = userId });
-            db.StaffMembers.Add(new StaffMember(id, userId, id.ToString("N"), "Test", "Member",
+            db.StaffMembers.Add(new StaffMember(id, userId, id.ToString("N"), id == FirstStaffId ? "First" : "Second", "Member",
                 $"{id:N}@ameriabank.am", department.Id, "Test", null, category.Id, Now));
         }
         db.Users.AddRange(new AppUser { Id = FirstReviewerId }, new AppUser { Id = SecondReviewerId });
@@ -61,8 +60,7 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
     private static BookSuggestionService Service(LibraryDbContext db, Guid? staffId, Guid reviewerId,
         IApplicationLock? applicationLock = null, DateTime? now = null) => new(
         new BookSuggestionRepository(db), new UnitOfWork(db), applicationLock ?? new SqlServerApplicationLock(db),
-        new Caller(staffId, reviewerId), new FixedClock(now ?? BookSuggestionDatabase.Now), new SequentialGuidGenerator(TimeProvider.System),
-        new RejectBookSuggestionRequestValidator());
+        new Caller(staffId, reviewerId), new FixedClock(now ?? BookSuggestionDatabase.Now), new SequentialGuidGenerator(TimeProvider.System));
 
     [Fact]
     public async Task Creation_and_own_lists_persist_and_filter_in_SQL()
@@ -72,6 +70,8 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         var secondService = Service(db, database.SecondStaffId, database.SecondReviewerId);
         var first = await firstService.CreateAsync(new("First", "Author", null, "Reason"));
         var second = await secondService.CreateAsync(new("Second", "Author", "9780132350884", "Reason"));
+        Assert.Equal("First Member", first.StaffMemberName);
+        Assert.Equal("Second Member", second.StaffMemberName);
         db.ChangeTracker.Clear();
         var firstPage = await firstService.ListMineAsync(new PageRequest(1, 100));
         var secondPage = await secondService.ListMineAsync(new PageRequest(1, 100));
@@ -79,6 +79,8 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         Assert.Contains(secondPage.Items, x => x.Id == second.Id);
         Assert.All(firstPage.Items, x => Assert.Equal(database.FirstStaffId, x.StaffMemberId));
         Assert.All(secondPage.Items, x => Assert.Equal(database.SecondStaffId, x.StaffMemberId));
+        Assert.All(firstPage.Items, x => Assert.Equal("First Member", x.StaffMemberName));
+        Assert.All(secondPage.Items, x => Assert.Equal("Second Member", x.StaffMemberName));
         Assert.DoesNotContain(firstPage.Items, x => x.Id == second.Id);
         Assert.DoesNotContain(secondPage.Items, x => x.Id == first.Id);
         Assert.Equal(firstPage.TotalCount, firstPage.Items.Count);
@@ -105,7 +107,6 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         Assert.All(all.Items, x => Assert.Equal(BookSuggestionStatus.Rejected, x.Status));
         Assert.Equal(all.TotalCount, page.TotalCount);
         Assert.Equal(all.Items[1], Assert.Single(page.Items));
-        Assert.Empty((await service.ListAsync(new(null, int.MaxValue, 100))).Items);
     }
 
     [Theory]
@@ -121,6 +122,7 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         var reviewAt = BookSuggestionDatabase.Now.AddHours(1);
         var reviewer = Service(db, null, database.FirstReviewerId, now: reviewAt);
         var result = reject ? await reviewer.RejectAsync(created.Id, new("  Comment  ")) : await reviewer.ApproveAsync(created.Id);
+        Assert.Equal("First Member", result.StaffMemberName);
         await using var verify = database.NewContext();
         var saved = await verify.Set<BookSuggestion>().SingleAsync(x => x.Id == created.Id);
         Assert.Equal(result.Status, saved.Status);

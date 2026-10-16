@@ -18,12 +18,8 @@ public sealed class CreateBookSuggestionRequestValidator : AbstractValidator<Cre
 
 public sealed class RejectBookSuggestionRequestValidator : AbstractValidator<RejectBookSuggestionRequest>
 {
-    public const string PendingReview = "PendingReview";
-
-    // CAT-10: the service checks completed status under the review lock before validating the comment.
     public RejectBookSuggestionRequestValidator() =>
-        RuleSet(PendingReview, () =>
-            RuleFor(x => x.Comment).NotEmpty().MaximumLength(BookSuggestion.ReviewCommentMaxLength));
+        RuleFor(x => x.Comment).NotEmpty().MaximumLength(BookSuggestion.ReviewCommentMaxLength);
 }
 
 public sealed class BookSuggestionListRequestValidator : AbstractValidator<BookSuggestionListRequest>

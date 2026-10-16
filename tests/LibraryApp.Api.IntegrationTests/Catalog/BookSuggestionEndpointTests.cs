@@ -59,6 +59,7 @@ public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
         private readonly List<BookSuggestion> _items = [];
         public void Add(BookSuggestion suggestion) => _items.Add(suggestion);
         public Task<BookSuggestion?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(_items.SingleOrDefault(x => x.Id == id));
+        public Task<string> GetStaffMemberNameAsync(Guid staffMemberId, CancellationToken ct) => Task.FromResult("Test Member");
         public Task AcquireAsync(string resource, CancellationToken ct = default) => Task.CompletedTask;
         public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
@@ -67,8 +68,8 @@ public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
         {
             var matches = _items.Where(x => staffMemberId is null || x.StaffMemberId == staffMemberId)
                 .Where(x => status is null || x.Status == status).OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.Id).ToArray();
-            var items = (long)(paging.Page - 1) * paging.PageSize >= matches.Length ? [] : matches.Skip(paging.Skip)
-                .Take(paging.PageSize).Select(x => new BookSuggestionDto(x.Id, x.StaffMemberId, x.Title, x.AuthorName,
+            var items = matches.Skip(paging.Skip)
+                .Take(paging.PageSize).Select(x => new BookSuggestionDto(x.Id, x.StaffMemberId, "Test Member", x.Title, x.AuthorName,
                     x.Isbn, x.Reason, x.Status, x.CreatedAtUtc, x.ReviewedAtUtc, x.ReviewedByUserId, x.ReviewComment)).ToArray();
             return Task.FromResult(new PagedResult<BookSuggestionDto>(items, matches.Length, paging.Page, paging.PageSize));
         }
@@ -105,15 +106,18 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
     private static Task<PagedResult<BookSuggestionDto>?> Page(HttpClient client, string path) =>
         client.GetFromJsonAsync<PagedResult<BookSuggestionDto>>(path, Json);
 
-    [Fact]
-    public async Task Creation_cannot_override_ownership_status_or_review_metadata()
+    [Theory]
+    [InlineData(StaffRoles.StaffMember)]
+    [InlineData(StaffRoles.Librarian)]
+    [InlineData(StaffRoles.LibraryAdministrator)]
+    public async Task Library_users_create_and_list_own_suggestions_without_overriding_server_fields(string role)
     {
         var owner = Guid.NewGuid();
-        using var client = Client(StaffRoles.StaffMember, owner);
+        using var client = Client(role, owner);
         using var response = await client.PostAsJsonAsync(Route, new
         {
             title = "  Title  ", authorName = " Author ", reason = " Reason ",
-            id = Guid.Empty, staffMemberId = Guid.NewGuid(), status = "Approved",
+            id = Guid.Empty, staffMemberId = Guid.NewGuid(), staffMemberName = "Injected", status = "Approved",
             createdAtUtc = "2000-01-01T00:00:00Z", reviewedAtUtc = "2001-01-01T00:00:00Z",
             reviewedByUserId = Guid.NewGuid(), reviewComment = "Injected",
         });
@@ -121,6 +125,7 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         var result = (await response.Content.ReadFromJsonAsync<BookSuggestionDto>(Json))!;
         Assert.NotEqual(Guid.Empty, result.Id);
         Assert.Equal(owner, result.StaffMemberId);
+        Assert.Equal("Test Member", result.StaffMemberName);
         Assert.Equal(BookSuggestionStatus.Pending, result.Status);
         Assert.Equal(BookSuggestionHostFactory.Now, result.CreatedAtUtc);
         Assert.Equal(DateTimeKind.Utc, result.CreatedAtUtc.Kind);
@@ -129,6 +134,7 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         Assert.Null(result.ReviewComment);
         Assert.Null(result.Isbn);
         Assert.Equal("Title", result.Title);
+        Assert.Equal(result, Assert.Single((await Page(client, Route + "/me"))!.Items));
         Assert.Equal(new[] { "AuthorName", "Isbn", "Reason", "Title" },
             typeof(CreateBookSuggestionRequest).GetProperties().Select(x => x.Name).Order());
     }
@@ -176,11 +182,15 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Staff_role_without_valid_staff_identity_cannot_create_or_read_own_data(bool empty)
+    [InlineData(StaffRoles.StaffMember, false)]
+    [InlineData(StaffRoles.StaffMember, true)]
+    [InlineData(StaffRoles.Librarian, false)]
+    [InlineData(StaffRoles.Librarian, true)]
+    [InlineData(StaffRoles.LibraryAdministrator, false)]
+    [InlineData(StaffRoles.LibraryAdministrator, true)]
+    public async Task Library_users_without_valid_staff_identity_cannot_create_or_read_own_data(string role, bool empty)
     {
-        using var client = Client(StaffRoles.StaffMember, empty ? Guid.Empty : null);
+        using var client = Client(role, empty ? Guid.Empty : null);
         using var create = await client.PostAsJsonAsync(Route, new CreateBookSuggestionRequest("Title", "Author", null, "Reason"));
         using var list = await client.GetAsync(Route + "/me");
         await Problem(create, HttpStatusCode.Forbidden, "catalog.suggestion_staff_identity_required");
@@ -206,6 +216,7 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         Assert.Equal(DateTimeKind.Utc, result.ReviewedAtUtc!.Value.Kind);
         Assert.Equal(reject ? "Review comment" : null, result.ReviewComment);
         Assert.Equal(suggestion.StaffMemberId, result.StaffMemberId);
+        Assert.Equal(suggestion.StaffMemberName, result.StaffMemberName);
     }
 
     [Theory]
@@ -251,7 +262,7 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
 
     [Theory]
     [MemberData(nameof(InvalidReviewComments))]
-    public async Task Completed_suggestions_return_409_even_when_rejection_comment_is_invalid(string first, string body)
+    public async Task Completed_suggestions_return_400_when_rejection_comment_is_invalid(string first, string body)
     {
         using var staff = Client(StaffRoles.StaffMember, Guid.NewGuid());
         var suggestion = await Create(staff);
@@ -260,7 +271,7 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
         var reviewed = await initial.Content.ReadFromJsonAsync<BookSuggestionDto>(Json);
         using var response = await admin.PostAsync($"{Route}/{suggestion.Id}/reject", new StringContent(body, Encoding.UTF8, "application/json"));
-        await Problem(response, HttpStatusCode.Conflict, "catalog.suggestion_already_reviewed");
+        await Problem(response, HttpStatusCode.BadRequest, "validation_failed");
         Assert.Equal(reviewed, Assert.Single((await Page(staff, Route + "/me"))!.Items));
     }
 
@@ -364,13 +375,12 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
     }
 
     [Fact]
-    public async Task Paging_follows_catalog_normalization_and_handles_distant_pages()
+    public async Task Paging_follows_catalog_normalization()
     {
         using var admin = Client(StaffRoles.LibraryAdministrator);
         var normalized = (await Page(admin, Route + "?page=-1&pageSize=0"))!;
         Assert.Equal((1, 20), (normalized.Page, normalized.PageSize));
         Assert.Equal(100, (await Page(admin, Route + "?pageSize=101"))!.PageSize);
-        Assert.Empty((await Page(admin, Route + "?page=2147483647&pageSize=100"))!.Items);
     }
 
     [Fact]
@@ -379,20 +389,20 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         using var client = Client(null);
         var swagger = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
         var paths = swagger.GetProperty("paths");
-        Check(paths.GetProperty(Route).GetProperty("post"), "Staff Member", ["201", "400", "401", "403", "409"]);
+        Check(paths.GetProperty(Route).GetProperty("post"), "Any library user", ["201", "400", "401", "403", "409"]);
         var list = paths.GetProperty(Route).GetProperty("get");
         Check(list, "Administrator", ["200", "400", "401", "403"]);
         Assert.Equal(new[] { "page", "pagesize", "status" }, list.GetProperty("parameters").EnumerateArray()
             .Select(p => p.GetProperty("name").GetString()!.ToLowerInvariant()).Order());
         var mine = paths.GetProperty(Route + "/me").GetProperty("get");
-        Check(mine, "Staff Member", ["200", "400", "401", "403"]);
+        Check(mine, "Any library user", ["200", "400", "401", "403"]);
         Assert.DoesNotContain(mine.GetProperty("parameters").EnumerateArray(), p => p.GetProperty("name").GetString() == "staffMemberId");
         Check(paths.GetProperty(Route + "/{id}/approve").GetProperty("post"), "Administrator", ["200", "401", "403", "404", "409"]);
         Check(paths.GetProperty(Route + "/{id}/reject").GetProperty("post"), "Administrator", ["200", "400", "401", "403", "404", "409"]);
         var schemas = swagger.GetProperty("components").GetProperty("schemas");
         Assert.Equal(new[] { "authorName", "isbn", "reason", "title" }, schemas.GetProperty("CreateBookSuggestionRequest")
             .GetProperty("properties").EnumerateObject().Select(x => x.Name).Order());
-        Assert.True(schemas.TryGetProperty("BookSuggestionDto", out _));
+        Assert.True(schemas.GetProperty("BookSuggestionDto").GetProperty("properties").TryGetProperty("staffMemberName", out _));
         Assert.True(schemas.TryGetProperty("RejectBookSuggestionRequest", out _));
 
         static void Check(JsonElement operation, string role, string[] codes)

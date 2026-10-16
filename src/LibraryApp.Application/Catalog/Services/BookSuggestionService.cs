@@ -1,4 +1,3 @@
-using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
@@ -10,13 +9,12 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Application.Catalog.Services;
 
 public sealed class BookSuggestionService(IBookSuggestionRepository repository, IUnitOfWork unitOfWork,
-    IApplicationLock applicationLock, ICurrentUser currentUser, IClock clock, IIdGenerator ids,
-    IValidator<RejectBookSuggestionRequest> rejectionValidator) : IBookSuggestionService
+    IApplicationLock applicationLock, ICurrentUser currentUser, IClock clock, IIdGenerator ids) : IBookSuggestionService
 {
     public Task<BookSuggestionDto> CreateAsync(CreateBookSuggestionRequest request, CancellationToken ct = default)
     {
         var staffMemberId = RequireStaffMemberId();
-        return unitOfWork.ExecuteInTransactionAsync(token =>
+        return unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             string? isbn = null;
             if (request.Isbn is not null)
@@ -29,7 +27,7 @@ public sealed class BookSuggestionService(IBookSuggestionRepository repository, 
             var suggestion = new BookSuggestion(ids.NewId(), staffMemberId, request.Title!, request.AuthorName!,
                 isbn, request.Reason!, clock.UtcNow);
             repository.Add(suggestion);
-            return Task.FromResult(ToDto(suggestion));
+            return await ToDtoAsync(suggestion, token);
         }, ct);
     }
 
@@ -43,15 +41,7 @@ public sealed class BookSuggestionService(IBookSuggestionRepository repository, 
         ReviewAsync(id, suggestion => suggestion.Approve(currentUser.UserId, clock.UtcNow), ct);
 
     public Task<BookSuggestionDto> RejectAsync(Guid id, RejectBookSuggestionRequest request, CancellationToken ct = default) =>
-        ReviewAsync(id, suggestion =>
-        {
-            var validation = rejectionValidator.Validate(request,
-                options => options.IncludeRuleSets(RejectBookSuggestionRequestValidator.PendingReview));
-            if (!validation.IsValid)
-                throw new DomainException(CommonErrors.ValidationFailed,
-                    extensions: new Dictionary<string, object?> { ["errors"] = validation.ToDictionary() });
-            suggestion.Reject(currentUser.UserId, clock.UtcNow, request.Comment);
-        }, ct);
+        ReviewAsync(id, suggestion => suggestion.Reject(currentUser.UserId, clock.UtcNow, request.Comment), ct);
 
     private Task<BookSuggestionDto> ReviewAsync(Guid id, Action<BookSuggestion> review, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
@@ -63,13 +53,17 @@ public sealed class BookSuggestionService(IBookSuggestionRepository repository, 
             if (suggestion.Status != BookSuggestionStatus.Pending)
                 throw new DomainException(CatalogErrors.SuggestionAlreadyReviewed);
             review(suggestion);
-            return ToDto(suggestion);
+            return await ToDtoAsync(suggestion, token);
         }, ct);
 
     private Guid RequireStaffMemberId() => currentUser.StaffMemberId is { } id && id != Guid.Empty
         ? id
         : throw new DomainException(CatalogErrors.SuggestionStaffIdentityRequired);
 
-    private static BookSuggestionDto ToDto(BookSuggestion x) => new(x.Id, x.StaffMemberId, x.Title, x.AuthorName,
-        x.Isbn, x.Reason, x.Status, x.CreatedAtUtc, x.ReviewedAtUtc, x.ReviewedByUserId, x.ReviewComment);
+    private async Task<BookSuggestionDto> ToDtoAsync(BookSuggestion x, CancellationToken ct)
+    {
+        var staffMemberName = await repository.GetStaffMemberNameAsync(x.StaffMemberId, ct);
+        return new(x.Id, x.StaffMemberId, staffMemberName, x.Title, x.AuthorName,
+            x.Isbn, x.Reason, x.Status, x.CreatedAtUtc, x.ReviewedAtUtc, x.ReviewedByUserId, x.ReviewComment);
+    }
 }
