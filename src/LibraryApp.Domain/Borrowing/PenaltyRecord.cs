@@ -10,6 +10,9 @@ public sealed class PenaltyRecord : Entity
 {
     public const int ReasonMaxLength = 500;
 
+    /// <summary>Most points one record can hold: the schema limit of the agreed CHECK constraint (G3-04).</summary>
+    public const int MaxPoints = 10;
+
     /// <summary>
     /// Gets the identifier of the staff member receiving the penalty.
     /// </summary>
@@ -66,7 +69,7 @@ public sealed class PenaltyRecord : Entity
     }
 
     /// <summary>
-    /// Creates an active penalty with a ninety-calendar-day validity period.
+    /// Creates an active penalty that counts until <paramref name="expiresAtUtc"/>.
     /// </summary>
     /// <param name="id">
     /// The identifier obtained by Application from IIdGenerator.
@@ -78,8 +81,11 @@ public sealed class PenaltyRecord : Entity
     /// <param name="createdAtUtc">
     /// The UTC creation timestamp obtained from IClock.
     /// </param>
+    /// <param name="expiresAtUtc">
+    /// The UTC moment the points stop counting, from <see cref="PenaltyPolicy.ExpiresAtUtc"/>.
+    /// </param>
     /// <remarks>
-    /// Application calculates the points and verifies that
+    /// Application calculates the points and the expiry and verifies that
     /// the supplied loan belongs to the supplied staff member.
     /// </remarks>
     public static PenaltyRecord Create(
@@ -88,7 +94,8 @@ public sealed class PenaltyRecord : Entity
         Guid loanId,
         int points,
         string reason,
-        DateTime createdAtUtc)
+        DateTime createdAtUtc,
+        DateTime expiresAtUtc)
     {
         if (staffMemberId == Guid.Empty || loanId == Guid.Empty)
         {
@@ -97,9 +104,15 @@ public sealed class PenaltyRecord : Entity
         }
 
         EnsureUtc(createdAtUtc);
+        EnsureUtc(expiresAtUtc);
 
-        // Preserve the guide's agreed range.
-        if (points < 0 || points > 10)
+        if (expiresAtUtc <= createdAtUtc)
+        {
+            throw new DomainException(
+                BorrowingErrors.PenaltyExpiryNotAfterCreation);
+        }
+
+        if (points < 0 || points > MaxPoints)
         {
             throw new DomainException(
                 BorrowingErrors.InvalidPenaltyPoints);
@@ -118,7 +131,7 @@ public sealed class PenaltyRecord : Entity
             Points = points,
             Reason = reason.Trim(),
             CreatedAtUtc = createdAtUtc,
-            ExpiresAtUtc = createdAtUtc.AddDays(90),
+            ExpiresAtUtc = expiresAtUtc,
             Status = PenaltyRecordStatus.Active,
             WaivedReason = null
         };
