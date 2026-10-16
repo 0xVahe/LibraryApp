@@ -145,6 +145,51 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         Assert.False(updatedLogin.PasswordChangeRequired);
     }
 
+    [Fact]
+    public async Task Five_wrong_current_passwords_lock_the_account()
+    {
+        using var administrator = await AdministratorClient();
+        var member = await Enrol(administrator);
+        using var client = await ClientFor(member.CorporateEmail);
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var wrong = await client.PostAsJsonAsync("/api/auth/change-password",
+                new ChangePasswordRequest("WrongPass1", "ChangedPass9"));
+            await AssertLoginError(wrong, HttpStatusCode.BadRequest, "staff.password_change_failed");
+        }
+
+        // Locked: the right current password is refused too, and so is login.
+        using var right = await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(Password, "ChangedPass9"));
+        await AssertLoginError(right, HttpStatusCode.BadRequest, "staff.password_change_failed");
+        using var login = await Login(member.CorporateEmail);
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+    }
+
+    [Fact]
+    public async Task New_password_equal_to_the_current_one_returns_400()
+    {
+        using var administrator = await AdministratorClient();
+        var member = await Enrol(administrator);
+        using var client = await ClientFor(member.CorporateEmail);
+
+        using var response = await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(Password, Password));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    private async Task<HttpClient> ClientFor(string email, string password = Password)
+    {
+        using var login = await Login(email, password);
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var token = await login.Content.ReadFromJsonAsync<LoginResponse>();
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
+        return client;
+    }
+
     private async Task<HttpClient> AdministratorClient()
     {
         var administrator = StaffSeedData.People.Single(x => x.Role == StaffRoles.LibraryAdministrator);

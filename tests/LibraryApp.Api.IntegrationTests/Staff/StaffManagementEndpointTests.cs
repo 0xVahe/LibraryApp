@@ -399,7 +399,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
             new ChangePasswordRequest("incorrect", "SecureChange9"));
         Assert.Equal(HttpStatusCode.BadRequest, failedPasswordChange.StatusCode);
         var failedPasswordProblem = await failedPasswordChange.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("staff.initial_password_change_failed", failedPasswordProblem.GetProperty("code").GetString());
+        Assert.Equal("staff.password_change_failed", failedPasswordProblem.GetProperty("code").GetString());
         Assert.True(failedPasswordProblem.TryGetProperty("traceId", out _));
         Assert.Equal(HttpStatusCode.NoContent, (await restrictedClient.PostAsJsonAsync("/api/auth/change-password",
             new ChangePasswordRequest(imported.TemporaryPassword, "SecureChange9"))).StatusCode);
