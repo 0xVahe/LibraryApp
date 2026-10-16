@@ -3,6 +3,7 @@ using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
 using System.Security.Claims;
+using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,8 +13,7 @@ public sealed class UserAccountStore(
     UserManager<AppUser> userManager,
     IPasswordHasher<AppUser> passwordHasher,
     LibraryDbContext db,
-    IClock clock,
-    IUnitOfWork unitOfWork) : IUserAccountStore
+    IClock clock) : IUserAccountStore
 {
     // Hash of a random password, checked when the email is unknown: that path then costs as much as a wrong password.
     private static string? _dummyPasswordHash;
@@ -52,44 +52,61 @@ public sealed class UserAccountStore(
         if (!lockedOut && user.AccessFailedCount > 0)
             await ResetFailedAttemptsAsync(user.Id, ct);
 
-        var mustChangePassword = (await userManager.GetClaimsAsync(user)).Any(claim =>
-            claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
+        var mustChangePassword = (await userManager.GetClaimsAsync(user)).Any(IsPasswordChangeMarker);
         return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList(), mustChangePassword);
+    }
+
+    public async Task<bool> VerifyCurrentPasswordAsync(Guid userId, string currentPassword, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
+        {
+            VerifyDummyPassword(currentPassword);
+            return false;
+        }
+
+        // The password is checked for a locked-out account too, so the answer time does not reveal the lockout.
+        var lockedOut = await userManager.IsLockedOutAsync(user);
+        var valid = await userManager.CheckPasswordAsync(user, currentPassword);
+        if (lockedOut)
+            return false;
+        if (valid)
+            return true;
+
+        await RegisterFailedAttemptAsync(user.Id, ct);
+        return false;
     }
 
     public async Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        try
-        {
-            return await unitOfWork.ExecuteInTransactionAsync<bool>(async token =>
-            {
-                token.ThrowIfCancellationRequested();
-                var user = await userManager.FindByIdAsync(userId.ToString());
-                if (user is null)
-                    throw new PasswordChangeRejectedException();
-
-                var marker = (await userManager.GetClaimsAsync(user)).FirstOrDefault(claim =>
-                    claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
-                var changed = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
-                if (!changed.Succeeded)
-                    throw new PasswordChangeRejectedException();
-
-                if (marker is not null)
-                {
-                    var removed = await userManager.RemoveClaimAsync(user, marker);
-                    if (!removed.Succeeded)
-                        throw new PasswordChangeRejectedException();
-                }
-
-                return true;
-            }, ct);
-        }
-        catch (PasswordChangeRejectedException)
-        {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        if (user is null)
             return false;
-        }
+
+        var changed = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+        if (!changed.Succeeded)
+            return false;
+
+        Ensure(await userManager.ResetAccessFailedCountAsync(user));
+
+        var marker = (await userManager.GetClaimsAsync(user)).FirstOrDefault(IsPasswordChangeMarker);
+        if (marker is not null)
+            Ensure(await userManager.RemoveClaimAsync(user, marker));
+
+        return true;
+    }
+
+    private static bool IsPasswordChangeMarker(Claim claim) =>
+        claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString;
+
+    // Throwing rolls back the caller's transaction, so the password never changes without the rest.
+    private static void Ensure(IdentityResult result)
+    {
+        if (!result.Succeeded)
+            throw new DomainException(StaffErrors.AccountWriteFailed);
     }
 
     /// <summary>
@@ -133,6 +150,4 @@ public sealed class UserAccountStore(
         var hash = _dummyPasswordHash ??= passwordHasher.HashPassword(new AppUser(), Guid.NewGuid().ToString("N"));
         passwordHasher.VerifyHashedPassword(new AppUser(), hash, password);
     }
-
-    private sealed class PasswordChangeRejectedException : Exception { }
 }

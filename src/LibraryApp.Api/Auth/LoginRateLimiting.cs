@@ -22,7 +22,7 @@ public static class LoginRateLimiting
     public const string PolicyName = "login";
 
     /// <summary>
-    /// Limits POST /api/auth/login per client IP (brute force across many accounts). Over the limit → 429.
+    /// Limits POST /api/auth/login and /api/auth/change-password per client IP (brute force across many accounts). Over the limit → 429.
     /// Behind a reverse proxy, configure ForwardedHeaders with the known proxies, otherwise every user shares the
     /// proxy's address and therefore one limit.
     /// </summary>
@@ -49,7 +49,10 @@ public static class LoginRateLimiting
 
             options.OnRejected = async (context, ct) =>
             {
-                var problem = GlobalExceptionHandler.Problem(HttpErrors.TooManyRequests, "Too many login attempts. Try again later.");
+                var detail = context.HttpContext.Request.Path.StartsWithSegments("/api/auth/login")
+                    ? "Too many login attempts. Try again later."
+                    : null;   // HttpErrors default: "Too many requests. Try again later."
+                var problem = GlobalExceptionHandler.Problem(HttpErrors.TooManyRequests, detail);
                 problem.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
 
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))

@@ -3,11 +3,13 @@ using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Borrowing.Services;
 
@@ -26,10 +28,10 @@ public sealed class ReservationService(
     IApplicationLock applicationLock,
     ICurrentUser currentUser,
     IClock clock,
-    IIdGenerator idGenerator) : IReservationService
+    IIdGenerator idGenerator,
+    IOptions<BorrowingOptions> options) : IReservationService
 {
-    /// <summary>BR-BOR-2: at most 3 active (Waiting or ReadyForPickup) reservations per employee.</summary>
-    public const int MaximumActiveReservations = 3;
+    private readonly ReservationOptions settings = options.Value.Reservations;
 
     public async Task<ReservationDto> CreateAsync(CreateReservationRequest request, CancellationToken ct = default)
     {
@@ -47,13 +49,18 @@ public sealed class ReservationService(
             await applicationLock.AcquireAsync(BorrowingLocks.Staff(staffMemberId), token);
             await applicationLock.AcquireAsync(BorrowingLocks.Book(bookId), token);
 
-            // Restricted: may borrow one book but not reserve (BR-MEM-3, BQ-G2-05); Suspended and Deactivated: Staff's reason.
-            if (await staffMembers.GetStatusAsync(staffMemberId, token) == StaffMemberStatus.Restricted)
+            // Restricted: may borrow one book; reserving follows the setting (BR-MEM-3, BQ-G2-05, BQ-BA-10).
+            StaffMemberStatus status = await staffMembers.GetStatusAsync(staffMemberId, token);
+            if (status == StaffMemberStatus.Restricted && !settings.RestrictedMayReserve)
                 throw new DomainException(BorrowingErrors.RestrictedReservationForbidden);
 
-            EligibilityResult eligibility = await staffMembers.CanBorrowAsync(staffMemberId, token);
-            if (!eligibility.IsAllowed)
-                throw new DomainException(eligibility.Error!);
+            // Suspended: Staff's reason unless the setting allows reserving (BQ-BA-11); Deactivated: always Staff's reason.
+            if (status != StaffMemberStatus.Suspended || !settings.SuspendedMayReserve)
+            {
+                EligibilityResult eligibility = await staffMembers.CanBorrowAsync(staffMemberId, token);
+                if (!eligibility.IsAllowed)
+                    throw new DomainException(eligibility.Error!);
+            }
 
             // BR-BOR-3: a reservation only when no copy is Available.
             if (await catalog.GetAvailableCopyAsync(bookId, token) is not null)
@@ -68,12 +75,12 @@ public sealed class ReservationService(
                     throw new DomainException(BorrowingErrors.BookAlreadyOnLoan);
             }
 
-            // The most precise reason first: already in this queue (409), then the limit of 3 (BR-BOR-2).
+            // The most precise reason first: already in this queue (409), then the limit of active reservations (BR-BOR-2).
             if (await reservations.HasActiveForBookAsync(staffMemberId, bookId, token))
                 throw new DomainException(BorrowingErrors.DuplicateActiveReservation);
 
-            if (await reservations.CountActiveAsync(staffMemberId, token) >= MaximumActiveReservations)
-                throw new DomainException(BorrowingErrors.ReservationLimitReached);
+            if (await reservations.CountActiveAsync(staffMemberId, token) >= settings.MaxActive)
+                throw new DomainException(BorrowingErrors.ReservationLimitReached(settings.MaxActive));
 
             // FIFO: the end of the queue of Waiting reservations.
             int queuePosition = await reservations.CountWaitingForBookAsync(bookId, token) + 1;
