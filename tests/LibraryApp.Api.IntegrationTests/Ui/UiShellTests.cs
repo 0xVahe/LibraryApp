@@ -229,6 +229,33 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
         Assert.Contains(response.Headers.GetValues("Set-Cookie"), c => c.StartsWith("LibraryApp.Auth=;", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The page was opened while signed in, then the session ended (cookie expired or a new security stamp): its
+    /// sign-out form still works and leads to the sign-in page instead of an error.
+    /// </summary>
+    [Fact]
+    public async Task Sign_out_after_the_session_ended_goes_to_sign_in()
+    {
+        var authCookie = await UiTestClient.CookieAsync(factory, StaffMember, StaffSeedData.Password);
+        var client = UiTestClient.Anonymous(factory);
+        var pageRequest = new HttpRequestMessage(HttpMethod.Get, "/forbidden");
+        pageRequest.Headers.Add("Cookie", authCookie);
+        var page = await client.SendAsync(pageRequest);
+        var token = Regex.Match(await page.Content.ReadAsStringAsync(),
+            "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+
+        // Only the antiforgery cookie is left: the authentication cookie is gone with the session.
+        var signOut = new HttpRequestMessage(HttpMethod.Post, "/logout")
+        {
+            Content = new FormUrlEncodedContent([new("__RequestVerificationToken", token)]),
+        };
+        signOut.Headers.Add("Cookie", UiTestClient.SetCookies(page));
+        var response = await client.SendAsync(signOut);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login", response.Headers.Location!.OriginalString);
+    }
+
     /// <summary>NFR-02 for the UI: only the sign-in, sign-out and status pages are open; every other page asks to sign in.</summary>
     [Fact]
     public async Task Every_page_requires_sign_in_except_the_allowed_ones()
