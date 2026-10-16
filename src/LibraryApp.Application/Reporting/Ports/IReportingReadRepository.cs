@@ -4,7 +4,7 @@ namespace LibraryApp.Application.Reporting.Ports;
 
 public interface IReportingReadRepository
 {
-    Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(DateTime nowUtc, CancellationToken ct = default);
+    Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(DateTime overdueCutoffUtc, Guid? departmentId, CancellationToken ct = default);
     Task<DashboardCountsData> GetDashboardCountsAsync(DateTime nowUtc, CancellationToken ct = default);
     Task<IReadOnlyList<TopBookReportItemDto>> GetTopBooksAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);

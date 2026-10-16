@@ -35,10 +35,9 @@ public sealed class ReportingService(
         DateTime nowUtc = clock.UtcNow;
         DateOnly today = clock.LocalToday;
         DateTime overdueCutoffUtc = clock.StartOfLocalDayUtc(today);
-        IReadOnlyList<OverdueLoanData> rows = await repository.GetOverdueLoansAsync(overdueCutoffUtc, ct);
+        IReadOnlyList<OverdueLoanData> rows = await repository.GetOverdueLoansAsync(overdueCutoffUtc, departmentId, ct);
 
         List<OverdueLoanItemDto> items = rows
-            .Where(row => !departmentId.HasValue || row.DepartmentId == departmentId.Value)
             .Select(row =>
             {
                 DateOnly dueDate = clock.ToLocalDate(row.DueAtUtc);

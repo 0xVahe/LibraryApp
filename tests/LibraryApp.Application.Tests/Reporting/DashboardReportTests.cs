@@ -144,7 +144,7 @@ public sealed class DashboardReportTests
         }
 
         public Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
-            DateTime nowUtc, CancellationToken ct = default) =>
+            DateTime nowUtc, Guid? departmentId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public Task<IReadOnlyList<TopBookReportItemDto>> GetTopBooksAsync(

@@ -196,7 +196,7 @@ public sealed class TopBooksAndCategoriesReportTests
         }
 
         public Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
-            DateTime nowUtc, CancellationToken ct = default) =>
+            DateTime nowUtc, Guid? departmentId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public Task<DashboardCountsData> GetDashboardCountsAsync(

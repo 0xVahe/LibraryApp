@@ -11,6 +11,7 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
 {
     public async Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
         DateTime overdueCutoffUtc,
+	Guid? departmentId,
         CancellationToken ct = default)
     {
         return await (
@@ -19,6 +20,7 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
                       && loan.DueAtUtc < overdueCutoffUtc
                 join staff in db.StaffMembers.AsNoTracking()
                     on loan.StaffMemberId equals staff.Id
+		where !departmentId.HasValue || staff.DepartmentId == departmentId.Value
                 join department in db.Departments.AsNoTracking()
                     on staff.DepartmentId equals department.Id
                 join copy in db.BookCopies.AsNoTracking()

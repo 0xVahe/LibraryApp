@@ -167,10 +167,14 @@ public sealed class OverdueLoansReportTests
         public DateTime? LastOverdueCutoffUtc { get; private set; }
 
         public Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
-            DateTime nowUtc, CancellationToken ct = default)
+            DateTime nowUtc, Guid? departmentId, CancellationToken ct = default)
         {
             LastOverdueCutoffUtc = nowUtc;
-            return Task.FromResult<IReadOnlyList<OverdueLoanData>>(Loans);
+            return Task.FromResult<IReadOnlyList<OverdueLoanData>>(
+
+		Loans
+		    .Where(loan => !departmentId.HasValue || loan.DepartmentId == departmentId.Value)
+		    .ToList());
         }
 
         public Task<DashboardCountsData> GetDashboardCountsAsync(
