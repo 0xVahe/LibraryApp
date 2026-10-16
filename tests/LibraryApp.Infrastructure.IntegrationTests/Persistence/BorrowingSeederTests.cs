@@ -34,7 +34,7 @@ public sealed class BorrowingSeederTests : IAsyncLifetime
     {
         await using var db = Open();
         // The providers are never reached: the seeder checks its references first.
-        var seeder = new BorrowingSeeder(db, null!, null!, null!, null!, NullLogger<BorrowingSeeder>.Instance);
+        var seeder = new BorrowingSeeder(db, null!, null!, null!, null!, null!, null!, NullLogger<BorrowingSeeder>.Instance);
 
         await new UnitOfWork(db).ExecuteInTransactionAsync(seeder.SeedAsync);
 

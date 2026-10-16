@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Application.Tests.Borrowing.Fakes;
@@ -55,6 +56,26 @@ public sealed class ReservationQueueServiceTests
         Assert.Equal([(CopyId, BookCopyStatus.Reserved)], fixture.Catalog.StatusChanges);
     }
 
+    [Theory]
+    // Thursday 15 Oct: 5 working days end on Thursday 22 Oct; with the (working) release day counted, 3 days end on
+    // Monday 19 Oct and 1 day ends the same Thursday.
+    [InlineData(5, false, 22)]
+    [InlineData(3, true, 19)]
+    [InlineData(1, true, 15)]
+    public async Task The_pickup_deadline_follows_the_settings(int pickupWorkingDays, bool countsReleaseDay, int lastDay)
+    {
+        var fixture = new Fixture(settings =>
+        {
+            settings.Reservations.PickupWorkingDays = pickupWorkingDays;
+            settings.Reservations.PickupCountsReleaseDay = countsReleaseDay;
+        });
+        Reservation first = fixture.Wait(1);
+
+        await fixture.Service.OfferCopyAsync(CopyId, BookId);
+
+        Assert.Equal(new DateTime(2026, 10, lastDay + 1, 0, 0, 0, DateTimeKind.Utc).AddTicks(-1), first.ReadyUntilUtc);
+    }
+
     [Fact]
     public async Task ReservationReady_is_published_for_the_first_reservation()
     {
@@ -106,11 +127,12 @@ public sealed class ReservationQueueServiceTests
         public readonly WaitingQueueFake Reservations;
         public ReservationQueueService Service { get; }
 
-        public Fixture()
+        public Fixture(Action<BorrowingOptions>? settings = null)
         {
             Reservations = new WaitingQueueFake(Lock.Log);
             Service = new ReservationQueueService(
-                Reservations, Catalog, Lock, Events, new WeekdayCalendar(), new TestClock(Now), Ids);
+                Reservations, Catalog, Lock, Events, new WeekdayCalendar(), new TestClock(Now), Ids,
+                BorrowingTestSettings.Create(settings));
         }
 
         /// <summary>Adds a Waiting reservation of the book at this queue position, created before now.</summary>

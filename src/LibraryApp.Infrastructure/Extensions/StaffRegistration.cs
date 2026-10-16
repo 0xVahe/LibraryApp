@@ -35,6 +35,7 @@ public static class StaffRegistrationExtensions
         services.AddScoped<IUserAccountStore, UserAccountStore>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddLibraryJwtAuthentication(configuration);
+        services.AddScoped<IPasswordChangeService, PasswordChangeService>();
 
         services.AddScoped<IModuleSeeder, StaffSeeder>();
 

@@ -21,5 +21,15 @@ public interface IUserAccountStore
     /// </summary>
     Task<LoginAccount?> VerifyCredentialsAsync(string email, string password, CancellationToken ct);
 
+    /// <summary>
+    /// True when the account exists, is not locked out and the current password is right.
+    /// A wrong password counts as a failed attempt (lockout), like a failed login.
+    /// </summary>
+    Task<bool> VerifyCurrentPasswordAsync(Guid userId, string currentPassword, CancellationToken ct);
+
+    /// <summary>
+    /// Sets the new password and clears failed attempts and the first-login flag. Opens no transaction: call it
+    /// inside IUnitOfWork. False when the password rules reject the new password.
+    /// </summary>
     Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct);
 }
