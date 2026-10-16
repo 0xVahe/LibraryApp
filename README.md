@@ -42,6 +42,34 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 | Port 8080 is in use | Another app | Set `API_PORT` in `.env`, or stop the other app |
 | Port 5080 or 2525 is in use | Another app | Set `SMTP4DEV_PORT` or `SMTP4DEV_SMTP_PORT` in `.env` (the API run from the IDE follows `SMTP4DEV_SMTP_PORT` through `Mail__Port` in `.env`), or stop the other app |
 
+## Daily jobs
+
+A module job that must run once per local (Asia/Yerevan) day — for example the Borrowing daily job (BOR-06) or the 09:00 reminders (NOT-05) — implements `IDailyJob` (`Application/Abstractions/Common`) and is registered in the module's `Add<Module>Module`:
+
+```csharp
+services.AddDailyJob<BorrowingDailyJob>(BorrowingDailyJob.Name);   // the name is stored with every run: never rename it
+```
+
+and gets a schedule in `appsettings.json` (a registered job without one stops the API at start):
+
+```json
+"Jobs": {
+  "Schedules": {
+    "borrowing-daily": { "Enabled": true, "RunAt": "00:30", "WorkingDaysOnly": false }
+  }
+}
+```
+
+The platform runs it at `RunAt`, once per day across all API instances (table `JobRuns`, one row per job and local date), catches up when an instance was down at that time, and retries a failed run after `Jobs:RetryDelay` up to `Jobs:MaxAttemptsPerDay` attempts. `DailyJobRun.LastSuccessfulStartUtc` tells the job since when it has work to do after downtime. The job decides its own transactions (`IUnitOfWork`). `Jobs:Enabled=false` stops every job of an instance; the API test host sets it.
+
+| Key | Value | Meaning |
+|---|---|---|
+| `Jobs:Enabled` | true | Master switch of the instance |
+| `Jobs:PollInterval` | 00:01:00 | How often an instance checks whether a run is due |
+| `Jobs:Lease` | 01:00:00 | After this, a run left Running by a stopped instance is taken over |
+| `Jobs:RetryDelay` | 00:15:00 | Wait after a failed run |
+| `Jobs:MaxAttemptsPerDay` | 5 | Attempts per job and day |
+
 ## Tests
 
 ```bash
