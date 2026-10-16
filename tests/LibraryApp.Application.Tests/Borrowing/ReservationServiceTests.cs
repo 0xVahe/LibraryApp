@@ -3,6 +3,7 @@ using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Application.Tests.Borrowing.Fakes;
@@ -97,7 +98,63 @@ public sealed class ReservationServiceTests
     {
         var fixture = new Fixture { ActiveCount = 3 };
 
-        await AssertRejected(fixture, BorrowingErrors.ReservationLimitReached);
+        await AssertRejected(fixture, BorrowingErrors.ReservationLimitReached(3));
+    }
+
+    [Theory]
+    [InlineData(1, 0, true)]
+    [InlineData(1, 1, false)]
+    [InlineData(5, 4, true)]
+    [InlineData(5, 5, false)]
+    public async Task CreateAsync_takes_the_reservation_limit_from_the_settings(int maxActive, int activeCount, bool allowed)
+    {
+        var fixture = new Fixture(settings => settings.Reservations.MaxActive = maxActive) { ActiveCount = activeCount };
+
+        if (allowed)
+            await fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId));
+        else
+            await AssertRejected(fixture, BorrowingErrors.ReservationLimitReached(maxActive));
+    }
+
+    [Fact]
+    public async Task CreateAsync_lets_a_Restricted_employee_reserve_when_the_settings_allow_it()
+    {
+        var fixture = new Fixture(settings => settings.Reservations.RestrictedMayReserve = true)
+        {
+            Status = StaffMemberStatus.Restricted,
+        };
+
+        ReservationDto result = await fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId));
+
+        Assert.Equal(ReservationStatus.Waiting, result.Status);
+    }
+
+    [Fact]
+    public async Task CreateAsync_lets_a_Suspended_employee_reserve_when_the_settings_allow_it()
+    {
+        var fixture = new Fixture(settings => settings.Reservations.SuspendedMayReserve = true)
+        {
+            Status = StaffMemberStatus.Suspended,
+        };
+
+        ReservationDto result = await fixture.Service.CreateAsync(new CreateReservationRequest(BookId, StaffId));
+
+        Assert.Equal(ReservationStatus.Waiting, result.Status);
+    }
+
+    [Fact]
+    public async Task CreateAsync_still_refuses_a_Deactivated_employee_when_Suspended_may_reserve()
+    {
+        var fixture = new Fixture(settings =>
+        {
+            settings.Reservations.SuspendedMayReserve = true;
+            settings.Reservations.RestrictedMayReserve = true;
+        })
+        {
+            Status = StaffMemberStatus.Deactivated,
+        };
+
+        await AssertRejected(fixture, StaffErrors.Deactivated);
     }
 
     [Fact]
@@ -241,13 +298,13 @@ public sealed class ReservationServiceTests
         }
         public ReservationService Service { get; }
 
-        public Fixture()
+        public Fixture(Action<BorrowingOptions>? settings = null)
         {
             Catalog.Book = Book();
             UnitOfWork = new UnitOfWorkFake(Reservations);
             Service = new ReservationService(
                 Staff, Catalog, Loans, Reservations, UnitOfWork, Lock, CurrentUser,
-                new TestClock(Now), Ids);
+                new TestClock(Now), Ids, BorrowingTestSettings.Create(settings));
         }
     }
 

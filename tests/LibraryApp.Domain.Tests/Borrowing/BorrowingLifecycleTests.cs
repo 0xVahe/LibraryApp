@@ -36,7 +36,8 @@ public sealed class BorrowingLifecycleTests
             loanId: Guid.NewGuid(),
             points: 4,
             reason: "Returned four working days late.",
-            createdAtUtc: IssuedAtUtc);
+            createdAtUtc: IssuedAtUtc,
+            expiresAtUtc: IssuedAtUtc.AddDays(90));
     }
 
     [Fact]
@@ -220,10 +221,32 @@ public sealed class BorrowingLifecycleTests
                     loanId: Guid.NewGuid(),
                     points: 11,
                     reason: "Late return.",
-                    createdAtUtc: IssuedAtUtc));
+                    createdAtUtc: IssuedAtUtc,
+                    expiresAtUtc: IssuedAtUtc.AddDays(90)));
 
         Assert.Equal(
             BorrowingErrors.InvalidPenaltyPoints,
+            exception.Error);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Penalty_rejects_an_expiry_not_after_creation(int lifetimeDays)
+    {
+        DomainException exception =
+            Assert.Throws<DomainException>(() =>
+                PenaltyRecord.Create(
+                    id: Guid.NewGuid(),
+                    staffMemberId: Guid.NewGuid(),
+                    loanId: Guid.NewGuid(),
+                    points: 4,
+                    reason: "Late return.",
+                    createdAtUtc: IssuedAtUtc,
+                    expiresAtUtc: IssuedAtUtc.AddDays(lifetimeDays)));
+
+        Assert.Equal(
+            BorrowingErrors.PenaltyExpiryNotAfterCreation,
             exception.Error);
     }
 
