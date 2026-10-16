@@ -14,11 +14,29 @@ public sealed class BorrowingOptions
     public PenaltyOptions Penalties { get; set; } = new();
 
     public ReservationOptions Reservations { get; set; } = new();
+    
+    public LoanOptions Loans { get; set; } = new();
 }
 
 /// <summary>Section <c>Borrowing:Penalties</c> — the penalty-point policy (BOR-05, BR-BOR-6).</summary>
 public sealed class PenaltyOptions
 {
+    /// <summary>
+    /// Calendar days a suspension lasts after it starts (BR-BOR-6).
+    /// </summary>
+    public int SuspensionDays { get; set; }
+    
+    /// <summary>
+    /// Whether late and damaged penalties add together or only the larger applies.
+    /// </summary>
+    public LateAndDamagedMode LateAndDamaged { get; set; }
+
+    /// <summary>
+    /// Whether a late return with zero chargeable working days creates
+    /// a zero-point record. Nullable so missing configuration is detected.
+    /// </summary>
+    public bool? RecordZeroPointLateReturn { get; set; }
+    
     /// <summary>Points for each working day a loan is returned late (BOR-05).</summary>
     public int PointsPerLateWorkingDay { get; set; }
 
@@ -71,4 +89,11 @@ public sealed class ReservationOptions
 
     /// <summary>Whether a Suspended employee may place new reservations (BQ-BA-11); a Deactivated one never may.</summary>
     public bool SuspendedMayReserve { get; set; }
+}
+/// <summary>
+/// Section Borrowing:Loans.
+/// </summary>
+public sealed class LoanOptions
+{
+    public OverdueFromMode OverdueFrom { get; set; }
 }

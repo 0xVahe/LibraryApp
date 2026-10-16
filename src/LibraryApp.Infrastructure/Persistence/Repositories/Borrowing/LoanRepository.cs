@@ -11,6 +11,15 @@ namespace LibraryApp.Infrastructure.Persistence.Repositories.Borrowing;
 public sealed class LoanRepository(LibraryDbContext db) : ILoanRepository
 {
     /// <inheritdoc />
+    public Task<Loan?> GetForUpdateAsync(
+        Guid loanId,
+        CancellationToken ct = default) =>
+        db.Set<Loan>()
+            .AsTracking()
+            .SingleOrDefaultAsync(loan => loan.Id == loanId, ct);
+    
+    
+    /// <inheritdoc />
     public async Task AddAsync(Loan loan, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(loan);

@@ -12,8 +12,9 @@ namespace LibraryApp.Api.Controllers.Borrowing;
 [Authorize(Roles = Librarians)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-public sealed class LoansController(ILoanService loans) : ControllerBase
-{
+public sealed class LoansController(
+    ILoanService loans,
+    ILoanReturnService loanReturns) : ControllerBase{
     private const string Librarians = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
 
     /// <summary>Issues a copy, found by its barcode, to a staff member (BOR-01, BOR-02).</summary>
@@ -40,4 +41,31 @@ public sealed class LoansController(ILoanService loans) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LoanDto>> Get(Guid id, CancellationToken ct) =>
         Ok(await loans.GetAsync(id, ct));
+    
+    /// <summary>
+    /// Returns a loan and applies late or damaged-copy penalties
+    /// (BOR-03, BOR-05, BOR-09).
+    /// </summary>
+    /// <remarks>
+    /// A damaged copy goes UnderRepair.
+    /// An undamaged copy is offered to the reservation queue;
+    /// otherwise, it becomes Available.
+    /// All changes are committed in one transaction.
+    /// </remarks>
+    [HttpPost("{id:guid}/return")]
+    [ProducesResponseType<ReturnLoanResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<ReturnLoanResponse>> Return(
+        Guid id,
+        [FromBody] ReturnLoanRequest request,
+        CancellationToken ct)
+    {
+        ReturnLoanResponse result =
+            await loanReturns.ReturnAsync(id, request, ct);
+
+        return Ok(result);
+    }
 }

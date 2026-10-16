@@ -11,7 +11,8 @@ public sealed class BorrowingOptionsValidator : IValidateOptions<BorrowingOption
 {
     private const string Penalties = BorrowingOptions.SectionName + ":" + nameof(BorrowingOptions.Penalties);
     private const string Reservations = BorrowingOptions.SectionName + ":" + nameof(BorrowingOptions.Reservations);
-
+    private const string Loans =
+        BorrowingOptions.SectionName + ":" + nameof(BorrowingOptions.Loans);
     public ValidateOptionsResult Validate(string? name, BorrowingOptions options)
     {
         var failures = new List<string>();
@@ -24,6 +25,7 @@ public sealed class BorrowingOptionsValidator : IValidateOptions<BorrowingOption
         RequireRange(failures, Penalties, nameof(penalties.DamagedPoints), penalties.DamagedPoints, 1, PenaltyRecord.MaxPoints);
         RequireRange(failures, Penalties, nameof(penalties.LostPoints), penalties.LostPoints, 1, PenaltyRecord.MaxPoints);
         RequireRange(failures, Penalties, nameof(penalties.LifetimeDays), penalties.LifetimeDays, 1, int.MaxValue);
+        RequireRange(failures, Penalties, nameof(penalties.SuspensionDays), penalties.SuspensionDays, 1, int.MaxValue);
         RequireRange(failures, Penalties, nameof(penalties.RestrictedFromPoints), penalties.RestrictedFromPoints, 1, int.MaxValue);
         RequireRange(failures, Penalties, nameof(penalties.SuspendedFromPoints), penalties.SuspendedFromPoints, 1, int.MaxValue);
 
@@ -38,6 +40,26 @@ public sealed class BorrowingOptionsValidator : IValidateOptions<BorrowingOption
         RequireRange(failures, Reservations, nameof(reservations.MaxActive), reservations.MaxActive, 1, int.MaxValue);
         RequireRange(failures, Reservations, nameof(reservations.PickupWorkingDays), reservations.PickupWorkingDays, 1, int.MaxValue);
 
+        if (!Enum.IsDefined(typeof(LateAndDamagedMode), penalties.LateAndDamaged))
+        {
+            failures.Add(
+                $"{Penalties}:{nameof(penalties.LateAndDamaged)} " +
+                "must be Sum or Highest.");
+        }
+
+        if (penalties.RecordZeroPointLateReturn is null)
+        {
+            failures.Add(
+                $"{Penalties}:{nameof(penalties.RecordZeroPointLateReturn)} " +
+                "must be explicitly set to true or false.");
+        }
+
+        if (!Enum.IsDefined(typeof(OverdueFromMode), options.Loans.OverdueFrom))
+        {
+            failures.Add(
+                $"{Loans}:{nameof(options.Loans.OverdueFrom)} " +
+                "must be NextLocalDay or DueTime.");
+        }
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 

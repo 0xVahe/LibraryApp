@@ -8,6 +8,7 @@ namespace LibraryApp.Domain.Borrowing;
 /// </summary>
 public sealed class Loan : Entity
 {
+    public const int ReturnNoteMaxLength = 500;
     /// <summary>
     /// Gets the identifier of the borrowed physical copy.
     /// </summary>
@@ -37,6 +38,11 @@ public sealed class Loan : Entity
     /// </remarks>
     public DateTime? ReturnedAtUtc { get; private set; }
 
+    /// <summary>
+    /// Gets the optional note recorded when the copy was returned.
+    /// </summary>
+    public string? ReturnNote { get; private set; }
+    
     /// <summary>
     /// Gets the number of successful renewals.
     /// </summary>
@@ -180,16 +186,16 @@ public sealed class Loan : Entity
 
         Status = LoanStatus.Overdue;
     }
-
     /// <summary>
-    /// Closes an active or overdue loan when the copy is returned.
+    /// Closes an active or overdue loan and records an optional return note.
     /// </summary>
     /// <param name="returnedAtUtc">The UTC return timestamp.</param>
+    /// <param name="note">An optional note, at most 500 characters after trimming.</param>
     /// <remarks>
     /// Application coordinates penalties, copy availability,
     /// and reservation processing.
     /// </remarks>
-    public void Return(DateTime returnedAtUtc)
+    public void Return(DateTime returnedAtUtc, string? note = null)
     {
         EnsureUtc(returnedAtUtc);
 
@@ -205,7 +211,20 @@ public sealed class Loan : Entity
                 BorrowingErrors.LoanClosingBeforeIssue);
         }
 
+        string? normalizedNote =
+            string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+
+        // Defensive check for callers that bypass request validation.
+        if (normalizedNote is { Length: > ReturnNoteMaxLength })
+        {
+            throw new ArgumentException(
+                $"The return note may have at most {ReturnNoteMaxLength} characters.",
+                nameof(note));
+        }
+
+        // Change state only after every check succeeds.
         ReturnedAtUtc = returnedAtUtc;
+        ReturnNote = normalizedNote;
         Status = LoanStatus.Returned;
     }
 

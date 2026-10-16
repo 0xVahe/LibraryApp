@@ -383,6 +383,13 @@ public sealed class ReservationServiceTests
 
     private sealed class LoansFake : ILoanRepository
     {
+        public Task<Loan?> GetForUpdateAsync(
+            Guid loanId,
+            CancellationToken ct = default)
+        {
+            throw new NotSupportedException(
+                "Reservation creation should not load a loan for modification.");
+        }
         public List<Guid> CopyIds { get; } = new();
         public Task<IReadOnlyList<Guid>> GetOpenLoanCopyIdsAsync(Guid staffMemberId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Guid>>(CopyIds);
         public Task<int> CountOpenLoansAsync(Guid staffMemberId, CancellationToken ct = default) => Task.FromResult(0);

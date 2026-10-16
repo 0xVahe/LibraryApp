@@ -13,6 +13,11 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
         // Concurrency token: two changes of the same loan at the same time give a 409 (G3-02).
         builder.Property(x => x.RowVersion).IsRowVersion();
 
+        // Optional note recorded during a return.
+        builder.Property(x => x.ReturnNote)
+            .HasMaxLength(Loan.ReturnNoteMaxLength)
+            .IsRequired(false);
+        
         // References to other modules: ids and foreign keys only, no navigation properties (SD-13).
         builder.HasOne<BookCopy>().WithMany().HasForeignKey(x => x.BookCopyId);
         builder.HasOne<StaffMember>().WithMany().HasForeignKey(x => x.StaffMemberId);
