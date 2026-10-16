@@ -9,39 +9,37 @@ namespace LibraryApp.Infrastructure.Persistence.Repositories.Reporting;
 
 public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingReadRepository
 {
-    public async Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(DateTime nowUtc, CancellationToken ct = default)
+    public async Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
+        DateTime overdueCutoffUtc,
+        CancellationToken ct = default)
     {
-        var activePoints = db.PenaltyRecords
-            .AsNoTracking()
-            .Where(p => p.Status != PenaltyRecordStatus.Waived)
-            .GroupBy(p => p.LoanId)
-            .Select(group => new { LoanId = group.Key, Points = group.Sum(p => p.Points) });
-
         return await (
-            from loan in db.Loans.AsNoTracking()
-            where (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
-                  && loan.DueAtUtc < nowUtc
-            join staff in db.StaffMembers.AsNoTracking() on loan.StaffMemberId equals staff.Id
-            join department in db.Departments.AsNoTracking() on staff.DepartmentId equals department.Id
-            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
-            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
-            join points in activePoints on loan.Id equals points.LoanId into pointsGroup
-            from points in pointsGroup.DefaultIfEmpty()
-            orderby loan.DueAtUtc
-            select new OverdueLoanData(
-                loan.Id,
-                staff.EmployeeId,
-                staff.FirstName + " " + staff.LastName,
-                department.Name,
-                staff.DepartmentId,
-                staff.LineManagerEmail,
-                book.Title,
-                loan.DueAtUtc,
-                points == null ? 0 : points.Points))
+                from loan in db.Loans.AsNoTracking()
+                where (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
+                      && loan.DueAtUtc < overdueCutoffUtc
+                join staff in db.StaffMembers.AsNoTracking()
+                    on loan.StaffMemberId equals staff.Id
+                join department in db.Departments.AsNoTracking()
+                    on staff.DepartmentId equals department.Id
+                join copy in db.BookCopies.AsNoTracking()
+                    on loan.BookCopyId equals copy.Id
+                join book in db.Books.AsNoTracking()
+                    on copy.BookId equals book.Id
+                orderby loan.DueAtUtc
+                select new OverdueLoanData(
+                    loan.Id,
+                    staff.EmployeeId,
+                    staff.FirstName + " " + staff.LastName,
+                    department.Name,
+                    staff.DepartmentId,
+                    staff.LineManagerEmail,
+                    book.Title,
+                    loan.DueAtUtc,
+                    0))
             .ToListAsync(ct);
     }
 
-    public async Task<DashboardCountsData> GetDashboardCountsAsync(DateTime nowUtc, CancellationToken ct = default)
+    public async Task<DashboardCountsData> GetDashboardCountsAsync(DateTime overdueCutoffUtc, CancellationToken ct = default)
     {
         int totalBooks = await db.Books.AsNoTracking().CountAsync(book => !book.IsDeleted, ct);
         int totalCopies = await db.BookCopies.AsNoTracking().CountAsync(ct);
@@ -51,7 +49,7 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
         int totalLoans = await db.Loans.AsNoTracking().CountAsync(ct);
         int overdueLoans = await db.Loans.AsNoTracking().CountAsync(
             loan => (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
-                    && loan.DueAtUtc < nowUtc, ct);
+                    && loan.DueAtUtc < overdueCutoffUtc, ct);
         int restrictedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(
             staff => staff.Status == StaffMemberStatus.Restricted, ct);
         int suspendedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(

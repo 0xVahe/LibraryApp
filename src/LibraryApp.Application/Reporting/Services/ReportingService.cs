@@ -1,3 +1,4 @@
+using LibraryApp.Domain.Borrowing;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
@@ -9,7 +10,8 @@ public sealed class ReportingService(
     IReportingReadRepository repository,
     IClock clock,
     IWorkingDayCalendar workingDayCalendar,
-    IMemoryCache cache) : IReportingService
+    IMemoryCache cache,
+    PenaltyPolicy penaltyPolicy) : IReportingService
 {
     public async Task<OverdueLoansReportDto> GetOverdueLoansAsync(
         Guid? departmentId,
@@ -28,20 +30,27 @@ public sealed class ReportingService(
 
         DateTime nowUtc = clock.UtcNow;
         DateOnly today = clock.LocalToday;
-        IReadOnlyList<OverdueLoanData> rows = await repository.GetOverdueLoansAsync(nowUtc, ct);
+        DateTime overdueCutoffUtc = clock.StartOfLocalDayUtc(today);
+        IReadOnlyList<OverdueLoanData> rows = await repository.GetOverdueLoansAsync(overdueCutoffUtc, ct);
 
         List<OverdueLoanItemDto> items = rows
             .Where(row => !departmentId.HasValue || row.DepartmentId == departmentId.Value)
-            .Select(row => new OverdueLoanItemDto(
-                row.LoanId,
-                row.EmployeeId,
-                row.EmployeeName,
-                row.Department,
-                row.LineManagerEmail,
-                row.BookTitle,
-                clock.ToLocalDate(row.DueAtUtc),
-                workingDayCalendar.CountWorkingDays(clock.ToLocalDate(row.DueAtUtc), today),
-                row.PointsSoFar))
+            .Select(row =>
+            {
+                DateOnly dueDate = clock.ToLocalDate(row.DueAtUtc);
+                int workingDaysOverdue = workingDayCalendar.CountWorkingDays(dueDate, today);
+
+                return new OverdueLoanItemDto(
+                    row.LoanId,
+                    row.EmployeeId,
+                    row.EmployeeName,
+                    row.Department,
+                    row.LineManagerEmail,
+                    row.BookTitle,
+                    dueDate,
+                    workingDaysOverdue,
+                    penaltyPolicy.CalculateLatePoints(workingDaysOverdue));
+            })
             .Where(item => !minimumDaysOverdue.HasValue || item.WorkingDaysOverdue >= minimumDaysOverdue.Value)
             .Where(item => !maximumDaysOverdue.HasValue || item.WorkingDaysOverdue <= maximumDaysOverdue.Value)
             .OrderByDescending(item => item.WorkingDaysOverdue)
@@ -59,7 +68,8 @@ public sealed class ReportingService(
         if (cache.TryGetValue(cacheKey, out DashboardReportDto? cached) && cached is not null)
             return cached;
 
-        DashboardCountsData counts = await repository.GetDashboardCountsAsync(nowUtc, ct);
+        DateTime overdueCutoffUtc = clock.StartOfLocalDayUtc(today);
+        DashboardCountsData counts = await repository.GetDashboardCountsAsync(overdueCutoffUtc, ct);
         decimal percentage = counts.TotalLoans == 0
             ? 0m
             : Math.Round((decimal)counts.OverdueLoans * 100m / counts.TotalLoans, 1, MidpointRounding.AwayFromZero);
