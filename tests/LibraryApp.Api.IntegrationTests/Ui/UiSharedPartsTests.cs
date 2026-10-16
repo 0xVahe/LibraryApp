@@ -11,7 +11,11 @@ using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.RazorPages.Infrastructure;
+using Microsoft.AspNetCore.Routing;
+using System.Reflection;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -212,4 +216,134 @@ public class UiSharedPartsTests
 
         Assert.Equal(valid, result.Succeeded);
     }
+
+    public sealed class FormPage : PageModel
+    {
+        [BindProperty]
+        public SampleInput Input { get; set; } = new("", 9);
+    }
+
+    private static PageHandlerExecutingContext PageContextFor(FormPage page, string method, IServiceProvider services,
+        Dictionary<string, object?>? arguments = null)
+    {
+        var http = new DefaultHttpContext { RequestServices = services };
+        http.Request.Method = method;
+        var property = typeof(FormPage).GetProperty(nameof(FormPage.Input))!;
+        var descriptor = new CompiledPageActionDescriptor
+        {
+            BoundProperties =
+            [
+                new PageBoundPropertyDescriptor
+                {
+                    Name = property.Name,
+                    Property = property,
+                    ParameterType = property.PropertyType,
+                    BindingInfo = BindingInfo.GetBindingInfo(property.GetCustomAttributes(inherit: true)),
+                },
+            ],
+        };
+        var context = new PageContext(new ActionContext(http, new RouteData(), descriptor)) { ActionDescriptor = descriptor };
+        return new PageHandlerExecutingContext(context, [], null, arguments ?? [], page);
+    }
+
+    private static Task<PageHandlerExecutedContext> Next(PageHandlerExecutingContext context, Exception? exception = null) =>
+        Task.FromResult(new PageHandlerExecutedContext(
+            new PageContext(context) { ActionDescriptor = context.ActionDescriptor }, [], null, context.HandlerInstance) { Exception = exception });
+
+    [Theory]
+    [InlineData("POST", false)]
+    [InlineData("GET", true)]   // the form is shown empty first: no errors before the user submits
+    public async Task The_page_filter_validates_bound_input_only_when_it_was_posted(string method, bool expectedValid)
+    {
+        using var services = new ServiceCollection().AddScoped<IValidator<SampleInput>, SampleInputValidator>().BuildServiceProvider();
+        var context = PageContextFor(new FormPage(), method, services);
+
+        await new UiValidationFilter(services).OnPageHandlerExecutionAsync(context, () => Next(context));
+
+        Assert.Equal(expectedValid, context.ModelState.IsValid);
+        if (!expectedValid)
+            Assert.Contains("Input.Email", context.ModelState.Keys);
+    }
+
+    [Fact]
+    public async Task The_page_filter_validates_handler_arguments_too()
+    {
+        using var services = new ServiceCollection().AddScoped<IValidator<SampleInput>, SampleInputValidator>().BuildServiceProvider();
+        var context = PageContextFor(new FormPage(), "GET", services, new() { ["request"] = new SampleInput(null, 0) });
+
+        await new UiValidationFilter(services).OnPageHandlerExecutionAsync(context, () => Next(context));
+
+        Assert.Equal(["Copies", "Email"], context.ModelState.Keys.Order());
+    }
+
+    [Theory]
+    [InlineData(ErrorKind.NotFound, typeof(NotFoundResult))]
+    [InlineData(ErrorKind.Forbidden, typeof(ForbidResult))]
+    [InlineData(ErrorKind.Unauthorized, typeof(ChallengeResult))]
+    public async Task An_uncaught_domain_error_on_a_page_gets_its_page(ErrorKind kind, Type expected)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = PageContextFor(new FormPage(), "GET", services);
+        PageHandlerExecutedContext? executed = null;
+
+        await new UiDomainExceptionFilter().OnPageHandlerExecutionAsync(context, async () =>
+            executed = await Next(context, new DomainException(new Error("test.code", "Message", kind))));
+
+        Assert.True(executed!.ExceptionHandled);
+        Assert.IsType(expected, executed.Result);
+    }
+
+    [Fact]
+    public async Task An_uncaught_form_error_is_not_hidden()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = PageContextFor(new FormPage(), "POST", services);
+        PageHandlerExecutedContext? executed = null;
+
+        await new UiDomainExceptionFilter().OnPageHandlerExecutionAsync(context, async () =>
+            executed = await Next(context, new DomainException(new Error("test.code", "Message", ErrorKind.Conflict))));
+
+        Assert.False(executed!.ExceptionHandled);   // goes on to the Error page; forms catch it with this.DomainError(ex)
+    }
+
+    private sealed class Environment(string name) : Microsoft.Extensions.Hosting.IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = name;
+        public string ApplicationName { get; set; } = "LibraryApp.Api";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = null!;
+    }
+
+    [Theory]
+    [InlineData("Production", Microsoft.AspNetCore.Http.CookieSecurePolicy.Always)]
+    [InlineData("Staging", Microsoft.AspNetCore.Http.CookieSecurePolicy.Always)]
+    [InlineData("Development", Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest)]
+    public void Cookies_are_https_only_outside_Development(string environment, Microsoft.AspNetCore.Http.CookieSecurePolicy expected)
+    {
+        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build();
+        var services = new ServiceCollection().AddLogging();
+        services.Configure<JwtOptions>(o => o.AccessTokenMinutes = 60);
+        services.AddUi(configuration, new Environment(environment));
+        using var provider = services.BuildServiceProvider();
+
+        var cookie = provider.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions>>()
+            .Get(LibraryApp.Api.Ui.Auth.UiAuthentication.CookieScheme);
+        var antiforgery = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.Antiforgery.AntiforgeryOptions>>().Value;
+
+        Assert.Equal(expected, cookie.Cookie.SecurePolicy);
+        Assert.Equal(expected, antiforgery.Cookie.SecurePolicy);
+        Assert.True(cookie.Cookie.HttpOnly);
+        Assert.False(cookie.SlidingExpiration);
+        Assert.Equal(TimeSpan.FromMinutes(60), cookie.ExpireTimeSpan);
+    }
+
+    [Theory]
+    [InlineData("/api/loans", true)]
+    [InlineData("/API/loans", true)]
+    [InlineData("/api", true)]
+    [InlineData("/apis", false)]
+    [InlineData("/catalog/api", false)]
+    public void The_api_is_exactly_the_api_segment(string path, bool api) =>
+        Assert.Equal(api, UiPaths.IsApi(new PathString(path)));
 }
+
