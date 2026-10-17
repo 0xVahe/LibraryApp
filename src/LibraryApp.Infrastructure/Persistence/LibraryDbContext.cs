@@ -38,6 +38,7 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
     public DbSet<Book> Books => Set<Book>();
     public DbSet<BookAuthor> BookAuthors => Set<BookAuthor>();
     public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+    public DbSet<BookSuggestion> BookSuggestions => Set<BookSuggestion>();
 
     // Staff (Group 2)
     

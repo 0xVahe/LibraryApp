@@ -33,5 +33,39 @@ public static class StaffSeedIds
         public static readonly Guid GorMkrtchyan = new("20000000-0000-0000-0003-000000000006");     // Restricted
         public static readonly Guid SonaVardanyan = new("20000000-0000-0000-0003-000000000007");    // Suspended
         public static readonly Guid HaykManukyan = new("20000000-0000-0000-0003-000000000008");     // Deactivated
+
+        // Retail Banking Department
+        public static readonly Guid NarekSimonyan = new("20000000-0000-0000-0003-000000000009");        // Manager, Active
+        public static readonly Guid EvaHovsepyan = new("20000000-0000-0000-0003-000000000010");         // Intern, Active
+        public static readonly Guid TigranMelikyan = new("20000000-0000-0000-0003-000000000011");       // Employee, Active
+
+        // Corporate Banking Department
+        public static readonly Guid ManeGevorgyan = new("20000000-0000-0000-0003-000000000012");        // Manager, Active
+        public static readonly Guid ArmenBabayan = new("20000000-0000-0000-0003-000000000013");         // Intern, Active
+        public static readonly Guid LusineKarapetyan = new("20000000-0000-0000-0003-000000000014");     // Employee, Active
+        public static readonly Guid RubenHarutyunyan = new("20000000-0000-0000-0003-000000000015");     // Employee, Active
+
+        // Risk Management Department
+        public static readonly Guid AnahitMartirosyan = new("20000000-0000-0000-0003-000000000016");    // Employee, Active
+        public static readonly Guid VahanStepanyan = new("20000000-0000-0000-0003-000000000017");       // Intern, Active
+        public static readonly Guid ElenDanielyan = new("20000000-0000-0000-0003-000000000018");        // Employee, Active
+        public static readonly Guid SamvelPoghosyan = new("20000000-0000-0000-0003-000000000019");      // Employee, Active
+
+        // Information Technology Department
+        public static readonly Guid AniSahakyan = new("20000000-0000-0000-0003-000000000020");          // Employee, Active
+        public static readonly Guid LevonKhachatryan = new("20000000-0000-0000-0003-000000000021");     // Manager, Active
+        public static readonly Guid MilenaAbrahamyan = new("20000000-0000-0000-0003-000000000022");     // Employee, Active
+
+        // Finance Department
+        public static readonly Guid ArturMinasyan = new("20000000-0000-0000-0003-000000000023");        // Manager, Active
+        public static readonly Guid LianaNalbandyan = new("20000000-0000-0000-0003-000000000024");      // Intern, Active
+        public static readonly Guid KarenAsatryan = new("20000000-0000-0000-0003-000000000025");        // Employee, Active
+        public static readonly Guid SofiaHambardzumyan = new("20000000-0000-0000-0003-000000000026");   // Employee, Active
+
+        // Human Resources Department
+        public static readonly Guid AshotBaghdasaryan = new("20000000-0000-0000-0003-000000000027");    // Manager, Active
+        public static readonly Guid NuneTorosyan = new("20000000-0000-0000-0003-000000000028");         // Intern, Active
+        public static readonly Guid ErikZakaryan = new("20000000-0000-0000-0003-000000000029");         // Employee, Active
+        public static readonly Guid AlinaMirzoyan = new("20000000-0000-0000-0003-000000000030");        // Employee, Active
     }
 }
