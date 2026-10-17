@@ -27,4 +27,13 @@ public interface IStaffMemberService
     /// <c>staff.deactivated_status_locked</c> (member is Deactivated).
     /// </summary>
     Task SetStatusAsync(Guid staffMemberId, StaffMemberStatus status, string reason, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Display names ("First Last") of the given staff members in one query, for lists such as the pickup queue or
+    /// overdue loans. Unknown ids are left out of the result (no exception); Deactivated members are included.
+    /// An empty list returns an empty dictionary without a query.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+        IReadOnlyCollection<Guid> staffMemberIds,
+        CancellationToken ct = default);
 }
