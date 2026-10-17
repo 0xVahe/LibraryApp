@@ -25,7 +25,8 @@ public static partial class StatusBadge
         StaffMemberStatus.Restricted => "badge-amber",
         StaffMemberStatus.Suspended or StaffMemberStatus.Deactivated => "badge-red",
 
-        LoanStatus.Active or LoanStatus.Returned => "badge-green",
+        LoanStatus.Active => "badge-blue",
+        LoanStatus.Returned => "badge-green",
         LoanStatus.Overdue or LoanStatus.Lost => "badge-red",
 
         BookCopyStatus.Available => "badge-green",
@@ -41,9 +42,12 @@ public static partial class StatusBadge
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, "The status has no badge colour; add it to StatusBadge."),
     };
 
-    /// <summary>"ReadyForPickup" → "Ready for pickup"; "OnLoan" → "On loan".</summary>
+    /// <summary>"ReadyForPickup" → "Ready for pickup"; "OnLoan" → "On loan". An open loan reads "On loan" (design.md).</summary>
     public static string Label(Enum status)
     {
+        if (status is LoanStatus.Active)
+            return "On loan";
+
         var words = WordStart().Replace(status.ToString(), " $1").ToLowerInvariant();
         return char.ToUpperInvariant(words[0]) + words[1..];
     }

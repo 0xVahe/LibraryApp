@@ -15,11 +15,12 @@ public static class UiNavigation
     public const string Notifications = "/notifications";
     public const string LoanDesk = "/desk";
     public const string Staff = "/staff";
+    public const string Reports = "/reports";
     public const string Settings = "/settings";
     public const string Profile = "/profile";
 
     /// <summary>
-    /// Staff Member: My library, Catalog, Notifications. Librarian: Loan desk, Staff members, Catalog, My library,
+    /// Staff Member: My library, Catalog, Notifications. Librarian: Loan desk, Staff members, Catalog, Reports, My library,
     /// Notifications. Library Administrator: the Librarian items plus Settings. Nothing while the first-login password
     /// change is pending.
     /// </summary>
@@ -36,6 +37,7 @@ public static class UiNavigation
             new("Loan desk", LoanDesk),
             new("Staff members", Staff),
             new("Catalog", Catalog),
+            new("Reports", Reports),
             new("My library", MyLibrary),
             new("Notifications", Notifications),
         };

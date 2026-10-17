@@ -165,6 +165,17 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
         Assert.Equal("text/css", response.Content.Headers.ContentType?.MediaType);
     }
 
+    [Fact]
+    public async Task The_stylesheet_has_the_agreed_brand_colours()
+    {
+        var css = await (await UiTestClient.Anonymous(factory).GetAsync("/css/site.css")).Content.ReadAsStringAsync();
+
+        Assert.Contains("--green: #72bf44;", css);
+        Assert.Contains("--green-hover: #5f9f39;", css);
+        Assert.Contains(".btn-primary { background: var(--green); color: var(--white); }", css);
+        Assert.DoesNotContain("--green-solid", css);
+    }
+
     [Theory]
     [InlineData("/fonts/montserrat-latin-600-normal.woff2")]
     [InlineData("/fonts/montserrat-latin-700-normal.woff2")]

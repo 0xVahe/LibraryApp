@@ -1,5 +1,5 @@
 /* Ameria Library — one stylesheet for every page (copy of the UI demo's design/styles.css; shared file, see design.md).
-   Colours from ameriabank.am: brand green #72BF44; solid #3F7D22 (hover #356B1C) under white text, text #171717 / #565656, footer #222.
+   Colours from ameriabank.am: brand green #72BF44 (hover #5F9F39) with white text, text #171717 / #565656, footer #222.
    Type scale 14/16/20/24/32, spacing on a 4px scale. */
 
 /* Fonts served from wwwroot/fonts (SIL Open Font License, see OFL-*.txt there), never from Google Fonts. Latin only:
@@ -11,10 +11,9 @@
 
 :root {
   --green: #72bf44;
+  --green-hover: #5f9f39;
   --green-soft: #eef6e6;
   --green-text: #3d6b1a;
-  --green-solid: #3f7d22;        /* brand green, darkened so white text passes 4.5:1 */
-  --green-solid-hover: #356b1c;
 
   --ink: #171717;
   --text: #565656;
@@ -113,7 +112,7 @@ strong { color: var(--ink); font-weight: 600; }
 .logo-mark {
   width: 32px; height: 32px;
   border-radius: 8px;
-  background: var(--green-solid);
+  background: var(--green);
   color: var(--white);
   display: grid;
   place-items: center;
@@ -161,7 +160,7 @@ strong { color: var(--ink); font-weight: 600; }
   flex: none;
 }
 .avatar.lg { width: 64px; height: 64px; font-size: 20px; }
-.user-name { line-height: 1.25; }
+.user-name { line-height: 1.25; white-space: nowrap; }
 .user-name .small { display: block; color: var(--muted); }
 
 /* Mobile menu without JavaScript: <details> opens and closes it. */
@@ -288,8 +287,8 @@ main {
   transition: background 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.2s var(--ease);
 }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--green-solid); color: var(--white); }
-.btn-primary:hover { background: var(--green-solid-hover); }
+.btn-primary { background: var(--green); color: var(--white); }
+.btn-primary:hover { background: var(--green-hover); }
 .btn-secondary { background: var(--white); color: var(--ink); border-color: #a3a3a3; font-weight: 400; }
 .btn-secondary:hover { border-color: var(--ink); }
 .btn-danger { background: var(--white); color: var(--red); border-color: var(--red); }
@@ -309,7 +308,7 @@ main {
   font-weight: 600;
   white-space: nowrap;
 }
-.badge-green { background: var(--green-solid); color: var(--white); }
+.badge-green { background: var(--green); color: var(--white); }
 .badge-red { background: var(--red-soft); color: var(--red); }
 .badge-amber { background: var(--amber-soft); color: var(--amber); }
 .badge-blue { background: var(--blue-soft); color: var(--blue); }
@@ -390,6 +389,8 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .table a.row-link:hover { text-decoration: underline; }
 .card.flush { padding: 0; overflow-x: auto; }
 .card.flush .card-head { padding: 24px 24px 0; }
+.card-head .btn { flex: none; white-space: nowrap; }
+.card-filters { padding: 16px 24px 0; }
 
 /* ---------- Lists ---------- */
 .list { list-style: none; margin: 0; padding: 0; }
@@ -487,7 +488,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
   font-weight: 600;
   display: grid; place-items: center;
 }
-.steps .num.done { background: var(--green-solid); color: var(--white); }
+.steps .num.done { background: var(--green); color: var(--white); }
 
 .pager { display: flex; gap: 8px; justify-content: center; margin-top: 24px; }
 .pager a {
@@ -499,7 +500,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
   color: var(--ink);
   text-decoration: none;
 }
-.pager a[aria-current="page"] { background: var(--green-solid); border-color: var(--green-solid); color: var(--white); font-weight: 600; }
+.pager a[aria-current="page"] { background: var(--green); border-color: var(--green); color: var(--white); font-weight: 600; }
 
 .unread { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
 .read { width: 8px; height: 8px; flex: none; }
@@ -565,10 +566,13 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .screen-list a:hover { border-color: var(--green); background: var(--green-soft); }
 
 /* ---------- Responsive ---------- */
+@media (max-width: 1520px) {
+  .user-name { display: none; }
+}
+
 @media (max-width: 1200px) {
   .nav a { padding: 0 8px; }
   .topbar-inner { gap: 16px; }
-  .user-name { display: none; }
 }
 
 @media (max-width: 1024px) {
@@ -593,6 +597,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
   .logo { font-size: 16px; }
   .card { padding: 16px; }
   .card.flush .card-head { padding: 16px 16px 0; }
+  .card-filters { padding: 16px 16px 0; }
+  .card-head { flex-wrap: wrap; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-2 { grid-template-columns: minmax(0, 1fr); }
   .grid { gap: 16px; }
   .dl { grid-template-columns: minmax(0, 1fr); gap: 4px; }
@@ -613,6 +620,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
   .table tr:last-child { border-bottom: 0; }
   .table td, .table td:first-child, .table td:last-child { border: 0; padding: 4px 0; display: flex; justify-content: space-between; gap: 16px; text-align: right; }
   .table td::before { content: attr(data-label); color: var(--muted); font-size: 14px; text-align: left; flex: none; }
+  .table td { overflow-wrap: anywhere; }
   .table td > * { min-width: 0; overflow-wrap: anywhere; }
   .table td.actions { justify-content: flex-end; padding-top: 8px; }
   .table td.actions::before { content: none; }
@@ -646,3 +654,28 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .error-page .row { justify-content: center; margin-top: 24px; }
 .page-alert { margin-bottom: 24px; }
 .auth-form .box > p.muted { margin: 8px 0 24px; }
+
+/* Spacing and alignment helpers for what the demo pages write as style="" (the Content-Security-Policy blocks inline
+   styles, design.md rule 1). Spacing scale only; one helper per value the demo uses. */
+.mt-4 { margin-top: 4px; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mb-4 { margin-bottom: 4px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.justify-center { justify-content: center; }
+.self-end { align-self: flex-end; }
+.min-w-160 { min-width: 160px; }
+.min-w-200 { min-width: 200px; }
+.grow-160 { flex: 1; min-width: 160px; }
+.card-foot { padding: 0 24px 24px; }
+@media (max-width: 600px) { .card-foot { padding: 0 16px 16px; } }

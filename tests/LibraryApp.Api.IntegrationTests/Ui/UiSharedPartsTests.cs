@@ -38,9 +38,9 @@ public class UiSharedPartsTests
         static string[] Texts(ClaimsPrincipal user) => UiNavigation.For(user).Select(i => i.Text).ToArray();
 
         Assert.Equal(["My library", "Catalog", "Notifications"], Texts(User("anna.petrosyan@ameriabank.am", StaffRoles.StaffMember)));
-        Assert.Equal(["Loan desk", "Staff members", "Catalog", "My library", "Notifications"],
+        Assert.Equal(["Loan desk", "Staff members", "Catalog", "Reports", "My library", "Notifications"],
             Texts(User("aram.sargsyan@ameriabank.am", StaffRoles.Librarian)));
-        Assert.Equal(["Loan desk", "Staff members", "Catalog", "My library", "Notifications", "Settings"],
+        Assert.Equal(["Loan desk", "Staff members", "Catalog", "Reports", "My library", "Notifications", "Settings"],
             Texts(User("lilit.grigoryan@ameriabank.am", StaffRoles.LibraryAdministrator)));
         Assert.Empty(UiNavigation.For(new ClaimsPrincipal(new ClaimsIdentity())));
     }
@@ -101,6 +101,13 @@ public class UiSharedPartsTests
         Assert.Equal("Ready for pickup", StatusBadge.Label(ReservationStatus.ReadyForPickup));
         Assert.Equal("On loan", StatusBadge.Label(BookCopyStatus.OnLoan));
         Assert.Equal("badge badge-red", StatusBadge.For(LoanStatus.Overdue).CssClass);
+    }
+
+    [Fact]
+    public void An_open_loan_is_on_loan_in_blue_as_in_the_design()
+    {
+        Assert.Equal(new BadgeModel("On loan", "badge badge-blue"), StatusBadge.For(LoanStatus.Active));
+        Assert.Equal(new BadgeModel("Returned", "badge badge-green"), StatusBadge.For(LoanStatus.Returned));
     }
 
     [Fact]
