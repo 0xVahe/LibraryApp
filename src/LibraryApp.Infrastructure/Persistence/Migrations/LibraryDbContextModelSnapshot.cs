@@ -39,6 +39,10 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.Property<int>("RenewalCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("ReturnNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime?>("ReturnedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -307,6 +311,67 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_BookCopies_BookId_Status");
 
                     b.ToTable("BookCopies");
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Catalog.BookSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Isbn")
+                        .HasMaxLength(13)
+                        .HasColumnType("nvarchar(13)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ReviewComment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("StaffMemberId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("StaffMemberId", "CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_BookSuggestions_StaffMemberId_CreatedAtUtc_Id");
+
+                    b.HasIndex("Status", "CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_BookSuggestions_Status_CreatedAtUtc_Id");
+
+                    b.ToTable("BookSuggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BookSuggestions_RejectComment", "[Status] <> 3 OR ([ReviewComment] IS NOT NULL AND LEN(LTRIM(RTRIM([ReviewComment]))) > 0)");
+
+                            t.HasCheckConstraint("CK_BookSuggestions_Review", "([Status] = 1 AND [ReviewedAtUtc] IS NULL AND [ReviewedByUserId] IS NULL AND [ReviewComment] IS NULL) OR ([Status] IN (2, 3) AND [ReviewedAtUtc] IS NOT NULL AND [ReviewedByUserId] IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("LibraryApp.Domain.Catalog.Category", b =>
@@ -662,51 +727,6 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("LibraryApp.Infrastructure.Jobs.JobRun", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("FinishedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("JobName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateOnly>("LocalDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime>("StartedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Summary")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("JobName", "LocalDate")
-                        .IsUnique()
-                        .HasDatabaseName("UX_JobRuns_JobName_LocalDate");
-
-                    b.ToTable("JobRuns", t =>
-                        {
-                            t.HasCheckConstraint("CK_JobRuns_Attempts", "[Attempts] >= 1");
-                        });
-                });
-
             modelBuilder.Entity("LibraryApp.Infrastructure.Messaging.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1023,6 +1043,20 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.HasOne("LibraryApp.Domain.Catalog.Book", null)
                         .WithMany()
                         .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("LibraryApp.Domain.Catalog.BookSuggestion", b =>
+                {
+                    b.HasOne("LibraryApp.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("LibraryApp.Domain.Staff.StaffMember", null)
+                        .WithMany()
+                        .HasForeignKey("StaffMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

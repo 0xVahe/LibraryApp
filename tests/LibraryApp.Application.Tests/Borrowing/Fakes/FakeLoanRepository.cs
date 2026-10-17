@@ -17,6 +17,15 @@ public sealed class FakeLoanRepository : ILoanRepository
     // Prepares existing loans before a test starts.
     public void Seed(Loan loan) => _saved.Add(loan);
 
+    public Task<Loan?> GetForUpdateAsync(
+        Guid loanId,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        return Task.FromResult(
+            _saved.SingleOrDefault(loan => loan.Id == loanId));
+    }
     public Task<int> CountOpenLoansAsync(
         Guid staffMemberId,
         CancellationToken ct = default)

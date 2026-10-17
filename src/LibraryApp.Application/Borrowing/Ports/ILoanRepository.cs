@@ -8,6 +8,14 @@ namespace LibraryApp.Application.Borrowing.Ports;
 public interface ILoanRepository
 {
     /// <summary>
+    /// Loads a tracked loan for modification.
+    /// Saving belongs to the unit of work.
+    /// </summary>
+    Task<Loan?> GetForUpdateAsync(
+        Guid loanId,
+        CancellationToken ct = default);
+    
+    /// <summary>
     /// Stages a new loan to be saved.
     /// </summary>
     Task AddAsync(Loan loan, CancellationToken ct = default);

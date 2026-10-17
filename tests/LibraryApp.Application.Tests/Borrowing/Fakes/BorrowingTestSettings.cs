@@ -20,6 +20,12 @@ public static class BorrowingTestSettings
             LifetimeDays = 90,
             RestrictedFromPoints = 5,
             SuspendedFromPoints = 10,
+            SuspensionDays = 30,
+            LateAndDamaged = LateAndDamagedMode.Sum,
+        },
+        Loans = new LoanOptions
+        {
+            OverdueFrom = OverdueFromMode.NextLocalDay,
         },
         Reservations = new ReservationOptions
         {
