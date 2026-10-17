@@ -38,7 +38,7 @@ public sealed class TestRequestValidator : AbstractValidator<TestRequest>
 
 [ApiController]
 [AllowAnonymous]
-[Route("test-errors")]
+[Route("api/test-errors")]
 public sealed class TestErrorsController : ControllerBase
 {
     [HttpGet("{kind}")]
@@ -81,7 +81,7 @@ public sealed class TestErrorsController : ControllerBase
 
 /// <summary>Needs a token like every real endpoint: without one the answer is an empty 401 from authentication.</summary>
 [ApiController]
-[Route("test-secured")]
+[Route("api/test-secured")]
 public sealed class TestSecuredController : ControllerBase
 {
     [HttpGet]
@@ -99,7 +99,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [InlineData("conflict", HttpStatusCode.Conflict, "test.conflict")]
     public async Task A_domain_error_becomes_ProblemDetails_with_the_status_of_its_kind(string kind, HttpStatusCode status, string code)
     {
-        var response = await factory.CreateClient().GetAsync($"/test-errors/{kind}");
+        var response = await factory.CreateClient().GetAsync($"/api/test-errors/{kind}");
         var body = await ReadAsync(response);
 
         Assert.Equal(status, response.StatusCode);
@@ -112,7 +112,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task Domain_error_details_are_forwarded_without_replacing_code_or_trace_id()
     {
-        var response = await factory.CreateClient().GetAsync("/test-errors/extensions");
+        var response = await factory.CreateClient().GetAsync("/api/test-errors/extensions");
         var body = await ReadAsync(response);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -135,7 +135,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [InlineData("boom", HttpStatusCode.InternalServerError, "internal_error")]
     public async Task An_error_is_ProblemDetails_whatever_the_client_accepts(string kind, HttpStatusCode status, string code)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, $"/test-errors/{kind}");
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/test-errors/{kind}");
         request.Headers.Accept.ParseAdd("text/plain");
 
         var response = await factory.CreateClient().SendAsync(request);
@@ -152,9 +152,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     public async Task A_domain_error_is_logged_with_its_final_status_not_as_500()
     {
         var before = ApiHostFactory.Logs.Events.Count;
-        await factory.CreateClient().GetAsync("/test-errors/conflict");
+        await factory.CreateClient().GetAsync("/api/test-errors/conflict");
 
-        var completed = await RequestLogAsync("/test-errors/conflict", before);
+        var completed = await RequestLogAsync("/api/test-errors/conflict", before);
         Assert.Equal("409", completed.Properties["StatusCode"].ToString());
         Assert.Equal(LogEventLevel.Information, completed.Level);
         Assert.Null(completed.Exception);
@@ -172,9 +172,9 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
         await other.DisposeAsync();
 
         var before = ApiHostFactory.Logs.Events.Count;
-        await factory.CreateClient().GetAsync("/test-errors/notfound");
+        await factory.CreateClient().GetAsync("/api/test-errors/notfound");
 
-        var completed = await RequestLogAsync("/test-errors/notfound", before);
+        var completed = await RequestLogAsync("/api/test-errors/notfound", before);
         Assert.Equal("404", completed.Properties["StatusCode"].ToString());
     }
 
@@ -185,7 +185,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
 
         foreach (var kind in Enum.GetValues<ErrorKind>())
         {
-            var response = await client.GetAsync($"/test-errors/kind/{(int)kind}");
+            var response = await client.GetAsync($"/api/test-errors/kind/{(int)kind}");
 
             Assert.True(response.StatusCode is >= HttpStatusCode.BadRequest and < HttpStatusCode.InternalServerError,
                 $"ErrorKind.{kind} answers {(int)response.StatusCode}: add its status to GlobalExceptionHandler.Describe");
@@ -195,7 +195,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task An_unmapped_error_kind_is_500_not_a_guessed_status()
     {
-        var response = await factory.CreateClient().GetAsync("/test-errors/kind/999");
+        var response = await factory.CreateClient().GetAsync("/api/test-errors/kind/999");
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
@@ -203,7 +203,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task A_concurrency_conflict_is_409_without_internal_details()
     {
-        var response = await factory.CreateClient().GetAsync("/test-errors/concurrency");
+        var response = await factory.CreateClient().GetAsync("/api/test-errors/concurrency");
         var text = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -238,7 +238,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task A_unique_index_violation_is_409_without_the_duplicate_value()
     {
-        var response = await factory.CreateClient().PostAsync("/test-errors/duplicate", null);
+        var response = await factory.CreateClient().PostAsync("/api/test-errors/duplicate", null);
         var text = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -249,7 +249,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task An_acceptance_criteria_message_reaches_the_client_unchanged()
     {
-        var body = await ReadAsync(await factory.CreateClient().GetAsync("/test-errors/business"));
+        var body = await ReadAsync(await factory.CreateClient().GetAsync("/api/test-errors/business"));
 
         Assert.Equal("Maximum renewals reached", body.GetProperty("detail").GetString());
     }
@@ -257,7 +257,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task An_unexpected_exception_is_500_without_internal_details()
     {
-        var response = await factory.CreateClient().GetAsync("/test-errors/boom");
+        var response = await factory.CreateClient().GetAsync("/api/test-errors/boom");
         var text = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -269,7 +269,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task Invalid_input_is_400_with_errors_per_field()
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/test-errors", new { name = "", quantity = 99 });
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/test-errors", new { name = "", quantity = 99 });
         var body = await ReadAsync(response);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -282,7 +282,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task Valid_input_reaches_the_action()
     {
-        var response = await factory.CreateClient().PostAsJsonAsync("/test-errors", new { name = "ok", quantity = 3 });
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/test-errors", new { name = "ok", quantity = 3 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -290,7 +290,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task Unreadable_input_has_the_same_shape_as_validation_errors()
     {
-        var response = await factory.CreateClient().PostAsync("/test-errors",
+        var response = await factory.CreateClient().PostAsync("/api/test-errors",
             new StringContent("{ not json", System.Text.Encoding.UTF8, "application/json"));
         var body = await ReadAsync(response);
 
@@ -301,7 +301,7 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     [Fact]
     public async Task An_unknown_route_is_a_ProblemDetails_404()
     {
-        var response = await factory.CreateClient().GetAsync("/no-such-endpoint");
+        var response = await factory.CreateClient().GetAsync("/api/no-such-endpoint");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -315,10 +315,10 @@ public class ErrorHandlingTests(ErrorHandlingFactory factory) : IClassFixture<Er
     /// With Accept: text/plain no ProblemDetails writer accepted them and the client got the text "Status Code: 404; Not Found".
     /// </summary>
     [Theory]
-    [InlineData("GET", "/no-such-endpoint", null, HttpStatusCode.NotFound, "not_found")]
-    [InlineData("GET", "/test-secured", null, HttpStatusCode.Unauthorized, "unauthorized")]
-    [InlineData("DELETE", "/test-errors", null, HttpStatusCode.MethodNotAllowed, "method_not_allowed")]
-    [InlineData("POST", "/test-errors", "text/plain", HttpStatusCode.UnsupportedMediaType, "unsupported_media_type")]
+    [InlineData("GET", "/api/no-such-endpoint", null, HttpStatusCode.NotFound, "not_found")]
+    [InlineData("GET", "/api/test-secured", null, HttpStatusCode.Unauthorized, "unauthorized")]
+    [InlineData("DELETE", "/api/test-errors", null, HttpStatusCode.MethodNotAllowed, "method_not_allowed")]
+    [InlineData("POST", "/api/test-errors", "text/plain", HttpStatusCode.UnsupportedMediaType, "unsupported_media_type")]
     public async Task An_empty_error_answer_is_ProblemDetails_whatever_the_client_accepts(
         string method, string path, string? contentType, HttpStatusCode status, string code)
     {

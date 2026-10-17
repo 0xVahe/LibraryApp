@@ -1,0 +1,6 @@
+@model AlertModel
+@* Green success, amber warning, red error; only an error interrupts a screen reader (role="alert"). *@
+<div class="@Model.CssClass" role="@(Model.Kind == AlertKind.Red ? "alert" : null)">
+    <strong>@Model.Title</strong>
+    @Model.Text
+</div>

@@ -134,6 +134,17 @@ The seed only fills an empty database; it never changes existing data. Before a 
 
 - with Docker: `docker compose down -v`, then `docker compose up --build`;
 - with the API run from the IDE: stop the API, run `dotnet ef database drop --force --project src/LibraryApp.Infrastructure` (the database of `LIBRARYAPP_DESIGNTIME_DB` in `.env`), then start the API: it applies the migrations and the seed.
+## Browser UI
+
+Razor Pages live in the API host (UI guide in the team docs): the shared shell in `src/LibraryApp.Api/Pages` and `Ui/`, each group's pages in `src/LibraryApp.Api/Areas/<Module>`.
+
+- **Two ways to sign in, chosen by path.** `/api/*` accepts only the JWT; every other path accepts only the UI cookie. The API never accepts the cookie (no cross-site requests), and pages never accept the JWT.
+- **Every page needs a signed-in user** unless its PageModel is `[AllowAnonymous]` (only sign-in, sign-out and the status pages). Library staff pages add `[Authorize(Policy = UiPolicies.LibraryStaff)]`.
+- **Errors.** `/api` answers ProblemDetails; pages show the Error, Not found and Forbidden pages. In a form, catch `DomainException` with `this.DomainError(ex)`; validators run before the handler and fill `ModelState`.
+- **Session.** The cookie ends with the access token (`Jwt:AccessTokenMinutes`) and is checked against the account's security stamp every `Ui:SecurityStampValidationInterval` (default 5 minutes): a password change or a deactivation ends it.
+- **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
+- **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
+- **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
 
 ## Test accounts
 

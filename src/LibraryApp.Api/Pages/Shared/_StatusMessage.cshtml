@@ -1,0 +1,16 @@
+@model StatusMessageModel
+@{
+    var home = User.Identity?.IsAuthenticated == true ? UiNavigation.StartPath(User) : UiPaths.Login;
+}
+<div class="card error-page">
+    <p class="error-code">@Model.Code</p>
+    <h1>@Model.Title</h1>
+    <p>@Model.Text</p>
+    @if (Model.TraceId is not null)
+    {
+        <p class="small muted">Reference for the library team: @Model.TraceId</p>
+    }
+    <div class="row">
+        <a class="btn btn-primary" href="@home">@(User.Identity?.IsAuthenticated == true ? "Go to the start page" : "Sign in")</a>
+    </div>
+</div>

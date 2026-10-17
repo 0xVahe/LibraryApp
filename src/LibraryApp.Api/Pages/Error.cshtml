@@ -1,0 +1,6 @@
+@page "/error"
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.Message.Title;
+}
+<partial name="_StatusMessage" model="Model.Message" />
