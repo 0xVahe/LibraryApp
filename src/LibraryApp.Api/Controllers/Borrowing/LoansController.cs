@@ -14,7 +14,8 @@ namespace LibraryApp.Api.Controllers.Borrowing;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
 public sealed class LoansController(
     ILoanService loans,
-    ILoanReturnService loanReturns) : ControllerBase{
+    ILoanReturnService loanReturns) : ControllerBase
+{
     private const string Librarians = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
 
     /// <summary>Issues a copy, found by its barcode, to a staff member (BOR-01, BOR-02).</summary>

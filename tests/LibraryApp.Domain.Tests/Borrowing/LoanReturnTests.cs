@@ -61,8 +61,9 @@ public sealed class LoanReturnTests
         Loan loan = CreateLoan();
         string note = new('a', Loan.ReturnNoteMaxLength + 1);
 
-        Assert.Throws<ArgumentException>(() =>
+        var ex = Assert.Throws<DomainException>(() =>
             loan.Return(IssuedAtUtc.AddDays(2), note));
+        Assert.Equal(BorrowingErrors.ReturnNoteTooLong, ex.Error);
 
         Assert.Equal(LoanStatus.Active, loan.Status);
         Assert.Null(loan.ReturnedAtUtc);

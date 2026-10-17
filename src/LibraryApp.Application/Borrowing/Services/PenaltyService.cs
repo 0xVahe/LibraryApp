@@ -126,12 +126,14 @@ public sealed class PenaltyService(
             return;
         }
 
-        PenaltyOptions settings = options.Value.Penalties;
+        // The thresholds live in PenaltyPolicy only (one policy for return, daily job, lost and waive).
+        StaffMemberStatus byPoints = policy.GetStatus(finalActivePoints);
 
-        // Start suspension only when this operation crosses the threshold.
+        // A suspension starts only when this operation crosses the threshold: after a suspension has ended the
+        // employee stays Restricted while the points stay high (BQ-BA-01), and is not suspended again without a crossing.
         bool startsSuspension =
-            previousActivePoints < settings.SuspendedFromPoints
-            && finalActivePoints >= settings.SuspendedFromPoints;
+            policy.GetStatus(previousActivePoints) != StaffMemberStatus.Suspended
+            && byPoints == StaffMemberStatus.Suspended;
 
         StaffMemberStatus nextStatus;
         DateTime? effectiveUntilUtc = null;
@@ -140,14 +142,13 @@ public sealed class PenaltyService(
         {
             nextStatus = StaffMemberStatus.Suspended;
             effectiveUntilUtc =
-                nowUtc.AddDays(settings.SuspensionDays);
+                nowUtc.AddDays(options.Value.Penalties.SuspensionDays);
         }
         else
         {
-            nextStatus =
-                finalActivePoints >= settings.RestrictedFromPoints
-                    ? StaffMemberStatus.Restricted
-                    : StaffMemberStatus.Active;
+            nextStatus = byPoints == StaffMemberStatus.Suspended
+                ? StaffMemberStatus.Restricted
+                : byPoints;
         }
 
         if (currentStatus == nextStatus)

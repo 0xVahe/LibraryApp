@@ -57,6 +57,10 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Penalties:LifetimeDays` | 90 | Calendar days a penalty record counts | BR-BOR-6 |
 | `Penalties:RestrictedFromPoints` | 5 | Active points from which the employee is Restricted | BR-BOR-6 |
 | `Penalties:SuspendedFromPoints` | 10 | Active points from which the employee is Suspended | BR-BOR-6 |
+| `Penalties:SuspensionDays` | 30 | Calendar days a suspension lasts once the points cross the Suspended threshold | BR-BOR-6, BQ-BA-01 |
+| `Penalties:LateAndDamaged` | Sum | Late and damaged on one return: `Sum` — two records, points add up; `Highest` — one record with the higher points | BQ-BA-02 |
+| `Penalties:RecordZeroPointLateReturn` | true | A late return with 0 overdue working days (for example due Friday, returned Saturday) still gets a 0-point record, without a notification | BQ-BA-03 |
+| `Loans:OverdueFrom` | NextLocalDay | When a loan counts as late: `NextLocalDay` — from the day after the local due date; `DueTime` — from the exact due time | BOR-05, BQ-BA-05 |
 | `Reservations:MaxActive` | 3 | Active reservations per employee | BR-BOR-2 |
 | `Reservations:PickupWorkingDays` | 3 | Working days a copy is held for the first person in the queue | BOR-07 |
 | `Reservations:PickupCountsReleaseDay` | false | The day the copy is held counts as the first pickup day | BOR-07 |

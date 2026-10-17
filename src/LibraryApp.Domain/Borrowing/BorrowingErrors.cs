@@ -74,6 +74,10 @@ public static class BorrowingErrors
     public static readonly Error LoanClosingBeforeIssue = Error.Validation(
         "borrowing.loan_closing_before_issue",
         "A loan cannot be closed before it was issued.");
+
+    public static readonly Error ReturnNoteTooLong = Error.Validation(
+        "borrowing.return_note_too_long",
+        "The return note may have at most 500 characters.");
     
     
     // Reservation errors

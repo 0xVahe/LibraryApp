@@ -214,12 +214,10 @@ public sealed class Loan : Entity
         string? normalizedNote =
             string.IsNullOrWhiteSpace(note) ? null : note.Trim();
 
-        // Defensive check for callers that bypass request validation.
+        // Also checked by the request validator; repeated here for callers without it (pages, jobs).
         if (normalizedNote is { Length: > ReturnNoteMaxLength })
         {
-            throw new ArgumentException(
-                $"The return note may have at most {ReturnNoteMaxLength} characters.",
-                nameof(note));
+            throw new DomainException(BorrowingErrors.ReturnNoteTooLong);
         }
 
         // Change state only after every check succeeds.

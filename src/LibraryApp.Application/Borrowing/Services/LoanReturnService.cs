@@ -77,7 +77,7 @@ public sealed class LoanReturnService(
                         nowUtc,
                         request.Damaged);
 
-                loan.Return(nowUtc, request.Note);;
+                loan.Return(nowUtc, request.Note);
 
                 if (request.Damaged)
                 {

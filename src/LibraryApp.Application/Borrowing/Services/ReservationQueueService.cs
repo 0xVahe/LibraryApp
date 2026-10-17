@@ -59,6 +59,7 @@ public sealed class ReservationQueueService(
         Guid bookId,
         CancellationToken ct = default)
     {
+        // The queue of the book changes one request at a time: the same lock as creating a reservation.
         await applicationLock.AcquireAsync(
             BorrowingLocks.Book(bookId), ct);
 
@@ -78,7 +79,10 @@ public sealed class ReservationQueueService(
         for (int index = 1; index < waiting.Count; index++)
             waiting[index].SetQueuePosition(index);
 
-        // Supports both newly available copies and returned OnLoan copies.
+        // Supports both newly available copies and returned OnLoan copies. The copy is not read back here: a new copy
+        // is not saved yet when Catalog calls (the caller's unit of work saves it together with this change), and
+        // SetCopyStatusAsync finds it in the same DbContext. Catalog's transition rules apply; only Borrowing sets
+        // Reserved (BR-CAT-4).
         await catalog.SetCopyStatusAsync(
             copyId, BookCopyStatus.Reserved, ct);
 

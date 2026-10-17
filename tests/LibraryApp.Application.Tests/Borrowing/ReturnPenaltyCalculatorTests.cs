@@ -1,10 +1,11 @@
+using LibraryApp.Application.Tests.Borrowing.Fakes;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
 using Xunit;
 
-namespace LibraryApp.Application.Tests.Borrowing.Fakes;
+namespace LibraryApp.Application.Tests.Borrowing;
 
 public sealed class ReturnPenaltyCalculatorTests
 {
