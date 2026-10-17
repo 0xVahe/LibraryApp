@@ -7,6 +7,26 @@ namespace LibraryApp.Domain.Catalog;
 /// </summary>
 public static class CatalogErrors
 {
+    // ---------- BookSuggestion (CAT-10) ----------
+
+    public static readonly Error SuggestionNotFound =
+        Error.NotFound("catalog.suggestion_not_found", "The book suggestion does not exist.");
+
+    public static readonly Error SuggestionAlreadyReviewed =
+        Error.Conflict("catalog.suggestion_already_reviewed", "The book suggestion has already been reviewed.");
+
+    public static readonly Error SuggestionStaffIdentityRequired =
+        Error.Forbidden("catalog.suggestion_staff_identity_required", "A staff member identity is required.");
+
+    public static readonly Error SuggestionReviewerRequired =
+        Error.Forbidden("catalog.suggestion_reviewer_required", "A reviewer user identity is required.");
+
+    public static readonly Error SuggestionReasonRequired =
+        Error.Validation("catalog.suggestion_reason_required", "A reason for the book suggestion is required.");
+
+    public static readonly Error SuggestionRejectionCommentRequired =
+        Error.Validation("catalog.suggestion_rejection_comment_required", "A rejection comment is required.");
+
     // ---------- Book ----------
 
     public static readonly Error BookTitleRequired =

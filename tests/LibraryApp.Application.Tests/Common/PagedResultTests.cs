@@ -36,4 +36,15 @@ public class PagedResultTests
         Assert.Equal(40, request.Skip);
         Assert.Equal(3, result.TotalPages);
     }
+
+    [Theory]
+    [InlineData(int.MaxValue, 20)]
+    [InlineData(int.MaxValue, 100)]
+    [InlineData(107374184, 20)]   // the first page whose offset no longer fits in 32 bits
+    public void A_page_far_past_the_end_never_gives_a_negative_skip(int page, int size)
+    {
+        var request = new PageRequest(page, size);
+
+        Assert.Equal(int.MaxValue, request.Skip);
+    }
 }
