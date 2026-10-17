@@ -39,6 +39,10 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.Property<int>("RenewalCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("ReturnNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime?>("ReturnedAtUtc")
                         .HasColumnType("datetime2");
 
