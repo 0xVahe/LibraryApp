@@ -30,6 +30,10 @@ public static class NotificationErrors
     public static readonly Error OnlyInAppCanBeRead =
         Error.BusinessRule("notifications.only_in_app_can_be_read", "Only an in-app notification can be marked as read.");
 
+    /// <summary>No notification has this id, or it belongs to another staff member (NFR-03).</summary>
+    public static readonly Error NotificationNotFound =
+        Error.NotFound("notifications.notification_not_found", "The notification does not exist.");
+
     // Template
     public static readonly Error TemplateSubjectRequired =
         Error.Validation("notifications.template_subject_required", "A template subject is required.");
