@@ -1,0 +1,11 @@
+@model PagerModel
+@* Usage: <partial name="_Pager" model="PagerModel.From(Model.Result, Request)" /> — nothing is shown for one page. *@
+@if (Model.Links.Count > 0)
+{
+    <nav class="pager" aria-label="Pages">
+        @foreach (var link in Model.Links)
+        {
+            <a href="@link.Href" aria-current="@(link.Current ? "page" : null)">@link.Page</a>
+        }
+    </nav>
+}

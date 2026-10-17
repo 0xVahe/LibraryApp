@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LibraryApp.Api.Ui;
 using LibraryApp.Application.Common;
 using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Diagnostics;
@@ -29,6 +30,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken ct)
     {
+        // Pages are answered by the Error page (UseErrorAnswers re-runs the request there); the API gets ProblemDetails.
+        // The original path: the middleware has already set Request.Path to the Error page when handlers run.
+        var path = httpContext.Features.Get<IExceptionHandlerPathFeature>()?.Path ?? httpContext.Request.Path;
+        if (!UiPaths.IsApi(path))
+            return false;
+
         ProblemDetails body;
 
         switch (exception)

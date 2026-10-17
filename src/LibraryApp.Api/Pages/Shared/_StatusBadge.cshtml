@@ -1,0 +1,6 @@
+@model Enum
+@* Usage: <partial name="_StatusBadge" model="loan.Status" /> — staff, loan, copy and reservation statuses (design.md). *@
+@{
+    var badge = StatusBadge.For(Model);
+}
+<span class="@badge.CssClass">@badge.Text</span>

@@ -1,0 +1,31 @@
+@model PageHeadModel
+@* Usage: <partial name="_PageHead" model="@(new PageHeadModel("Staff members", "One sentence.", [new("Enrol", "/staff/new", Primary: true)]))" />
+   The page sets ViewData["Title"] itself (a partial cannot change the layout's title). *@
+@if (Model.Crumbs is { Count: > 0 } crumbs)
+{
+    <p class="crumbs">
+        @foreach (var crumb in crumbs)
+        {
+            <a href="@crumb.Href">@crumb.Text</a><text> / </text>
+        }
+        @Model.Title
+    </p>
+}
+<div class="page-head">
+    <div>
+        <h1>@Model.Title</h1>
+        @if (Model.Subtitle is not null)
+        {
+            <p>@Model.Subtitle</p>
+        }
+    </div>
+    @if (Model.Actions is { Count: > 0 } actions)
+    {
+        <div class="row">
+            @foreach (var action in actions)
+            {
+                <a class="btn @(action.Primary ? "btn-primary" : "btn-secondary")" href="@action.Href">@action.Text</a>
+            }
+        </div>
+    }
+</div>

@@ -1,0 +1,30 @@
+@* Sign-in and the first-login password change: brand panel on the left, the form (the page body) on the right. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@(ViewData["Title"] is string title ? $"{title} · Ameria Library" : "Ameria Library")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
+</head>
+<body>
+<div class="auth">
+    <section class="auth-brand">
+        <span class="logo"><span class="logo-mark" aria-hidden="true">A</span>AMERIA <span class="light">LIBRARY</span></span>
+        <div>
+            <h1>The bank’s library, one sign-in away</h1>
+            <p>Find a book, reserve it and pick it up at the library desk. We remind you before it is due.</p>
+        </div>
+        <ul class="auth-points hide-sm">
+            <li>Reservations with email alerts</li>
+            <li>Your loans and due dates in one place</li>
+        </ul>
+    </section>
+    <main class="auth-form" id="main">
+        <div class="box">
+            @RenderBody()
+        </div>
+    </main>
+</div>
+</body>
+</html>

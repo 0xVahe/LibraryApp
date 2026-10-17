@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,8 @@ public class EndpointSecurityTests(ApiHostFactory factory) : IClassFixture<ApiHo
         Assert.NotEmpty(endpoints);
         var anonymousRoutes = new List<string>();
 
-        foreach (var endpoint in endpoints)
+        // Pages sign in with the UI cookie and answer with a redirect, not 401: checked in Ui/UiShellTests.
+        foreach (var endpoint in endpoints.Where(e => e.Metadata.GetMetadata<PageActionDescriptor>() is null))
         {
             var path = RequestPath(endpoint);
             var methods = endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["GET"];

@@ -18,7 +18,7 @@ public sealed class AuthorizationFactory : ApiHostFactory
 }
 
 [ApiController]
-[Route("test-authorization")]
+[Route("api/test-authorization")]
 public sealed class TestAuthorizationController : ControllerBase
 {
     /// <summary>No attribute: protected by RequireAuthorization() on MapControllers (NFR-02).</summary>
@@ -47,7 +47,7 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
     [Fact]
     public async Task Endpoint_without_attributes_returns_401_without_a_token()
     {
-        Assert.Equal(HttpStatusCode.Unauthorized, (await Get("/test-authorization/default")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Get("/api/test-authorization/default")).StatusCode);
     }
 
     [Theory]
@@ -64,7 +64,7 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
         if (wrongRole)
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Token(StaffRoles.StaffMember));
 
-        var response = await client.GetAsync("/test-authorization/librarian");
+        var response = await client.GetAsync("/api/test-authorization/librarian");
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var status = wrongRole ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized;
         var code = wrongRole ? "forbidden" : "unauthorized";
@@ -82,14 +82,14 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
     [Fact]
     public async Task Endpoint_without_attributes_accepts_any_valid_token()
     {
-        Assert.Equal(HttpStatusCode.OK, (await Get("/test-authorization/default", Token(StaffRoles.StaffMember))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Get("/api/test-authorization/default", Token(StaffRoles.StaffMember))).StatusCode);
     }
 
     [Fact]
     public async Task Role_endpoint_returns_403_for_another_role_and_200_for_the_role()
     {
-        Assert.Equal(HttpStatusCode.Forbidden, (await Get("/test-authorization/librarian", Token(StaffRoles.StaffMember))).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await Get("/test-authorization/librarian", Token(StaffRoles.Librarian))).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Get("/api/test-authorization/librarian", Token(StaffRoles.StaffMember))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Get("/api/test-authorization/librarian", Token(StaffRoles.Librarian))).StatusCode);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<Au
         var parts = Token(StaffRoles.Librarian).Split('.');
         parts[2] = (parts[2][0] == 'A' ? 'B' : 'A') + parts[2][1..];
 
-        var response = await Get("/test-authorization/librarian", string.Join('.', parts));
+        var response = await Get("/api/test-authorization/librarian", string.Join('.', parts));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.DoesNotContain("error_description", response.Headers.WwwAuthenticate.ToString());
