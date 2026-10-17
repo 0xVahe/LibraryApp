@@ -13,7 +13,8 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int 
 
 /// <summary>
 /// Page number (from 1) and size (default 20, at most 100 — SD-14; CAT-05 asks for 20). Out-of-range values are
-/// corrected, not rejected, so a client can always ask for "page=1" without knowing the limits.
+/// corrected, not rejected, so a client can always ask for "page=1" without knowing the limits. A page far past the
+/// end is an empty page, never an error.
 /// </summary>
 public sealed record PageRequest
 {
@@ -30,6 +31,9 @@ public sealed record PageRequest
 
     public int PageSize { get; }
 
-    /// <summary>Rows to skip for this page.</summary>
-    public int Skip => (Page - 1) * PageSize;
+    /// <summary>
+    /// Rows to skip for this page. Computed in 64 bits and capped at <see cref="int.MaxValue"/>: page 2147483647 would
+    /// otherwise overflow to a negative OFFSET, which SQL Server rejects (500 instead of an empty page).
+    /// </summary>
+    public int Skip => (int)Math.Min((long)(Page - 1) * PageSize, int.MaxValue);
 }
