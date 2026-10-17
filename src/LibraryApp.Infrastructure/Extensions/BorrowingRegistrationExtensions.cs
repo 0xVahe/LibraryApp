@@ -33,13 +33,22 @@ public static class BorrowingRegistrationExtensions
 
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
+        services.AddScoped<IPenaltyRepository, PenaltyRepository>();
+        services.AddScoped<OverdueRule>();
+        services.AddScoped<ReturnPenaltyCalculator>();
+        services.AddScoped<IPenaltyService, PenaltyService>();
         services.AddScoped<ILoanService, LoanService>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();
 
         // Contract for Catalog: a new or repaired copy goes to the reservation queue (BOR-07, BQ-G1-10)
-        services.AddScoped<IReservationQueueService, ReservationQueueService>();
+        services.AddScoped<ReservationQueueService>();
 
+        services.AddScoped<IReservationQueueService>(provider =>
+            provider.GetRequiredService<ReservationQueueService>());//new
+        
+        services.AddScoped<ILoanReturnService, LoanReturnService>();//new
+        
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
 

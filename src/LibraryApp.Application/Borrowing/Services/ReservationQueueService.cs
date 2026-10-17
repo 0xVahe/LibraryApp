@@ -41,34 +41,61 @@ public sealed class ReservationQueueService(
         return clock.EndOfLocalDayUtc(calendar.AddWorkingDays(today, daysToAdd));
     }
 
-    public async Task OfferCopyAsync(Guid copyId, Guid bookId, CancellationToken ct = default)
+    public async Task OfferCopyAsync(
+        Guid copyId,
+        Guid bookId,
+        CancellationToken ct = default)
+    {
+        await TryOfferCopyAsync(copyId, bookId, ct);
+    }
+
+    /// <summary>
+    /// Offers the copy to the first waiting reservation.
+    /// Returns false when nobody is waiting, leaving the copy unchanged.
+    /// Runs inside the caller's transaction.
+    /// </summary>
+    internal async Task<bool> TryOfferCopyAsync(
+        Guid copyId,
+        Guid bookId,
+        CancellationToken ct = default)
     {
         // The queue of the book changes one request at a time: the same lock as creating a reservation.
-        await applicationLock.AcquireAsync(BorrowingLocks.Book(bookId), ct);
+        await applicationLock.AcquireAsync(
+            BorrowingLocks.Book(bookId), ct);
 
-        IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(bookId, ct);
+        IReadOnlyList<Reservation> waiting =
+            await reservations.GetWaitingForBookAsync(bookId, ct);
+
         if (waiting.Count == 0)
-            return;   // nobody waits: the copy stays as the caller left it
+            return false;
 
-        // The copy is not read back here: a new copy is not saved yet when Catalog calls (the caller's unit of work saves
-        // it together with this change), and SetCopyStatusAsync finds it in the same DbContext.
-        DateTime readyUntilUtc = ReadyUntilUtc(options.Value.Reservations, calendar, clock);
+        DateTime readyUntilUtc =
+            ReadyUntilUtc(options.Value.Reservations, calendar, clock);
+
         Reservation first = waiting[0];
         first.MarkReady(copyId, readyUntilUtc);
 
-        // The others move up one place: positions stay 1..n without gaps (G3-03).
+        // Remaining positions become 1, 2, 3, ...
         for (int index = 1; index < waiting.Count; index++)
             waiting[index].SetQueuePosition(index);
 
-        // Catalog's transition rules apply (Available → Reserved); only Borrowing sets Reserved (BR-CAT-4).
-        await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Reserved, ct);
+        // Supports both newly available copies and returned OnLoan copies. The copy is not read back here: a new copy
+        // is not saved yet when Catalog calls (the caller's unit of work saves it together with this change), and
+        // SetCopyStatusAsync finds it in the same DbContext. Catalog's transition rules apply; only Borrowing sets
+        // Reserved (BR-CAT-4).
+        await catalog.SetCopyStatusAsync(
+            copyId, BookCopyStatus.Reserved, ct);
 
-        await events.PublishAsync(new ReservationReady(
-            idGenerator.NewId(),
-            clock.UtcNow,
-            first.Id,
-            bookId,
-            first.StaffMemberId,
-            readyUntilUtc), ct);
+        await events.PublishAsync(
+            new ReservationReady(
+                idGenerator.NewId(),
+                clock.UtcNow,
+                first.Id,
+                bookId,
+                first.StaffMemberId,
+                readyUntilUtc),
+            ct);
+
+        return true;
     }
 }

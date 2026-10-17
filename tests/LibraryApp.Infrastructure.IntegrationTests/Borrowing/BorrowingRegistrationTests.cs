@@ -20,6 +20,9 @@ public class BorrowingRegistrationTests
         ["Borrowing:Penalties:LifetimeDays"] = "60",
         ["Borrowing:Penalties:RestrictedFromPoints"] = "4",
         ["Borrowing:Penalties:SuspendedFromPoints"] = "8",
+        ["Borrowing:Penalties:SuspensionDays"] = "21",
+        ["Borrowing:Penalties:LateAndDamaged"] = "Highest",
+        ["Borrowing:Loans:OverdueFrom"] = "DueTime",
         ["Borrowing:Reservations:MaxActive"] = "2",
         ["Borrowing:Reservations:PickupWorkingDays"] = "5",
         ["Borrowing:Reservations:PickupCountsReleaseDay"] = "true",
@@ -45,6 +48,9 @@ public class BorrowingRegistrationTests
         Assert.Equal(5, options.Reservations.PickupWorkingDays);
         Assert.True(options.Reservations.PickupCountsReleaseDay);
         Assert.False(options.Reservations.RestrictedMayReserve);
+        Assert.Equal(21, options.Penalties.SuspensionDays);
+        Assert.Equal(LateAndDamagedMode.Highest, options.Penalties.LateAndDamaged);
+        Assert.Equal(OverdueFromMode.DueTime, options.Loans.OverdueFrom);
     }
 
     [Fact]

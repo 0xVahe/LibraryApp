@@ -25,6 +25,8 @@ public sealed class BorrowingOptionsValidatorTests
                      "Borrowing:Penalties:PointsPerLateWorkingDay", "Borrowing:Penalties:MaxLatePoints",
                      "Borrowing:Penalties:DamagedPoints", "Borrowing:Penalties:LostPoints", "Borrowing:Penalties:LifetimeDays",
                      "Borrowing:Penalties:RestrictedFromPoints", "Borrowing:Penalties:SuspendedFromPoints",
+                     "Borrowing:Penalties:SuspensionDays", "Borrowing:Penalties:LateAndDamaged",
+                     "Borrowing:Loans:OverdueFrom",
                      "Borrowing:Reservations:MaxActive", "Borrowing:Reservations:PickupWorkingDays",
                  })
             Assert.Contains(key, result.FailureMessage);
@@ -80,7 +82,30 @@ public sealed class BorrowingOptionsValidatorTests
         options.Penalties.SuspendedFromPoints = 12;
         options.Reservations.MaxActive = 5;
         options.Reservations.PickupWorkingDays = 1;
+        options.Penalties.SuspensionDays = 14;
+        options.Penalties.LateAndDamaged = LateAndDamagedMode.Highest;
+        options.Loans.OverdueFrom = OverdueFromMode.DueTime;
 
         Assert.True(Validator.Validate(null, options).Succeeded);
+    }
+
+    public static TheoryData<string, Action<BorrowingOptions>> InvalidVariants() => new()
+    {
+        { "Borrowing:Penalties:SuspensionDays", o => o.Penalties.SuspensionDays = 0 },
+        { "Borrowing:Penalties:LateAndDamaged", o => o.Penalties.LateAndDamaged = (LateAndDamagedMode)99 },
+        { "Borrowing:Loans:OverdueFrom", o => o.Loans.OverdueFrom = (OverdueFromMode)99 },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidVariants))]
+    public void A_missing_or_unknown_return_setting_fails_and_names_the_key(string key, Action<BorrowingOptions> change)
+    {
+        var options = BorrowingTestSettings.Defaults();
+        change(options);
+
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(key, result.FailureMessage);
     }
 }
