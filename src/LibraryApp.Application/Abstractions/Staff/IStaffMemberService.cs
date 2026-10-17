@@ -3,7 +3,7 @@ using LibraryApp.Domain.Staff;
 namespace LibraryApp.Application.Abstractions.Staff;
 
 /// <summary>
-/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3).
+/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1).
 /// <para>
 /// The loan limit is checked by Borrowing, which owns the loans: it compares its active loan count with
 /// <see cref="LendingRules.MaxLoans"/> and reports <see cref="StaffErrors.LoanLimitReached"/>.
