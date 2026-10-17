@@ -90,7 +90,7 @@ public class StaffDeactivationServiceTests
 
     private sealed class CatalogFake : ICatalogService
     {
-        public BookDto Book { get; } = new(Guid.NewGuid(), "Staff Test Book", "9780134685991", 2020, "English",
+        public BookDto Book { get; } = new(Guid.NewGuid(), "Staff Test Book", "9780000000002", 2020, "en",
             null, Guid.NewGuid(), "Test Category", null, null, ["Test Author"], 1, 0, false);
         public BookCopyDto Copy { get; }
 
