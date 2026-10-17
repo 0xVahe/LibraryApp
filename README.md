@@ -68,6 +68,36 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 
+## Daily jobs
+
+A module job that must run once per local (Asia/Yerevan) day — for example the Borrowing daily job (BOR-06) or the 09:00 reminders (NOT-05) — implements `IDailyJob` (`Application/Abstractions/Common`) and is registered in the module's `Add<Module>Module`:
+
+```csharp
+services.AddDailyJob<BorrowingDailyJob>(BorrowingDailyJob.Name);   // the name is stored with every run: never rename it
+```
+
+and gets a schedule in `appsettings.json` (a registered job without one stops the API at start):
+
+```json
+"Jobs": {
+  "Schedules": {
+    "borrowing-daily": { "Enabled": true, "RunAt": "00:30", "WorkingDaysOnly": false }
+  }
+}
+```
+
+The platform runs it at `RunAt`, once per day across all API instances (table `JobRuns`, one row per job and local date), catches up when an instance was down at that time, and retries a failed run after `Jobs:RetryDelay` up to `Jobs:MaxAttemptsPerDay` attempts; a failure on the last attempt is logged as Critical. `DailyJobRun.LastSuccessfulStartUtc` tells the job since when it has work to do after downtime. The job decides its own transactions (`IUnitOfWork`). `Jobs:Enabled=false` stops every job of an instance; the API test host sets it.
+
+While the job works, its instance extends the lease of the run every third of `Jobs:Lease`, so a long run is never started a second time by another instance. Only an instance that stops in the middle of a run (or loses the database for longer than the lease) gives the run to another instance, which then does it again: write the job so that a second run of the same day changes nothing and sends nothing twice (NOT-06). A finished run whose result cannot be saved at that moment is not run again; the result is saved at the next check.
+
+| Key | Value | Meaning |
+|---|---|---|
+| `Jobs:Enabled` | true | Master switch of the instance |
+| `Jobs:PollInterval` | 00:01:00 | How often an instance checks whether a run is due |
+| `Jobs:Lease` | 01:00:00 | Extended while the job works; when it runs out (the instance stopped), another instance takes the run over |
+| `Jobs:RetryDelay` | 00:15:00 | Wait after a failed run |
+| `Jobs:MaxAttemptsPerDay` | 5 | Attempts per job and day |
+
 ## Tests
 
 ```bash
@@ -96,6 +126,14 @@ Databases left by an interrupted run (for example after stopping the test proces
 
 Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
 
+## Demo data
+
+In Development the API seeds synthetic data (C-2) at start: 57 books with 115 copies, 30 staff members in 6 departments, and 40 loans of which 6 are overdue (the dashboard shows an overdue rate of 15.0 %), with a reservation queue, a copy held for pickup and penalty records in every status. Loan dates are counted from the moment of seeding: the figures stay exact for 12 days, after which more loans become overdue.
+
+The seed only fills an empty database; it never changes existing data. Before a demo, or after a change of the seed, recreate the Development database:
+
+- with Docker: `docker compose down -v`, then `docker compose up --build`;
+- with the API run from the IDE: stop the API, run `dotnet ef database drop --force --project src/LibraryApp.Infrastructure` (the database of `LIBRARYAPP_DESIGNTIME_DB` in `.env`), then start the API: it applies the migrations and the seed.
 ## Browser UI
 
 Razor Pages live in the API host (UI guide in the team docs): the shared shell in `src/LibraryApp.Api/Pages` and `Ui/`, each group's pages in `src/LibraryApp.Api/Areas/<Module>`.

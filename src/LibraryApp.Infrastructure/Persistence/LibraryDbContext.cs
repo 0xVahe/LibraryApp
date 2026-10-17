@@ -1,4 +1,5 @@
 using LibraryApp.Infrastructure.Identity;
+using LibraryApp.Infrastructure.Jobs;
 using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.Identity;
@@ -61,6 +62,7 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
+    public DbSet<JobRun> JobRuns => Set<JobRun>();   // daily job runs (SD-10)
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
         LibraryModelConventions.Configure(configurationBuilder);

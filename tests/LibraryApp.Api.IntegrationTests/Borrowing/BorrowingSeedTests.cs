@@ -1,7 +1,11 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
@@ -24,7 +28,7 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
 
     private static LibraryDbContext Db(IServiceProvider services) => services.GetRequiredService<LibraryDbContext>();
 
-    private static readonly Guid[] LoanIds = Enumerable.Range(1, 11).Select(Ids.Loan).ToArray();
+    private static readonly Guid[] LoanIds = Enumerable.Range(1, 40).Select(Ids.Loan).ToArray();
     private static readonly Guid[] ReservationIds = Enumerable.Range(1, 3).Select(Ids.Reservation).ToArray();
     private static readonly Guid[] PenaltyIds = Enumerable.Range(1, 5).Select(Ids.Penalty).ToArray();
 
@@ -41,11 +45,11 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         var reservations = await Read(s => Db(s).Reservations.CountAsync(r => ReservationIds.Contains(r.Id)));
         var penalties = await Read(s => Db(s).PenaltyRecords.AsNoTracking().Where(p => PenaltyIds.Contains(p.Id)).ToListAsync());
 
-        Assert.Equal(LoanIds.Length, loans.Count);
-        Assert.Equal(4, loans.Count(l => l.Status == LoanStatus.Active));
-        Assert.Single(loans, l => l.Status == LoanStatus.Overdue);
+        Assert.Equal(40, loans.Count);
+        Assert.Equal(13, loans.Count(l => l.Status == LoanStatus.Active));
+        Assert.Equal(6, loans.Count(l => l.Status == LoanStatus.Overdue));
         Assert.Single(loans, l => l.Status == LoanStatus.Lost);
-        Assert.Equal(5, loans.Count(l => l.Status == LoanStatus.Returned));
+        Assert.Equal(20, loans.Count(l => l.Status == LoanStatus.Returned));
         Assert.Equal(ReservationIds.Length, reservations);
         Assert.Equal(3, penalties.Count(p => p.Status == PenaltyRecordStatus.Active));
         Assert.Single(penalties, p => p.Status == PenaltyRecordStatus.Waived);
@@ -63,6 +67,10 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
     [InlineData(16, 1, BookCopyStatus.Available)]
     [InlineData(16, 2, BookCopyStatus.Available)]
     [InlineData(16, 3, BookCopyStatus.Available)]
+    [InlineData(9, 1, BookCopyStatus.OnLoan)]       // overdue loan of another staff member
+    [InlineData(52, 1, BookCopyStatus.OnLoan)]      // recent loan
+    [InlineData(52, 2, BookCopyStatus.Available)]   // only one copy of a book is lent
+    [InlineData(33, 1, BookCopyStatus.Available)]   // returned on time
     public async Task Copy_statuses_match_the_loans_and_the_held_copy(int book, int copy, BookCopyStatus expected)
     {
         Assert.Equal(expected, await CopyStatus(book, copy));
@@ -89,6 +97,50 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         Assert.Single(await OpenLoans(Members.GorMkrtchyan));              // Restricted: 1 (BR-MEM-3)
         Assert.Empty(await OpenLoans(Members.HaykManukyan));               // Deactivated: none (BR-MEM-4)
         Assert.Empty(await OpenLoans(Members.SonaVardanyan));              // the lost loan is closed
+    }
+
+    [Fact]
+    public async Task The_dashboard_shows_6_overdue_of_40_loans_as_15_percent()
+    {
+        // REP-02 acceptance: "Given 40 seeded loans of which 6 are overdue … overdue count is 6 and overdue rate is 15.0%".
+        using var client = factory.CreateClient();
+        string token = factory.Services.GetRequiredService<IAccessTokenIssuer>()
+            .Issue(new LoginAccount(Guid.NewGuid(), "seed-tests@example.com", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian]))
+            .Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var dashboard = await client.GetFromJsonAsync<DashboardReportDto>("/api/reports/dashboard");
+
+        Assert.NotNull(dashboard);
+        Assert.Equal(6, dashboard.OverdueLoans);
+        Assert.Equal(15.0m, dashboard.OverduePercentage);
+        Assert.Equal(19, dashboard.ActiveLoans);   // 13 Active + 6 Overdue
+    }
+
+    [Fact]
+    public async Task Every_late_return_has_a_penalty_record_and_on_time_returns_have_none()
+    {
+        // "A return from Overdue always creates a PenaltyRecord" (Loan lifecycle).
+        var clock = factory.Services.GetRequiredService<IClock>();
+        var returned = await Read(s => Db(s).Loans.AsNoTracking()
+            .Where(l => LoanIds.Contains(l.Id) && l.Status == LoanStatus.Returned).ToListAsync());
+        var penaltyLoans = await Read(s => Db(s).PenaltyRecords.AsNoTracking().Select(p => p.LoanId).ToListAsync());
+
+        Assert.All(returned, loan =>
+            Assert.Equal(clock.ToLocalDate(loan.ReturnedAtUtc!.Value) > clock.ToLocalDate(loan.DueAtUtc), penaltyLoans.Contains(loan.Id)));
+        Assert.Equal(4, returned.Count(loan => penaltyLoans.Contains(loan.Id)));
+    }
+
+    [Fact]
+    public async Task Loans_are_spread_over_all_six_departments()
+    {
+        var departments = await Read(s => (
+            from loan in Db(s).Loans.AsNoTracking()
+            join member in Db(s).StaffMembers.AsNoTracking() on loan.StaffMemberId equals member.Id
+            where LoanIds.Contains(loan.Id)
+            select member.DepartmentId).Distinct().CountAsync());
+
+        Assert.Equal(6, departments);
     }
 
     [Fact]
