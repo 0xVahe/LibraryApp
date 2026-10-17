@@ -1,3 +1,4 @@
+using System.Data;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
@@ -9,6 +10,7 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.IntegrationTests.Identity;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Catalog;
@@ -180,6 +182,55 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         Task<BookSuggestionDto> Review(BookSuggestionService service, bool reject, string comment) => reject
             ? service.RejectAsync(created.Id, new(comment), timeout.Token)
             : service.ApproveAsync(created.Id, timeout.Token);
+    }
+
+    [Fact]
+    public async Task SQL_check_refuses_an_approved_suggestion_without_a_reviewer()
+    {
+        await using var db = database.NewContext();
+
+        var error = await Assert.ThrowsAsync<SqlException>(() =>
+            InsertThroughSqlAsync(db, BookSuggestionStatus.Approved, reviewedByUserId: null, reviewComment: null));
+
+        // 547 is also the number of a foreign key error: the constraint name proves it is the CHECK.
+        Assert.Equal(547, error.Number);
+        Assert.Contains("CK_BookSuggestions_Review", error.Message);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    public async Task SQL_check_refuses_a_rejected_suggestion_without_a_comment(string? reviewComment)
+    {
+        await using var db = database.NewContext();
+
+        // A real reviewer: the row breaks only the comment rule, not CK_BookSuggestions_Review or a foreign key.
+        var error = await Assert.ThrowsAsync<SqlException>(() =>
+            InsertThroughSqlAsync(db, BookSuggestionStatus.Rejected, database.FirstReviewerId, reviewComment));
+
+        Assert.Equal(547, error.Number);
+        Assert.Contains("CK_BookSuggestions_RejectComment", error.Message);
+    }
+
+    /// <summary>
+    /// Inserts a reviewed suggestion with plain SQL, past the entity's own checks. The staff member is a real one, so
+    /// the foreign key on StaffMemberId never fails.
+    /// </summary>
+    private Task<int> InsertThroughSqlAsync(
+        LibraryDbContext db, BookSuggestionStatus status, Guid? reviewedByUserId, string? reviewComment)
+    {
+        const string sql =
+            "INSERT INTO [BookSuggestions] ([Id], [StaffMemberId], [Title], [AuthorName], [Reason], [Status], [CreatedAtUtc], [ReviewedAtUtc], [ReviewedByUserId], [ReviewComment]) " +
+            "VALUES (@id, @staffMemberId, N'SQL title', N'SQL author', N'SQL reason', @status, @createdAtUtc, @reviewedAtUtc, @reviewedByUserId, @reviewComment)";
+
+        return db.Database.ExecuteSqlRawAsync(sql,
+            new SqlParameter("@id", SqlDbType.UniqueIdentifier) { Value = Guid.NewGuid() },
+            new SqlParameter("@staffMemberId", SqlDbType.UniqueIdentifier) { Value = database.FirstStaffId },
+            new SqlParameter("@status", SqlDbType.Int) { Value = (int)status },
+            new SqlParameter("@createdAtUtc", SqlDbType.DateTime2) { Value = BookSuggestionDatabase.Now },
+            new SqlParameter("@reviewedAtUtc", SqlDbType.DateTime2) { Value = BookSuggestionDatabase.Now.AddHours(1) },
+            new SqlParameter("@reviewedByUserId", SqlDbType.UniqueIdentifier) { Value = (object?)reviewedByUserId ?? DBNull.Value },
+            new SqlParameter("@reviewComment", SqlDbType.NVarChar, BookSuggestion.ReviewCommentMaxLength) { Value = (object?)reviewComment ?? DBNull.Value });
     }
 
     private sealed class ObservedLock(IApplicationLock inner, bool hold) : IApplicationLock

@@ -4,12 +4,31 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Converters;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Catalog;
 
 public class BookSuggestionModelTests
 {
+    [Fact]
+    public void Review_rules_are_check_constraints_with_one_line_SQL()
+    {
+        using var db = new LibraryDbContext(new DbContextOptionsBuilder<LibraryDbContext>()
+            .UseSqlServer("Server=unused;Database=unused;Integrated Security=true;TrustServerCertificate=true").Options);
+
+        // Check constraints are kept only in the design-time model; db.Model (the runtime model) throws for them.
+        var entity = db.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(BookSuggestion))!;
+        var constraints = entity.GetCheckConstraints().ToDictionary(x => x.Name!, x => x.Sql);
+
+        Assert.Equal(
+            new[] { "CK_BookSuggestions_RejectComment", "CK_BookSuggestions_Review" },
+            constraints.Keys.Order());
+
+        // A line break in the SQL would differ between Windows and Linux checkouts and break the model check in CI.
+        Assert.All(constraints.Values, sql => Assert.DoesNotContain("\n", sql));
+    }
+
     [Fact]
     public void Discovered_configuration_preserves_catalog_and_platform_conventions()
     {
