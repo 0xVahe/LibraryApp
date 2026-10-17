@@ -14,10 +14,17 @@ public sealed class ReturnPenaltyCalculator(
     IClock clock,
     IOptions<BorrowingOptions> options)
 {
+    private readonly OverdueRule _overdue = new(clock, options);
+
+    /// <param name="alreadyOverdue">
+    /// The loan was already marked Overdue (by the daily job). Such a return is always late (BQ-BA-03): with 0 overdue
+    /// working days it still gets a 0-point record when <c>RecordZeroPointLateReturn</c> is set.
+    /// </param>
     public ReturnPenaltyCalculation Calculate(
         DateTime dueAtUtc,
         DateTime returnedAtUtc,
-        bool damaged)
+        bool damaged,
+        bool alreadyOverdue = false)
     {
         if (dueAtUtc.Kind != DateTimeKind.Utc)
             throw new ArgumentException(
@@ -32,16 +39,8 @@ public sealed class ReturnPenaltyCalculator(
         DateOnly dueDate = clock.ToLocalDate(dueAtUtc);
         DateOnly returnDate = clock.ToLocalDate(returnedAtUtc);
 
-        // Use the actual dates, even if the daily job has not yet
-        // changed the loan's stored status to Overdue.
-        bool isLate = settings.Loans.OverdueFrom switch
-        {
-            OverdueFromMode.NextLocalDay => returnDate > dueDate,
-            OverdueFromMode.DueTime => returnedAtUtc > dueAtUtc,
-
-            _ => throw new InvalidOperationException(
-                "Unknown overdue calculation mode.")
-        };
+        // Late by the dates (even if the daily job has not marked the loan yet), or already marked Overdue.
+        bool isLate = alreadyOverdue || _overdue.IsOverdue(dueAtUtc, returnedAtUtc);
 
         int lateWorkingDays = isLate
             ? calendar.CountWorkingDays(dueDate, returnDate)

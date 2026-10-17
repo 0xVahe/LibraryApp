@@ -33,9 +33,10 @@ public static class BorrowingRegistrationExtensions
 
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
-        services.AddScoped<IPenaltyRepository, PenaltyRepository>();//new
-        services.AddScoped<ReturnPenaltyCalculator>();//new
-        services.AddScoped<IPenaltyService, PenaltyService>();//new
+        services.AddScoped<IPenaltyRepository, PenaltyRepository>();
+        services.AddScoped<OverdueRule>();
+        services.AddScoped<ReturnPenaltyCalculator>();
+        services.AddScoped<IPenaltyService, PenaltyService>();
         services.AddScoped<ILoanService, LoanService>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();

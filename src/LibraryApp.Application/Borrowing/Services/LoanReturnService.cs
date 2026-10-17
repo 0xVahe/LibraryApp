@@ -75,7 +75,8 @@ public sealed class LoanReturnService(
                     calculator.Calculate(
                         loan.DueAtUtc,
                         nowUtc,
-                        request.Damaged);
+                        request.Damaged,
+                        alreadyOverdue: loan.Status == LoanStatus.Overdue);
 
                 loan.Return(nowUtc, request.Note);
 

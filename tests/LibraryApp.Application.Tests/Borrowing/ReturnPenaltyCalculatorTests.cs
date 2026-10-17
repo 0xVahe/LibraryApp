@@ -26,6 +26,53 @@ public sealed class ReturnPenaltyCalculatorTests
         Assert.Equal(0, result.TotalPoints);
     }
 
+    /// <summary>
+    /// The daily job may mark a loan Overdue on its due date (a due time just after midnight, a catch-up run). With
+    /// NextLocalDay the dates alone say "not late"; the stored Overdue status still makes the return late (BQ-BA-03).
+    /// </summary>
+    [Fact]
+    public void A_loan_already_marked_overdue_returned_on_its_due_date_gets_a_zero_point_record()
+    {
+        ReturnPenaltyCalculator calculator = CreateCalculator();
+
+        ReturnPenaltyCalculation result = calculator.Calculate(
+            Utc(16, 8),
+            Utc(16, 12),
+            damaged: false,
+            alreadyOverdue: true);
+
+        Assert.Equal(0, result.OverdueWorkingDays);
+        Assert.Equal(0, Assert.Single(result.Penalties).Points);
+    }
+
+    [Fact]
+    public void Without_zero_point_records_an_overdue_loan_returned_on_its_due_date_has_no_record()
+    {
+        ReturnPenaltyCalculator calculator = CreateCalculator(
+            o => o.Penalties.RecordZeroPointLateReturn = false);
+
+        ReturnPenaltyCalculation result = calculator.Calculate(
+            Utc(16, 8),
+            Utc(16, 12),
+            damaged: false,
+            alreadyOverdue: true);
+
+        Assert.Empty(result.Penalties);
+    }
+
+    [Theory]
+    [InlineData(OverdueFromMode.NextLocalDay, 16, 19, 59, false)]   // 23:59 local on the due date
+    [InlineData(OverdueFromMode.NextLocalDay, 16, 20, 1, true)]     // 00:01 local on the next day
+    [InlineData(OverdueFromMode.DueTime, 16, 8, 0, false)]          // exactly the due time
+    [InlineData(OverdueFromMode.DueTime, 16, 8, 1, true)]           // one minute after
+    public void The_overdue_rule_follows_the_setting(OverdueFromMode mode, int day, int hour, int minute, bool expected)
+    {
+        var settings = new BorrowingOptions { Loans = new LoanOptions { OverdueFrom = mode } };
+        var rule = new OverdueRule(new TestClock(), Microsoft.Extensions.Options.Options.Create(settings));
+
+        Assert.Equal(expected, rule.IsOverdue(Utc(16, 8), Utc(day, hour, minute)));
+    }
+
     [Fact]
     public void Late_return_excludes_due_date_and_weekend()
     {

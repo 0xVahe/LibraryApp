@@ -250,6 +250,38 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
             x => x.BookId == BookId);
     }
 
+    /// <summary>
+    /// A loan already marked Overdue is returned on its due-date local day: with NextLocalDay the dates say "not late",
+    /// but the stored status makes it late — one 0-point record, no PenaltyApplied, no status change (BQ-BA-03).
+    /// </summary>
+    [Fact]
+    public async Task Returning_an_overdue_loan_on_its_due_date_records_zero_points()
+    {
+        Guid loanId = await SeedAsync(overdueToday: true);
+
+        using var client = Client();
+        using var response = await ReturnAsync(client, loanId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result =
+            (await response.Content.ReadFromJsonAsync<ReturnLoanResponse>(
+                Json))!;
+        Assert.Equal(0, result.OverdueWorkingDays);
+        Assert.Equal(0, result.PenaltyPointsApplied);
+
+        int[] points = await Db(db =>
+            db.PenaltyRecords
+                .Where(x => x.LoanId == loanId)
+                .Select(x => x.Points)
+                .ToArrayAsync());
+        Assert.Equal(new[] { 0 }, points);
+
+        Assert.DoesNotContain(
+            (await EventsAsync<PenaltyApplied>()),
+            x => x.LoanId == loanId);
+        Assert.Equal(StaffMemberStatus.Active, await StaffStatusAsync());
+    }
+
     [Fact]
     public async Task Late_and_damaged_return_stores_two_penalties_and_one_status_change()
     {
@@ -520,7 +552,8 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
     private Task<Guid> SeedAsync(
         bool late = false,
         int priorPoints = 0,
-        bool queue = false) =>
+        bool queue = false,
+        bool overdueToday = false) =>
         Db(async db =>
         {
             var staff = await db.StaffMembers
@@ -536,10 +569,11 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
 
             copy.ChangeStatus(BookCopyStatus.OnLoan);
 
+            // overdueToday: due two hours before Now on the same local day (Tuesday 14:00 Yerevan).
             DateTime dueAtUtc = late
                 ? new DateTime(
                     2026, 10, 16, 12, 0, 0, DateTimeKind.Utc)
-                : Now.AddDays(1);
+                : overdueToday ? Now.AddHours(-2) : Now.AddDays(1);
 
             Loan loan = Loan.Issue(
                 Guid.NewGuid(),
@@ -547,6 +581,9 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
                 StaffId,
                 dueAtUtc.AddDays(-14),
                 14);
+
+            if (overdueToday)
+                loan.MarkOverdue(Now);   // what the daily job may do once the due time has passed
 
             db.Loans.Add(loan);
 
