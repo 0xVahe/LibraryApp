@@ -1,11 +1,14 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
+using LibraryApp.Domain.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Repositories.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -18,15 +21,34 @@ public static class BorrowingRegistrationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Rule values and decided variants (SD-21): section "Borrowing" in appsettings.json, checked at start.
+        services.AddOptions<BorrowingOptions>()
+            .Bind(configuration.GetSection(BorrowingOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<BorrowingOptions>, BorrowingOptionsValidator>();
+
+        // Penalty-point policy (BOR-05, BR-BOR-6): the Domain gets the values, never the configuration.
+        services.AddSingleton(provider =>
+            new PenaltyPolicy(provider.GetRequiredService<IOptions<BorrowingOptions>>().Value.Penalties.ToRules()));
+
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
+        services.AddScoped<IPenaltyRepository, PenaltyRepository>();
+        services.AddScoped<OverdueRule>();
+        services.AddScoped<ReturnPenaltyCalculator>();
+        services.AddScoped<IPenaltyService, PenaltyService>();
         services.AddScoped<ILoanService, LoanService>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();
 
         // Contract for Catalog: a new or repaired copy goes to the reservation queue (BOR-07, BQ-G1-10)
-        services.AddScoped<IReservationQueueService, ReservationQueueService>();
+        services.AddScoped<ReservationQueueService>();
 
+        services.AddScoped<IReservationQueueService>(provider =>
+            provider.GetRequiredService<ReservationQueueService>());//new
+        
+        services.AddScoped<ILoanReturnService, LoanReturnService>();//new
+        
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
 

@@ -1,0 +1,99 @@
+using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Application.Reporting.Ports;
+using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
+using Microsoft.EntityFrameworkCore;
+
+namespace LibraryApp.Infrastructure.Persistence.Repositories.Reporting;
+
+public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingReadRepository
+{
+    public async Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
+        DateTime overdueCutoffUtc,
+	Guid? departmentId,
+        CancellationToken ct = default)
+    {
+        return await (
+                from loan in db.Loans.AsNoTracking()
+                where (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
+                      && loan.DueAtUtc < overdueCutoffUtc
+                join staff in db.StaffMembers.AsNoTracking()
+                    on loan.StaffMemberId equals staff.Id
+		where !departmentId.HasValue || staff.DepartmentId == departmentId.Value
+                join department in db.Departments.AsNoTracking()
+                    on staff.DepartmentId equals department.Id
+                join copy in db.BookCopies.AsNoTracking()
+                    on loan.BookCopyId equals copy.Id
+                join book in db.Books.AsNoTracking()
+                    on copy.BookId equals book.Id
+                orderby loan.DueAtUtc
+                select new OverdueLoanData(
+                    loan.Id,
+                    staff.EmployeeId,
+                    staff.FirstName + " " + staff.LastName,
+                    department.Name,
+                    staff.DepartmentId,
+                    staff.LineManagerEmail,
+                    book.Title,
+                    loan.DueAtUtc,
+                    0))
+            .ToListAsync(ct);
+    }
+
+    public async Task<DashboardCountsData> GetDashboardCountsAsync(DateTime overdueCutoffUtc, CancellationToken ct = default)
+    {
+        int totalBooks = await db.Books.AsNoTracking().CountAsync(book => !book.IsDeleted, ct);
+        int totalCopies = await db.BookCopies.AsNoTracking().CountAsync(ct);
+        int activeReaders = await db.StaffMembers.AsNoTracking().CountAsync(staff => staff.Status == StaffMemberStatus.Active, ct);
+        int activeLoans = await db.Loans.AsNoTracking().CountAsync(
+            loan => loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue, ct);
+        int totalLoans = await db.Loans.AsNoTracking().CountAsync(ct);
+        int overdueLoans = await db.Loans.AsNoTracking().CountAsync(
+            loan => (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
+                    && loan.DueAtUtc < overdueCutoffUtc, ct);
+        int restrictedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(
+            staff => staff.Status == StaffMemberStatus.Restricted, ct);
+        int suspendedEmployees = await db.StaffMembers.AsNoTracking().CountAsync(
+            staff => staff.Status == StaffMemberStatus.Suspended, ct);
+
+        return new DashboardCountsData(
+            totalBooks,
+            totalCopies,
+            activeReaders,
+            activeLoans,
+            totalLoans,
+            overdueLoans,
+            restrictedEmployees,
+            suspendedEmployees);
+    }
+
+    public async Task<IReadOnlyList<TopBookReportItemDto>> GetTopBooksAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            group loan by new { book.Id, book.Title } into grouped
+            orderby grouped.Count() descending, grouped.Key.Title
+            select new TopBookReportItemDto(grouped.Key.Id, grouped.Key.Title, grouped.Count()))
+            .Take(10)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+            group loan by new { category.Id, category.Name } into grouped
+            orderby grouped.Count() descending, grouped.Key.Name
+            select new TopCategoryReportItemDto(grouped.Key.Id, grouped.Key.Name, grouped.Count()))
+            .Take(5)
+            .ToListAsync(ct);
+}

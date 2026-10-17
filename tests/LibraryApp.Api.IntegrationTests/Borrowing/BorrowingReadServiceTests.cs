@@ -100,11 +100,11 @@ public class BorrowingReadServiceTests(ApiHostWithoutBorrowingSeed factory) : IC
         var cancelled = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(26), member, Now.AddDays(-4), 1);
         cancelled.Cancel();
 
-        var older = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 3, "Returned late", Now.AddDays(-10));
-        var newer = PenaltyRecord.Create(Guid.NewGuid(), member, renewed.Id, 1, "Returned damaged", Now.AddDays(-1));
-        var waived = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 2, "Returned late", Now.AddDays(-5));
+        var older = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 3, "Returned late", Now.AddDays(-10), Now.AddDays(-10).AddDays(90));
+        var newer = PenaltyRecord.Create(Guid.NewGuid(), member, renewed.Id, 1, "Returned damaged", Now.AddDays(-1), Now.AddDays(-1).AddDays(90));
+        var waived = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 2, "Returned late", Now.AddDays(-5), Now.AddDays(-5).AddDays(90));
         waived.Waive("Business trip");
-        var timeExpired = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 5, "Returned late", Now.AddDays(-100));
+        var timeExpired = PenaltyRecord.Create(Guid.NewGuid(), member, returned.Id, 5, "Returned late", Now.AddDays(-100), Now.AddDays(-100).AddDays(90));
 
         using (var seed = factory.Services.CreateScope())
         {

@@ -1,12 +1,14 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Ids = LibraryApp.Infrastructure.Persistence.Seed.Borrowing.BorrowingSeedIds;
 using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
@@ -21,7 +23,8 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 /// <item>Book 15 (4 copies): Gor's active loan, Anna's overdue loan, Sona's lost copy, the copy held for Mariam.</item>
 /// <item>Book 16 (3 copies): returned loans only — the history behind the penalties.</item>
 /// </list>
-/// Dates are relative to <see cref="IClock.UtcNow"/>; late returns are counted in working days (BR-BOR-5). Entities are
+/// Dates are relative to <see cref="IClock.UtcNow"/>; late returns are counted in working days (BR-BOR-5). Points, expiry
+/// and the pickup deadline come from the Borrowing settings; the staff statuses above match the default values. Entities are
 /// created through their own methods, copy statuses change only through <see cref="ICatalogService"/>, no event is
 /// published (demo data must not send emails). Runs inside the seed runner's transaction.
 /// Idempotent: nothing is added when the first seeded loan exists. Skipped with a warning when the staff members or
@@ -33,9 +36,12 @@ public sealed class BorrowingSeeder(
     IStaffMemberService staff,
     IClock clock,
     IWorkingDayCalendar calendar,
+    PenaltyPolicy policy,
+    IOptions<BorrowingOptions> options,
     ILogger<BorrowingSeeder> logger) : IModuleSeeder
 {
-    private const int PointsPerLateReturn = 3;
+    // Shape of the demo data, not a rule: every late return in the seed is this many working days late.
+    private const int LateWorkingDays = 3;
 
     private static readonly Guid[] StaffMembers =
     [
@@ -81,26 +87,28 @@ public sealed class BorrowingSeeder(
         lost.MarkLost(now.AddDays(-12));
         await catalog.SetCopyStatusAsync(CatalogSeedIds.Copy(15, 3), BookCopyStatus.Lost, ct);
 
-        // The copy freed for the queue is held for Mariam for 3 working days (BOR-07).
+        // The copy freed for the queue is held for Mariam for the pickup working days (BOR-07).
         var ready = Reservation.Create(Ids.Reservation(3), CatalogSeedIds.Book(15), Members.MariamAvetisyan, now.AddDays(-1), 1);
-        ready.MarkReady(CatalogSeedIds.Copy(15, 4), clock.EndOfLocalDayUtc(calendar.AddWorkingDays(clock.LocalToday, ReservationQueueService.PickupWorkingDays)));
+        ready.MarkReady(CatalogSeedIds.Copy(15, 4), ReservationQueueService.ReadyUntilUtc(options.Value.Reservations, calendar, clock));
         db.Reservations.Add(ready);
         await catalog.SetCopyStatusAsync(CatalogSeedIds.Copy(15, 4), BookCopyStatus.Reserved, ct);
 
-        // Book 16: returned loans. Gor returned two books 3 working days late: 6 active points (Restricted).
+        // Book 16: returned loans. Gor returned two books 3 working days late: 6 active points by default (Restricted).
         Loan gorLate1 = await LateReturnAsync(7, (16, 1), Members.GorMkrtchyan, now.AddDays(-50), ct);
         Loan gorLate2 = await LateReturnAsync(8, (16, 2), Members.GorMkrtchyan, now.AddDays(-45), ct);
         Loan annaLate = await LateReturnAsync(9, (16, 3), Members.AnnaPetrosyan, now.AddDays(-80), ct);
-        Loan davitLate = await LateReturnAsync(10, (16, 3), Members.DavitHakobyan, now.AddDays(-140), ct);
+        // Davit's record must already be past its lifetime, whatever the setting: issued a lifetime and 50 days ago.
+        Loan davitLate = await LateReturnAsync(10, (16, 3), Members.DavitHakobyan,
+            now.AddDays(-options.Value.Penalties.LifetimeDays - 50), ct);
         Loan hayk = await IssueAsync(11, (16, 2), Members.HaykManukyan, now.AddDays(-200), ct, lend: false);
         hayk.Return(hayk.DueAtUtc.AddDays(-2));
 
         db.PenaltyRecords.AddRange(
             LatePenalty(1, gorLate1),
             LatePenalty(2, gorLate2),
-            // Sona: the lost copy, 10 points — Suspended for 30 days (BR-BOR-6).
-            PenaltyRecord.Create(Ids.Penalty(3), Members.SonaVardanyan, lost.Id, PenaltyPolicy.LostPoints,
-                "Copy lost", lost.ReturnedAtUtc!.Value));
+            // Sona: the lost copy, 10 points by default — Suspended (BR-BOR-6).
+            PenaltyRecord.Create(Ids.Penalty(3), Members.SonaVardanyan, lost.Id, policy.CalculateLostPoints(),
+                "Copy lost", lost.ReturnedAtUtc!.Value, policy.ExpiresAtUtc(lost.ReturnedAtUtc!.Value)));
 
         PenaltyRecord waived = LatePenalty(4, annaLate);
         waived.Waive("Late because of a business trip");
@@ -124,12 +132,12 @@ public sealed class BorrowingSeeder(
         return loan;
     }
 
-    /// <summary>A closed loan returned <see cref="PointsPerLateReturn"/> working days after its due date.</summary>
+    /// <summary>A closed loan returned <see cref="LateWorkingDays"/> working days after its due date.</summary>
     private async Task<Loan> LateReturnAsync(int number, (int Book, int Copy) copy, Guid staffMemberId, DateTime issuedAtUtc,
         CancellationToken ct)
     {
         Loan loan = await IssueAsync(number, copy, staffMemberId, issuedAtUtc, ct, lend: false);
-        DateOnly returnDay = calendar.AddWorkingDays(clock.ToLocalDate(loan.DueAtUtc), PointsPerLateReturn);
+        DateOnly returnDay = calendar.AddWorkingDays(clock.ToLocalDate(loan.DueAtUtc), LateWorkingDays);
         loan.Return(clock.StartOfLocalDayUtc(returnDay).AddHours(12));
         return loan;
     }
@@ -137,9 +145,10 @@ public sealed class BorrowingSeeder(
     private int Added<T>() where T : class =>
         db.ChangeTracker.Entries<T>().Count(e => e.State == EntityState.Added);
 
-    private static PenaltyRecord LatePenalty(int number, Loan loan) =>
-        PenaltyRecord.Create(Ids.Penalty(number), loan.StaffMemberId, loan.Id, PointsPerLateReturn,
-            $"Returned {PointsPerLateReturn} working days late", loan.ReturnedAtUtc!.Value);
+    private PenaltyRecord LatePenalty(int number, Loan loan) =>
+        PenaltyRecord.Create(Ids.Penalty(number), loan.StaffMemberId, loan.Id, policy.CalculateLatePoints(LateWorkingDays),
+            $"Returned {LateWorkingDays} working days late", loan.ReturnedAtUtc!.Value,
+            policy.ExpiresAtUtc(loan.ReturnedAtUtc!.Value));
 
     private async Task<bool> ReferencesAreReadyAsync(CancellationToken ct)
     {

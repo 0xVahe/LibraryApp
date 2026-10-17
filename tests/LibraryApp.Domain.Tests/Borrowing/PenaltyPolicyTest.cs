@@ -5,7 +5,12 @@ namespace LibraryApp.Domain.Tests.Borrowing;
 
 public class PenaltyPolicyTests
 {
-    private readonly PenaltyPolicy _policy = new();
+    // The values of the "Borrowing:Penalties" section in appsettings.json.
+    private static readonly PenaltyRules DefaultRules = new(
+        PointsPerLateWorkingDay: 1, MaxLatePoints: 10, DamagedPoints: 5, LostPoints: 10,
+        LifetimeDays: 90, RestrictedFromPoints: 5, SuspendedFromPoints: 10);
+
+    private readonly PenaltyPolicy _policy = new(DefaultRules);
 
     [Fact]
     public void FourPoints_ShouldBeActive()
@@ -61,5 +66,50 @@ public class PenaltyPolicyTests
         var result = _policy.CalculateDamagedPoints();
 
         Assert.Equal(5, result);
+    }
+
+    [Fact]
+    public void PenaltyRecord_ShouldExpireAfterTheLifetime()
+    {
+        var createdAtUtc = new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(createdAtUtc.AddDays(90), _policy.ExpiresAtUtc(createdAtUtc));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(-3, 0)]
+    [InlineData(2, 4)]
+    [InlineData(3, 6)]
+    [InlineData(4, 6)]
+    [InlineData(int.MaxValue, 6)]
+    public void LatePoints_FollowTheConfiguredRateAndCap(int lateWorkingDays, int expected)
+    {
+        var policy = new PenaltyPolicy(DefaultRules with { PointsPerLateWorkingDay = 2, MaxLatePoints = 6 });
+
+        Assert.Equal(expected, policy.CalculateLatePoints(lateWorkingDays));
+    }
+
+    [Theory]
+    [InlineData(2, StaffMemberStatus.Active)]
+    [InlineData(3, StaffMemberStatus.Restricted)]
+    [InlineData(6, StaffMemberStatus.Restricted)]
+    [InlineData(7, StaffMemberStatus.Suspended)]
+    public void Status_FollowsTheConfiguredThresholds(int activePoints, StaffMemberStatus expected)
+    {
+        var policy = new PenaltyPolicy(DefaultRules with { RestrictedFromPoints = 3, SuspendedFromPoints = 7 });
+
+        Assert.Equal(expected, policy.GetStatus(activePoints));
+    }
+
+    [Fact]
+    public void ConfiguredValues_AreUsedForDamagedLostAndLifetime()
+    {
+        var policy = new PenaltyPolicy(DefaultRules with { DamagedPoints = 3, LostPoints = 8, LifetimeDays = 30 });
+        var createdAtUtc = new DateTime(2026, 10, 1, 9, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(3, policy.CalculateDamagedPoints());
+        Assert.Equal(8, policy.CalculateLostPoints());
+        Assert.Equal(createdAtUtc.AddDays(30), policy.ExpiresAtUtc(createdAtUtc));
     }
 }

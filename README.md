@@ -42,6 +42,32 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 | Port 8080 is in use | Another app | Set `API_PORT` in `.env`, or stop the other app |
 | Port 5080 or 2525 is in use | Another app | Set `SMTP4DEV_PORT` or `SMTP4DEV_SMTP_PORT` in `.env` (the API run from the IDE follows `SMTP4DEV_SMTP_PORT` through `Mail__Port` in `.env`), or stop the other app |
 
+## Business-rule settings
+
+Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
+
+### Borrowing (`Borrowing`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Penalties:PointsPerLateWorkingDay` | 1 | Points per working day a loan is returned late | BOR-05 |
+| `Penalties:MaxLatePoints` | 10 | Cap on the late points of one return | BOR-05 |
+| `Penalties:DamagedPoints` | 5 | Points for a copy returned damaged | BOR-05, BOR-09 |
+| `Penalties:LostPoints` | 10 | Points for a lost copy | BOR-05, BOR-09 |
+| `Penalties:LifetimeDays` | 90 | Calendar days a penalty record counts | BR-BOR-6 |
+| `Penalties:RestrictedFromPoints` | 5 | Active points from which the employee is Restricted | BR-BOR-6 |
+| `Penalties:SuspendedFromPoints` | 10 | Active points from which the employee is Suspended | BR-BOR-6 |
+| `Penalties:SuspensionDays` | 30 | Calendar days a suspension lasts once the points cross the Suspended threshold | BR-BOR-6, BQ-BA-01 |
+| `Penalties:LateAndDamaged` | Sum | Late and damaged on one return: `Sum` — two records, points add up; `Highest` — one record with the higher points | BQ-BA-02 |
+| `Loans:OverdueFrom` | NextLocalDay | When a loan counts as late: `NextLocalDay` — from the day after the local due date; `DueTime` — from the exact due time | BOR-05, BQ-BA-05 |
+| `Reservations:MaxActive` | 3 | Active reservations per employee | BR-BOR-2 |
+| `Reservations:PickupWorkingDays` | 3 | Working days a copy is held for the first person in the queue | BOR-07 |
+| `Reservations:PickupCountsReleaseDay` | false | The day the copy is held counts as the first pickup day | BOR-07 |
+| `Reservations:RestrictedMayReserve` | false | A Restricted employee may place reservations | BR-MEM-3 |
+| `Reservations:SuspendedMayReserve` | false | A Suspended employee may place reservations | BR-BOR-6 |
+
+Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
+
 ## Tests
 
 ```bash

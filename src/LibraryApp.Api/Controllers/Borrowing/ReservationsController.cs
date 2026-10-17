@@ -21,8 +21,9 @@ public sealed class ReservationsController(IReservationService reservations) : C
 
     /// <summary>Places a staff member at the end of the waiting queue of a book (BOR-07).</summary>
     /// <remarks>
-    /// Only when no copy of the book is Available (BR-BOR-3), never for a book the staff member holds, at most 3 active
-    /// reservations (BR-BOR-2); Restricted, Suspended and Deactivated staff members are refused (422). Already in the
+    /// Only when no copy of the book is Available (BR-BOR-3), never for a book the staff member holds, at most
+    /// <c>Borrowing:Reservations:MaxActive</c> active reservations (BR-BOR-2, 3 by default); Restricted and Suspended staff
+    /// members are refused unless the settings allow it, Deactivated ones always (422). Already in the
     /// queue of this book: 409. A Staff Member leaves <c>staffMemberId</c> out or sends their own.
     /// </remarks>
     [HttpPost]
