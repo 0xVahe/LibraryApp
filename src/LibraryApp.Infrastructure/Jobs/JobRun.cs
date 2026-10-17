@@ -14,13 +14,14 @@ public sealed class JobRun : Entity
 
     private JobRun() { }
 
-    private JobRun(Guid id, string jobName, DateOnly localDate, DateTime startedAtUtc) : base(id)
+    private JobRun(Guid id, string jobName, DateOnly localDate, DateTime startedAtUtc, DateTime leaseUntilUtc) : base(id)
     {
         JobName = jobName;
         LocalDate = localDate;
         Status = JobRunStatus.Running;
         Attempts = 1;
         StartedAtUtc = startedAtUtc;
+        LeaseUntilUtc = leaseUntilUtc;
     }
 
     public string JobName { get; private set; } = "";
@@ -34,23 +35,33 @@ public sealed class JobRun : Entity
 
     public DateTime StartedAtUtc { get; private set; }
 
+    /// <summary>
+    /// Until when the instance running the attempt owns it. The runner extends it while the job works; a Running record
+    /// past this moment belongs to an instance that stopped, and another instance takes the run over.
+    /// </summary>
+    public DateTime LeaseUntilUtc { get; private set; }
+
     public DateTime? FinishedAtUtc { get; private set; }
 
     public string? Summary { get; private set; }
 
     public string? LastError { get; private set; }
 
-    public static JobRun Start(Guid id, string jobName, DateOnly localDate, DateTime startedAtUtc) =>
-        new(id, jobName, localDate, startedAtUtc);
+    public static JobRun Start(Guid id, string jobName, DateOnly localDate, DateTime startedAtUtc, DateTime leaseUntilUtc) =>
+        new(id, jobName, localDate, startedAtUtc, leaseUntilUtc);
 
-    /// <summary>A failed run, or a run whose instance stopped mid-run, starts again.</summary>
-    public void Restart(DateTime startedAtUtc)
+    /// <summary>A failed run, or a run whose instance stopped mid-run, starts again as the next attempt.</summary>
+    public void Restart(DateTime startedAtUtc, DateTime leaseUntilUtc)
     {
         Status = JobRunStatus.Running;
         Attempts++;
         StartedAtUtc = startedAtUtc;
+        LeaseUntilUtc = leaseUntilUtc;
         FinishedAtUtc = null;
     }
+
+    /// <summary>The instance running the attempt is still working on it.</summary>
+    public void ExtendLease(DateTime leaseUntilUtc) => LeaseUntilUtc = leaseUntilUtc;
 
     public void Succeed(DateTime finishedAtUtc, string summary)
     {
