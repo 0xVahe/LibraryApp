@@ -25,4 +25,11 @@ public sealed class StaffMemberRepository(LibraryDbContext db) : IStaffMemberRep
                 member.Status,
                 new LendingRules(category.MaxLoans, category.LoanDays, category.MaxRenewals)))
         .SingleOrDefaultAsync(ct);
+    
+    public async Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        await db.StaffMembers
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new { x.Id, Name = x.FirstName + " " + x.LastName })
+            .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
 }
