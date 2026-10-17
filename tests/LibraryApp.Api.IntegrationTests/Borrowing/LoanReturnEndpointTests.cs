@@ -12,6 +12,7 @@ using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
@@ -19,6 +20,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Xunit;
 using Members =
     LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
@@ -90,8 +92,8 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
                 .ToListAsync()));
 
         LoanReturned returned = Assert.Single(
-            (await EventsAsync<LoanReturned>())
-            .Where(x => x.LoanId == loanId));
+            (await EventsAsync<LoanReturned>()),
+            x => x.LoanId == loanId);
 
         Assert.Equal(BookId, returned.BookId);
         Assert.Equal(CopyId, returned.BookCopyId);
@@ -99,9 +101,9 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Equal(Now, returned.ReturnedAtUtc);
         Assert.Equal(0, returned.OverdueWorkingDays);
 
-        Assert.Empty(
-            (await EventsAsync<PenaltyApplied>())
-            .Where(x => x.LoanId == loanId));
+        Assert.DoesNotContain(
+            (await EventsAsync<PenaltyApplied>()),
+            x => x.LoanId == loanId);
     }
 
     [Fact]
@@ -151,8 +153,8 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Equal(BookCopyStatus.Reserved, await CopyStatusAsync());
 
         ReservationReady ready = Assert.Single(
-            (await EventsAsync<ReservationReady>())
-            .Where(x => x.BookId == BookId));
+            (await EventsAsync<ReservationReady>()),
+            x => x.BookId == BookId);
 
         Assert.Equal(first.Id, ready.ReservationId);
         Assert.Equal(first.StaffMemberId, ready.StaffMemberId);
@@ -196,16 +198,16 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Equal(Now.AddDays(90), penalty.ExpiresAtUtc);
 
         PenaltyApplied applied = Assert.Single(
-            (await EventsAsync<PenaltyApplied>())
-            .Where(x => x.LoanId == loanId));
+            (await EventsAsync<PenaltyApplied>()),
+            x => x.LoanId == loanId);
 
         Assert.Equal(penalty.Id, applied.PenaltyRecordId);
         Assert.Equal(5, applied.Points);
         Assert.Equal(priorPoints + 5, applied.ActivePointsTotal);
 
         StaffStatusChanged changed = Assert.Single(
-            (await EventsAsync<StaffStatusChanged>())
-            .Where(x => x.StaffMemberId == StaffId));
+            (await EventsAsync<StaffStatusChanged>()),
+            x => x.StaffMemberId == StaffId);
 
         Assert.Equal(expectedStatus, changed.NewStatus);
 
@@ -243,9 +245,9 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
             Assert.Null(reservation.ReadyUntilUtc);
         });
 
-        Assert.Empty(
-            (await EventsAsync<ReservationReady>())
-            .Where(x => x.BookId == BookId));
+        Assert.DoesNotContain(
+            (await EventsAsync<ReservationReady>()),
+            x => x.BookId == BookId);
     }
 
     [Fact]
@@ -287,8 +289,8 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
             .Count(x => x.LoanId == loanId));
 
         Assert.Single(
-            (await EventsAsync<StaffStatusChanged>())
-            .Where(x => x.StaffMemberId == StaffId));
+            (await EventsAsync<StaffStatusChanged>()),
+            x => x.StaffMemberId == StaffId);
     }
 
     [Fact]
@@ -486,10 +488,12 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
                 StaffMemberStatus.Active,
                 [role]);
 
-            string token = _host.Services
-                .GetRequiredService<IAccessTokenIssuer>()
-                .Issue(account)
-                .Token;
+            // The business clock of the host is fixed (Now); the token must be valid at the real time the test
+            // runs, otherwise the API answers 401 on every day except the fixed one.
+            var issuer = new JwtTokenIssuer(
+                _host.Services.GetRequiredService<IOptions<JwtOptions>>(),
+                new ReturnClock(() => DateTime.UtcNow));
+            string token = issuer.Issue(account).Token;
 
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", token);
@@ -653,7 +657,7 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
             services.Remove(borrowingSeed);
 
             services.RemoveAll<IClock>();
-            services.AddSingleton<IClock>(new ReturnClock());
+            services.AddSingleton<IClock>(new ReturnClock(() => Now));
 
             services.RemoveAll<IEventBus>();
 
@@ -697,14 +701,14 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         }
     }
 
-    private sealed class ReturnClock : IClock
+    private sealed class ReturnClock(Func<DateTime> now) : IClock
     {
         private static readonly TimeZoneInfo Zone =
             TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan");
 
-        public DateTime UtcNow => Now;
+        public DateTime UtcNow => now();
 
-        public DateOnly LocalToday => ToLocalDate(Now);
+        public DateOnly LocalToday => ToLocalDate(now());
 
         public DateTime ToLocal(DateTime utc) =>
             TimeZoneInfo.ConvertTimeFromUtc(utc, Zone);
