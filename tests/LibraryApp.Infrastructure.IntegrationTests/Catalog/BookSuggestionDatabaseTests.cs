@@ -3,6 +3,7 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
+using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
@@ -10,6 +11,7 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.IntegrationTests.Identity;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
+using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -61,7 +63,8 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
 {
     private static BookSuggestionService Service(LibraryDbContext db, Guid? staffId, Guid reviewerId,
         IApplicationLock? applicationLock = null, DateTime? now = null) => new(
-        new BookSuggestionRepository(db), new UnitOfWork(db), applicationLock ?? new SqlServerApplicationLock(db),
+        new BookSuggestionRepository(db), new StaffMemberService(new StaffMemberRepository(db)),
+        new UnitOfWork(db), applicationLock ?? new SqlServerApplicationLock(db),
         new Caller(staffId, reviewerId), new FixedClock(now ?? BookSuggestionDatabase.Now), new SequentialGuidGenerator(TimeProvider.System));
 
     [Fact]
