@@ -26,7 +26,7 @@ public sealed class BorrowingOptionsValidatorTests
                      "Borrowing:Penalties:DamagedPoints", "Borrowing:Penalties:LostPoints", "Borrowing:Penalties:LifetimeDays",
                      "Borrowing:Penalties:RestrictedFromPoints", "Borrowing:Penalties:SuspendedFromPoints",
                      "Borrowing:Penalties:SuspensionDays", "Borrowing:Penalties:LateAndDamaged",
-                     "Borrowing:Penalties:RecordZeroPointLateReturn", "Borrowing:Loans:OverdueFrom",
+                     "Borrowing:Loans:OverdueFrom",
                      "Borrowing:Reservations:MaxActive", "Borrowing:Reservations:PickupWorkingDays",
                  })
             Assert.Contains(key, result.FailureMessage);
@@ -84,7 +84,6 @@ public sealed class BorrowingOptionsValidatorTests
         options.Reservations.PickupWorkingDays = 1;
         options.Penalties.SuspensionDays = 14;
         options.Penalties.LateAndDamaged = LateAndDamagedMode.Highest;
-        options.Penalties.RecordZeroPointLateReturn = false;
         options.Loans.OverdueFrom = OverdueFromMode.DueTime;
 
         Assert.True(Validator.Validate(null, options).Succeeded);
@@ -94,7 +93,6 @@ public sealed class BorrowingOptionsValidatorTests
     {
         { "Borrowing:Penalties:SuspensionDays", o => o.Penalties.SuspensionDays = 0 },
         { "Borrowing:Penalties:LateAndDamaged", o => o.Penalties.LateAndDamaged = (LateAndDamagedMode)99 },
-        { "Borrowing:Penalties:RecordZeroPointLateReturn", o => o.Penalties.RecordZeroPointLateReturn = null },
         { "Borrowing:Loans:OverdueFrom", o => o.Loans.OverdueFrom = (OverdueFromMode)99 },
     };
 

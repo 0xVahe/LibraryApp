@@ -22,7 +22,6 @@ public static class BorrowingTestSettings
             SuspendedFromPoints = 10,
             SuspensionDays = 30,
             LateAndDamaged = LateAndDamagedMode.Sum,
-            RecordZeroPointLateReturn = true,
         },
         Loans = new LoanOptions
         {

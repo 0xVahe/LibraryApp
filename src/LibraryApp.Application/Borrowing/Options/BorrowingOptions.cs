@@ -31,11 +31,6 @@ public sealed class PenaltyOptions
     /// </summary>
     public LateAndDamagedMode LateAndDamaged { get; set; }
 
-    /// <summary>
-    /// Whether a late return with zero chargeable working days creates
-    /// a zero-point record. Nullable so missing configuration is detected.
-    /// </summary>
-    public bool? RecordZeroPointLateReturn { get; set; }
     
     /// <summary>Points for each working day a loan is returned late (BOR-05).</summary>
     public int PointsPerLateWorkingDay { get; set; }

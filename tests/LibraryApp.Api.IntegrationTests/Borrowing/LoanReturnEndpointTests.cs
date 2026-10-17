@@ -311,6 +311,14 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
                 .ToArrayAsync());
 
         Assert.Equal(new[] { 2, 5 }, points);
+
+        // Points expire after the configured lifetime (policy table: 90 days).
+        DateTime[] expiries = await Db(db =>
+            db.PenaltyRecords
+                .Where(x => x.LoanId == loanId)
+                .Select(x => x.ExpiresAtUtc)
+                .ToArrayAsync());
+        Assert.All(expiries, expiry => Assert.Equal(Now.AddDays(90), expiry));
         Assert.Equal(
             StaffMemberStatus.Restricted,
             await StaffStatusAsync());
@@ -394,6 +402,57 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Equal(
             outboxBefore,
             await Db(db => db.OutboxMessages.CountAsync()));
+    }
+
+    /// <summary>
+    /// Policy table: a damaged copy goes UnderRepair. The queue keeps waiting — nobody gets a copy that cannot be lent.
+    /// </summary>
+    [Fact]
+    public async Task Damaged_return_keeps_the_queue_waiting()
+    {
+        Guid loanId = await SeedAsync(queue: true);
+
+        using var client = Client();
+        using var response = await ReturnAsync(client, loanId, damaged: true);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(BookCopyStatus.UnderRepair, await CopyStatusAsync());
+
+        int[] positions = await Db(db =>
+            db.Reservations
+                .Where(x => x.BookId == BookId && x.Status == ReservationStatus.Waiting)
+                .OrderBy(x => x.QueuePosition)
+                .Select(x => x.QueuePosition)
+                .ToArrayAsync());
+        Assert.Equal(new[] { 1, 2 }, positions);
+        Assert.DoesNotContain(
+            (await EventsAsync<ReservationReady>()),
+            x => x.BookId == BookId);
+    }
+
+    /// <summary>
+    /// Two librarians return the same loan at the same moment (BR-BOR-4, NFR-08): the staff lock serialises them, one
+    /// return succeeds, the other is refused, and the penalties and events exist once.
+    /// </summary>
+    [Fact]
+    public async Task Two_simultaneous_returns_close_the_loan_once()
+    {
+        Guid loanId = await SeedAsync(late: true);
+
+        using var first = Client();
+        using var second = Client();
+        HttpResponseMessage[] responses = await Task.WhenAll(
+            ReturnAsync(first, loanId),
+            ReturnAsync(second, loanId));
+
+        Assert.Equal(
+            new[] { HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity },
+            responses.Select(r => r.StatusCode).OrderBy(c => (int)c));
+        foreach (var response in responses)
+            response.Dispose();
+
+        Assert.Equal(1, await Db(db => db.PenaltyRecords.CountAsync(x => x.LoanId == loanId)));
+        Assert.Single(await EventsAsync<LoanReturned>(), x => x.LoanId == loanId);
     }
 
     [Fact]

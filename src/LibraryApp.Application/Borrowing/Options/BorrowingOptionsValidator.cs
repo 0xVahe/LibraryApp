@@ -47,13 +47,6 @@ public sealed class BorrowingOptionsValidator : IValidateOptions<BorrowingOption
                 "must be Sum or Highest.");
         }
 
-        if (penalties.RecordZeroPointLateReturn is null)
-        {
-            failures.Add(
-                $"{Penalties}:{nameof(penalties.RecordZeroPointLateReturn)} " +
-                "must be explicitly set to true or false.");
-        }
-
         if (!Enum.IsDefined(typeof(OverdueFromMode), options.Loans.OverdueFrom))
         {
             failures.Add(

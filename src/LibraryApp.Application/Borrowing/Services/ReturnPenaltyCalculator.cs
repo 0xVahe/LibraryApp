@@ -17,9 +17,12 @@ public sealed class ReturnPenaltyCalculator(
     private readonly OverdueRule _overdue = new(clock, options);
 
     /// <param name="alreadyOverdue">
-    /// The loan was already marked Overdue (by the daily job). Such a return is always late (BQ-BA-03): with 0 overdue
-    /// working days it still gets a 0-point record when <c>RecordZeroPointLateReturn</c> is set.
+    /// The loan was already marked Overdue (by the daily job). Such a return is always late.
     /// </param>
+    /// <remarks>
+    /// A late return always creates a penalty record, also with 0 overdue working days (requirements, section 8: "a return
+    /// from Overdue always creates a PenaltyRecord"; BQ-BA-03) — a 0-point record publishes no PenaltyApplied.
+    /// </remarks>
     public ReturnPenaltyCalculation Calculate(
         DateTime dueAtUtc,
         DateTime returnedAtUtc,
@@ -48,17 +51,12 @@ public sealed class ReturnPenaltyCalculator(
 
         int latePoints = policy.CalculateLatePoints(lateWorkingDays);
 
-        bool recordZeroPoints =
-            settings.Penalties.RecordZeroPointLateReturn
-            ?? throw new InvalidOperationException(
-                "RecordZeroPointLateReturn must be configured.");
-
         var penalties = new List<ReturnPenaltyItem>();
 
         ReturnPenaltyItem? latePenalty = null;
         ReturnPenaltyItem? damagePenalty = null;
 
-        if (isLate && (latePoints > 0 || recordZeroPoints))
+        if (isLate)
         {
             latePenalty = new ReturnPenaltyItem(
                 latePoints,

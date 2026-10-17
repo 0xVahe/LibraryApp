@@ -45,21 +45,6 @@ public sealed class ReturnPenaltyCalculatorTests
         Assert.Equal(0, Assert.Single(result.Penalties).Points);
     }
 
-    [Fact]
-    public void Without_zero_point_records_an_overdue_loan_returned_on_its_due_date_has_no_record()
-    {
-        ReturnPenaltyCalculator calculator = CreateCalculator(
-            o => o.Penalties.RecordZeroPointLateReturn = false);
-
-        ReturnPenaltyCalculation result = calculator.Calculate(
-            Utc(16, 8),
-            Utc(16, 12),
-            damaged: false,
-            alreadyOverdue: true);
-
-        Assert.Empty(result.Penalties);
-    }
-
     [Theory]
     [InlineData(OverdueFromMode.NextLocalDay, 16, 19, 59, false)]   // 23:59 local on the due date
     [InlineData(OverdueFromMode.NextLocalDay, 16, 20, 1, true)]     // 00:01 local on the next day
@@ -183,16 +168,11 @@ public sealed class ReturnPenaltyCalculatorTests
         Assert.Equal(expectedPoints, result.TotalPoints);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Weekend_only_lateness_respects_zero_point_setting(
-        bool recordZeroPoints)
+    /// <summary>Requirements, section 8: a late return always creates a penalty record, with 0 points when no working day passed.</summary>
+    [Fact]
+    public void Weekend_only_lateness_still_creates_a_zero_point_record()
     {
-        ReturnPenaltyCalculator calculator = CreateCalculator(
-            configure: settings =>
-                settings.Penalties.RecordZeroPointLateReturn =
-                    recordZeroPoints);
+        ReturnPenaltyCalculator calculator = CreateCalculator();
 
         // Friday -> Sunday: overdue, but no working days elapsed.
         ReturnPenaltyCalculation result = calculator.Calculate(
@@ -201,12 +181,7 @@ public sealed class ReturnPenaltyCalculatorTests
             damaged: false);
 
         Assert.Equal(0, result.OverdueWorkingDays);
-        Assert.Equal(0, result.TotalPoints);
-
-        if (recordZeroPoints)
-            Assert.Equal(0, Assert.Single(result.Penalties).Points);
-        else
-            Assert.Empty(result.Penalties);
+        Assert.Equal(0, Assert.Single(result.Penalties).Points);
     }
 
     [Theory]
@@ -293,8 +268,7 @@ public sealed class ReturnPenaltyCalculatorTests
                 RestrictedFromPoints = 5,
                 SuspendedFromPoints = 10,
                 SuspensionDays = 30,
-                LateAndDamaged = LateAndDamagedMode.Sum,
-                RecordZeroPointLateReturn = true
+                LateAndDamaged = LateAndDamagedMode.Sum
             },
             Loans = new LoanOptions
             {
