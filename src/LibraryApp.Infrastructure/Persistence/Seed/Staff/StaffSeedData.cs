@@ -50,7 +50,10 @@ public static class StaffSeedData
         new(Categories.ManagerSenior, "Manager / Senior Specialist", MaxLoans: 5, LoanDays: 30, MaxRenewals: 2),
     ];
 
-    /// <summary>One account per role and per status, so every module can test its rules.</summary>
+    /// <summary>
+    /// Thirty synthetic staff members across six departments and all three categories.
+    /// The original eight retain their IDs, roles and statuses for other modules' seeds and tests.
+    /// </summary>
     public static readonly IReadOnlyList<SeedPerson> People =
     [
         Person(
@@ -161,6 +164,326 @@ public static class StaffSeedData
             StaffRoles.StaffMember,
             StaffMemberStatus.Deactivated,
             500
+            ),
+
+        // Retail Banking: 2 existing + 3 new.
+        Person(
+            StaffMembers.NarekSimonyan,
+            9,
+            "EMP-10007",
+            "Narek",
+            "Simonyan",
+            Departments.RetailBanking,
+            "Branch Manager",
+            ManagerEmail,
+            Categories.ManagerSenior,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            360
+            ),
+        Person(
+            StaffMembers.EvaHovsepyan,
+            10,
+            "EMP-10008",
+            "Eva",
+            "Hovsepyan",
+            Departments.RetailBanking,
+            "Banking Intern",
+            ManagerEmail,
+            Categories.InternTrainee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            45
+            ),
+        Person(
+            StaffMembers.TigranMelikyan,
+            11,
+            "EMP-10009",
+            "Tigran",
+            "Melikyan",
+            Departments.RetailBanking,
+            "Customer Adviser",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            180
+            ),
+
+        // Corporate Banking: 1 existing + 4 new.
+        Person(
+            StaffMembers.ManeGevorgyan,
+            12,
+            "EMP-10010",
+            "Mane",
+            "Gevorgyan",
+            Departments.CorporateBanking,
+            "Corporate Banking Manager",
+            ManagerEmail,
+            Categories.ManagerSenior,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            330
+            ),
+        Person(
+            StaffMembers.ArmenBabayan,
+            13,
+            "EMP-10011",
+            "Armen",
+            "Babayan",
+            Departments.CorporateBanking,
+            "Corporate Banking Intern",
+            ManagerEmail,
+            Categories.InternTrainee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            60
+            ),
+        Person(
+            StaffMembers.LusineKarapetyan,
+            14,
+            "EMP-10012",
+            "Lusine",
+            "Karapetyan",
+            Departments.CorporateBanking,
+            "Credit Analyst",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            210
+            ),
+        Person(
+            StaffMembers.RubenHarutyunyan,
+            15,
+            "EMP-10013",
+            "Ruben",
+            "Harutyunyan",
+            Departments.CorporateBanking,
+            "Relationship Officer",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            150
+            ),
+
+        // Risk Management: 1 existing + 4 new.
+        Person(
+            StaffMembers.AnahitMartirosyan,
+            16,
+            "EMP-10014",
+            "Anahit",
+            "Martirosyan",
+            Departments.RiskManagement,
+            "Risk Analyst",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            240
+            ),
+        Person(
+            StaffMembers.VahanStepanyan,
+            17,
+            "EMP-10015",
+            "Vahan",
+            "Stepanyan",
+            Departments.RiskManagement,
+            "Risk Management Intern",
+            ManagerEmail,
+            Categories.InternTrainee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            35
+            ),
+        Person(
+            StaffMembers.ElenDanielyan,
+            18,
+            "EMP-10016",
+            "Elen",
+            "Danielyan",
+            Departments.RiskManagement,
+            "Compliance Analyst",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            190
+            ),
+        Person(
+            StaffMembers.SamvelPoghosyan,
+            19,
+            "EMP-10017",
+            "Samvel",
+            "Poghosyan",
+            Departments.RiskManagement,
+            "Operational Risk Analyst",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            280
+            ),
+
+        // Information Technology: 2 existing + 3 new.
+        Person(
+            StaffMembers.AniSahakyan,
+            20,
+            "EMP-10018",
+            "Ani",
+            "Sahakyan",
+            Departments.InformationTechnology,
+            "Software Developer",
+            AdminEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            220
+            ),
+        Person(
+            StaffMembers.LevonKhachatryan,
+            21,
+            "EMP-10019",
+            "Levon",
+            "Khachatryan",
+            Departments.InformationTechnology,
+            "Senior Systems Engineer",
+            AdminEmail,
+            Categories.ManagerSenior,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            390
+            ),
+        Person(
+            StaffMembers.MilenaAbrahamyan,
+            22,
+            "EMP-10020",
+            "Milena",
+            "Abrahamyan",
+            Departments.InformationTechnology,
+            "Quality Assurance Engineer",
+            AdminEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            160
+            ),
+
+        // Finance: 1 existing + 4 new.
+        Person(
+            StaffMembers.ArturMinasyan,
+            23,
+            "EMP-10021",
+            "Artur",
+            "Minasyan",
+            Departments.Finance,
+            "Finance Manager",
+            ManagerEmail,
+            Categories.ManagerSenior,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            350
+            ),
+        Person(
+            StaffMembers.LianaNalbandyan,
+            24,
+            "EMP-10022",
+            "Liana",
+            "Nalbandyan",
+            Departments.Finance,
+            "Finance Intern",
+            ManagerEmail,
+            Categories.InternTrainee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            50
+            ),
+        Person(
+            StaffMembers.KarenAsatryan,
+            25,
+            "EMP-10023",
+            "Karen",
+            "Asatryan",
+            Departments.Finance,
+            "Financial Analyst",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            200
+            ),
+        Person(
+            StaffMembers.SofiaHambardzumyan,
+            26,
+            "EMP-10024",
+            "Sofia",
+            "Hambardzumyan",
+            Departments.Finance,
+            "Accountant",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            130
+            ),
+
+        // Human Resources: 1 existing + 4 new.
+        Person(
+            StaffMembers.AshotBaghdasaryan,
+            27,
+            "EMP-10025",
+            "Ashot",
+            "Baghdasaryan",
+            Departments.HumanResources,
+            "Human Resources Manager",
+            ManagerEmail,
+            Categories.ManagerSenior,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            320
+            ),
+        Person(
+            StaffMembers.NuneTorosyan,
+            28,
+            "EMP-10026",
+            "Nune",
+            "Torosyan",
+            Departments.HumanResources,
+            "Human Resources Intern",
+            ManagerEmail,
+            Categories.InternTrainee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            40
+            ),
+        Person(
+            StaffMembers.ErikZakaryan,
+            29,
+            "EMP-10027",
+            "Erik",
+            "Zakaryan",
+            Departments.HumanResources,
+            "Recruitment Specialist",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            170
+            ),
+        Person(
+            StaffMembers.AlinaMirzoyan,
+            30,
+            "EMP-10028",
+            "Alina",
+            "Mirzoyan",
+            Departments.HumanResources,
+            "Training Specialist",
+            ManagerEmail,
+            Categories.Employee,
+            StaffRoles.StaffMember,
+            StaffMemberStatus.Active,
+            110
             ),
     ];
 
