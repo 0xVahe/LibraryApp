@@ -149,4 +149,52 @@ public sealed class ReportingService(
 
         return new TopBooksAndCategoriesReportDto(from, to, clock.UtcNow, books, categories);
     }
+
+
+    public async Task<ReadingActivityByDepartmentReportDto> GetReadingActivityByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        if (from == default || to == default || from > to)
+        {
+            throw new DomainException(ReportingErrors.InvalidDateRange);
+        }
+
+        DateTime fromUtc = clock.StartOfLocalDayUtc(from);
+        DateTime toUtc = clock.EndOfLocalDayUtc(to);
+        IReadOnlyList<DepartmentEmployeesData> departments = await repository.GetDepartmentEmployeesAsync(ct);
+        IReadOnlyList<DepartmentCategoryLoansData> loans = await repository.GetDepartmentCategoryLoansAsync(fromUtc, toUtc, ct);
+
+        ILookup<Guid, DepartmentCategoryLoansData> loansByDepartment = loans.ToLookup(row => row.DepartmentId);
+
+        // Every department is listed, also the ones without loans in the period.
+        List<DepartmentReadingActivityDto> items = departments
+            .Select(department =>
+            {
+                List<DepartmentCategoryLoansData> categories = loansByDepartment[department.DepartmentId].ToList();
+                int loanCount = categories.Sum(row => row.LoanCount);
+                DepartmentCategoryLoansData? top = categories
+                    .OrderByDescending(row => row.LoanCount)
+                    .ThenBy(row => row.Category)
+                    .FirstOrDefault();
+                decimal per10Employees = department.Employees == 0
+                    ? 0m
+                    : Math.Round(loanCount * 10m / department.Employees, 1, MidpointRounding.AwayFromZero);
+
+                return new DepartmentReadingActivityDto(
+                    department.DepartmentId,
+                    department.Department,
+                    department.Employees,
+                    loanCount,
+                    per10Employees,
+                    top?.CategoryId,
+                    top?.Category,
+                    top?.LoanCount ?? 0);
+            })
+            .OrderBy(item => item.Department)
+            .ToList();
+
+        return new ReadingActivityByDepartmentReportDto(from, to, clock.UtcNow, items);
+    }
 }

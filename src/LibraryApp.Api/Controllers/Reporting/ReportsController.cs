@@ -43,4 +43,16 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     {
         return Ok(await reporting.GetTopBooksAndCategoriesAsync(from, to, ct));
     }
+
+    [HttpGet("reading-activity-by-department")]
+    [Authorize(Roles = StaffRoles.LibraryAdministrator)]
+    [ProducesResponseType<ReadingActivityByDepartmentReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ReadingActivityByDepartmentReportDto>> GetReadingActivityByDepartment(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken ct)
+    {
+        return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
+    }
 }

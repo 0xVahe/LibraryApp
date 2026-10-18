@@ -96,4 +96,29 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
             select new TopCategoryReportItemDto(grouped.Key.Id, grouped.Key.Name, grouped.Count()))
             .Take(5)
             .ToListAsync(ct);
+
+   public async Task<IReadOnlyList<DepartmentEmployeesData>> GetDepartmentEmployeesAsync(
+        CancellationToken ct = default) => await (
+            from department in db.Departments.AsNoTracking()
+            select new DepartmentEmployeesData(
+                department.Id,
+                department.Name,
+                db.StaffMembers.Count(staff =>
+                    staff.DepartmentId == department.Id && staff.Status != StaffMemberStatus.Deactivated)))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join staff in db.StaffMembers.AsNoTracking() on loan.StaffMemberId equals staff.Id
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+            group loan by new { staff.DepartmentId, CategoryId = category.Id, category.Name } into grouped
+            select new DepartmentCategoryLoansData(
+                grouped.Key.DepartmentId, grouped.Key.CategoryId, grouped.Key.Name, grouped.Count()))
+            .ToListAsync(ct);
 }
