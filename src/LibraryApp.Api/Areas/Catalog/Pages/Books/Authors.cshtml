@@ -1,0 +1,6 @@
+@page "/catalog/books/authors"
+@model AuthorsModel
+@{
+    ViewData["Title"] = $"Edit {Model.Edit.BookTitle}";
+}
+<partial name="_EditBook" model="Model.Edit" />

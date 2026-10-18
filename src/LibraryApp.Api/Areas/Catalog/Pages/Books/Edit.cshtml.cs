@@ -19,11 +19,16 @@ public sealed class EditModel(
     IBookService books,
     IBookDetailsService details,
     ICategoryService categories,
-    IPublisherService publishers) : BookFormPageModel(categories, publishers)
+    IPublisherService publishers,
+    IAuthorService authors) : BookFormPageModel(categories, publishers)
 {
     public Guid BookId { get; private set; }
 
     public string BookTitle { get; private set; } = "";
+
+    public IReadOnlyList<AuthorDto> Authors { get; private set; } = [];
+
+    public IReadOnlyList<Guid> AuthorIds { get; set; } = [];
 
     public async Task OnGetAsync(Guid id, CancellationToken ct)
     {
@@ -95,6 +100,10 @@ public sealed class EditModel(
         var book = await details.GetBookDetailsAsync(id, ct);   // unknown or deleted → Not found page
         BookId = book.Id;
         BookTitle = book.Title;
+        Authors = (await authors.ListAsync(ct))
+            .OrderBy(author => author.FullName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        AuthorIds = await authors.GetBookAuthorIdsAsync(id, ct);
         return book;
     }
 }
