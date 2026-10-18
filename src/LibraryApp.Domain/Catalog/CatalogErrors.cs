@@ -27,6 +27,11 @@ public static class CatalogErrors
     public static readonly Error SuggestionRejectionCommentRequired =
         Error.Validation("catalog.suggestion_rejection_comment_required", "A rejection comment is required.");
 
+    // ---------- Book CSV import (CAT-09) ----------
+
+    public static readonly Error ImportInvalid =
+        Error.Validation("catalog.import_invalid", "The book CSV contains invalid rows.");
+
     // ---------- Book ----------
 
     public static readonly Error BookTitleRequired =
