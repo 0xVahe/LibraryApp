@@ -9,7 +9,11 @@
         ? 0
         : firstResult + Model.Result.Items.Count - 1;
     var actions = Model.CanManageBooks
-        ? new[] { new PageAction("Add book", "/catalog/books/new", Primary: true) }
+        ? new[]
+        {
+            new PageAction("Import CSV", "/catalog/import"),
+            new PageAction("Add book", "/catalog/books/new", Primary: true),
+        }
         : null;
 }
 <partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Catalog", "Browse the library collection and find your next book.", actions)' />
@@ -68,15 +72,13 @@ else
                 ? "No copies"
                 : book.AvailableCopies > 0 ? $"{book.AvailableCopies} available" : "Not available now";
             <a class="book-card" href="/catalog/books/@book.Id">
-                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)">
+                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)" aria-hidden="true">
                     @if (hasCover)
                     {
                         <img class="cover-img" src="@book.CoverImageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
                     }
-                    <div class="cover-copy">
-                        <span>@book.Title</span>
-                        <span class="small">@string.Join(", ", book.Authors)</span>
-                    </div>
+                    <span>@book.Title</span>
+                    <span class="small">@string.Join(", ", book.Authors)</span>
                 </div>
                 <span class="title">@book.Title</span>
                 <span>@string.Join(", ", book.Authors) · @book.PublicationYear</span>

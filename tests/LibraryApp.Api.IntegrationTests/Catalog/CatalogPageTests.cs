@@ -15,6 +15,7 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
 {
     private const string StaffMember = "anna.petrosyan@ameriabank.am";
     private const string Librarian = "aram.sargsyan@ameriabank.am";
+    private const string Administrator = "lilit.grigoryan@ameriabank.am";
 
     [Fact]
     public async Task A_staff_member_can_open_catalog_and_search_returns_expected_book()
@@ -31,18 +32,23 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.Contains("name=\"language\"", html);
         Assert.Contains("name=\"available\"", html);
         Assert.DoesNotContain("Add book", html);
+        Assert.DoesNotContain("Import CSV", html);
+        Assert.DoesNotContain("href=\"/catalog/import\"", html);
     }
 
-    [Fact]
-    public async Task A_librarian_sees_the_add_book_action()
+    [Theory]
+    [InlineData(Librarian)]
+    [InlineData(Administrator)]
+    public async Task Library_staff_see_the_add_book_and_import_actions(string email)
     {
-        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
 
         var html = await client.GetStringAsync("/catalog");
 
         Assert.Contains("href=\"/catalog/books/new\"", html);
         Assert.Contains("Add book", html);
-        Assert.DoesNotContain("Import CSV", html);
+        Assert.Contains("href=\"/catalog/import\"", html);
+        Assert.Contains("Import CSV", html);
     }
 
     [Fact]

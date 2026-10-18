@@ -15,7 +15,7 @@ namespace LibraryApp.Api.Areas.Catalog.Pages;
 /// <summary>The Catalog page for every signed-in role (CAT-05).</summary>
 [Authorize(Policy = UiPolicies.SignedIn)]
 public sealed class IndexModel(
-    IBookSearchService search,
+    IBookSearchService searchService,
     ICategoryService categories) : PageModel
 {
     public const int PageSize = PageRequest.DefaultPageSize;
@@ -49,7 +49,7 @@ public sealed class IndexModel(
             ? requestedPage
             : 1;
 
-        Result = await search.SearchAsync(
+        Result = await searchService.SearchAsync(
             new BookSearchRequest(Search, CategoryId, Language, Available ? true : null,
                 new PageRequest(pageNumber, PageSize)), ct);
     }

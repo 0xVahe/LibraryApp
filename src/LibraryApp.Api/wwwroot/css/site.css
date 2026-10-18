@@ -423,11 +423,8 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
   background: #2d4a22;
 }
 .cover .small { font-family: var(--font-text); font-weight: 400; opacity: 0.9; }
-.cover.has-image { padding: 0; overflow: hidden; }
-.cover-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
-.cover.has-image { position: relative; }
-.cover.has-image .cover-img { position: absolute; inset: 0; z-index: 1; }
-.cover-copy { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 100%; position: relative; z-index: 0; }
+.cover.has-image { position: relative; overflow: hidden; }
+.cover-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 .cover.c2 { background: #1d4f91; }
 .cover.c3 { background: #6b2d5c; }
 .cover.c4 { background: #7a4a12; }

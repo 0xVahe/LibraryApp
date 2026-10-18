@@ -84,12 +84,6 @@ public sealed class Book : Entity
         CoverImagePath = string.IsNullOrWhiteSpace(coverImagePath) ? null : coverImagePath.Trim();
     }
 
-    /// <summary>Sets the stored cover path without changing the librarian's other book edits.</summary>
-    public void SetCoverImagePath(string? coverImagePath)
-    {
-        CoverImagePath = string.IsNullOrWhiteSpace(coverImagePath) ? null : coverImagePath.Trim();
-    }
-
     /// <summary>Soft delete. The check "no copy is OnLoan or Reserved" (BR-CAT-3) is made by the service before this call.</summary>
     public void Delete(DateTime deletedAtUtc)
     {

@@ -34,8 +34,7 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
 
     private async Task SeedBooksAsync(CancellationToken ct)
     {
-        var existingBooks = await db.Books.ToDictionaryAsync(x => x.Id, ct);
-        var existingBookIds = existingBooks.Keys.ToHashSet();
+        var existingBookIds = (await db.Books.Select(x => x.Id).ToListAsync(ct)).ToHashSet();
         var authorIds = CatalogSeedData.Authors
             .ToDictionary(x => x.Name, x => x.Id, StringComparer.Ordinal);
         var publisherIds = CatalogSeedData.Publishers
@@ -45,15 +44,7 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
         {
             Guid bookId = CatalogSeedIds.Book(seedBook.Number);
             if (existingBookIds.Contains(bookId))
-            {
-                // Existing development databases predate cover paths. Backfill only an empty path;
-                // never overwrite a librarian's deliberate cover choice.
-                Book existingBook = existingBooks[bookId];
-                if (string.IsNullOrWhiteSpace(existingBook.CoverImagePath))
-                    existingBook.SetCoverImagePath(CatalogSeedIds.CoverImagePath(seedBook.Number));
-
                 continue;
-            }
 
             Guid categoryId = CatalogSeedIds.Category(seedBook.CategoryNumber);
             Guid? publisherId = seedBook.Publisher is null ? null : publisherIds[seedBook.Publisher];
