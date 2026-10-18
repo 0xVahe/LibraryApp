@@ -85,8 +85,15 @@ public sealed class InMemoryCatalogService : ICatalogService
     public Task<IReadOnlyList<BookCopyDto>> GetCopiesAsync(
         IReadOnlyCollection<Guid> copyIds,
         CancellationToken ct = default)
-        => throw new NotSupportedException();
+    {
+        ct.ThrowIfCancellationRequested();
 
+        IReadOnlyList<BookCopyDto> copies = _copies.Values
+            .Where(copy => copyIds.Contains(copy.Id))
+            .ToList();
+
+        return Task.FromResult(copies);
+    }
     public Task<IReadOnlyList<Guid>> GetCopyIdsAsync(
         Guid bookId, CancellationToken ct = default)
         => throw new NotSupportedException();

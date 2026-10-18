@@ -98,6 +98,12 @@ While the job works, its instance extends the lease of the run every third of `J
 | `Jobs:RetryDelay` | 00:15:00 | Wait after a failed run |
 | `Jobs:MaxAttemptsPerDay` | 5 | Attempts per job and day |
 
+Scheduled jobs:
+
+| Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
+|---|---|---|---|---|
+| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints` | BOR-06, policy table, BQ-BA-01, BQ-G2-03 |
+
 ## Tests
 
 ```bash
