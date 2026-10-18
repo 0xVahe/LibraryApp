@@ -1,0 +1,37 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.ReservePanelModel
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* "Get this book" (Group 3) on the Book page; the reservation is posted to /reservations (Post/Redirect/Get). *@
+<section class="card" aria-labelledby="reserve-panel-title">
+    <div class="card-head"><h2 id="reserve-panel-title">Get this book</h2></div>
+    <div class="stack">
+        @switch (Model.State)
+        {
+            case ReservePanelState.OnLoanToYou:
+                <p>You have this book on loan. Return or renew it from My library.</p>
+                break;
+            case ReservePanelState.Reserved:
+                <div class="row">
+                    <partial name="/Pages/Shared/_StatusBadge.cshtml" model="Model.Reservation!.Status" />
+                </div>
+                <p>@Model.ReservationText</p>
+                break;
+            case ReservePanelState.OnShelf:
+                <p>A copy is on the shelf. Take it at the library desk and a librarian issues it to you.</p>
+                break;
+            default:
+                <p>All copies are out. Reserve one and we hold it for you at the library desk. You get an email when it is ready.</p>
+                if (Model.CanReserve)
+                {
+                    <form method="post" asp-area="Borrowing" asp-page="/Reserve">
+                        <input type="hidden" name="BookId" value="@Model.BookId" />
+                        <button class="btn btn-primary btn-block" type="submit">Reserve a copy</button>
+                    </form>
+                }
+                break;
+        }
+        @if (Model.Rules is not null)
+        {
+            <p class="small muted">@Model.LimitsText</p>
+        }
+    </div>
+</section>
