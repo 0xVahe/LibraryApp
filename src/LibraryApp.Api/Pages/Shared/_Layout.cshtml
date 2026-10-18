@@ -10,7 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@(ViewData["Title"] is string title ? $"{title} · Ameria Library" : "Ameria Library")</title>
-    <link rel="icon" href="img/green-on-white-cube.ico"/>
+    <link rel="icon" href="~/img/green-on-white-cube.ico">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
 </head>
 <body>
@@ -18,7 +18,7 @@
 <header class="topbar">
     <div class="topbar-inner">
         <a class="logo" href="/">
-            <img src="img/green-on-white-cube.ico" class="logo-img"/>AMERIA <span class="light">LIBRARY</span>
+            <img src="~/img/logo-green.svg" class="logo-img" alt="">AMERIA <span class="light">LIBRARY</span>
         </a>
         @if (nav.Count > 0)
         {
@@ -36,7 +36,7 @@
                 <span class="user-name">@UiNavigation.DisplayName(User)<span class="small">@UiNavigation.RoleName(User)</span></span>
             </a>
             <form class="signout" method="post" action="@UiPaths.Logout" asp-antiforgery="true">
-                <button class="btn btn-secondary btn-sm logout-btn" type="submit">Log Out</button>
+                <button class="btn btn-secondary btn-sm " type="submit">Sign out</button>
             </form>
             <details class="menu">
                 <summary>Menu</summary>
@@ -49,7 +49,7 @@
                     {
                         <a href="@UiNavigation.Profile">My profile</a>
                     }
-                    <form method="post" action="@UiPaths.Logout" asp-antiforgery="true"><button type="submit">Log Out</button></form>
+                    <form method="post" action="@UiPaths.Logout" asp-antiforgery="true"><button type="submit">Sign out</button></form>
                 </nav>
             </details>
         }

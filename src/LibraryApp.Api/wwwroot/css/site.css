@@ -290,12 +290,6 @@ main {
 .btn-block { width: 100%; }
 .link-btn { min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 
-.logout-btn {
-  border-color: transparent !important;
-}
-.logout-btn:hover {
-  background: var(--green-soft);
-}
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex;
@@ -512,9 +506,8 @@ input[readonly] { background: var(--surface); color: var(--text); }
   min-height: 100vh;
 }
 .auth-brand {
-  /*background: var(--dark);*/
-  background: url("../img/lib-background.jpg");
-  background-size: cover;
+  /* dark overlay keeps the text readable on the photo; var(--dark) if the photo does not load */
+  background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("../img/lib-background.jpg") center / cover, var(--dark);
   color: #d4d4d4;
   padding: 48px;
   display: flex;
@@ -634,6 +627,8 @@ input[readonly] { background: var(--surface); color: var(--text); }
 /* ---------- Shell (Integration Owner): pieces the static demo did not need ---------- */
 /* Sign-out is a POST form; its button looks like the links around it. */
 .signout { margin: 0; }
+.signout .btn { border-color: transparent; }
+.signout .btn:hover { background: var(--green-soft); }
 @media (max-width: 1024px) { .signout { display: none; } }   /* the mobile menu has its own sign-out, like .user */
 .menu nav form { margin: 0; }
 .menu nav form button {
