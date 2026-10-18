@@ -83,6 +83,7 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Application.xml"));   // DTOs
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Domain.xml"));        // enums used in DTOs
     options.SchemaFilter<StaffMemberExamples>();
+    options.SchemaFilter<CatalogExamples>();
     // "Authorize" button (Group 2, MEM-02): paste the accessToken from POST /api/auth/login.
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
