@@ -1,0 +1,128 @@
+using LibraryApp.Application.Abstractions.Notifications;
+using LibraryApp.Application.Notifications.Ports;
+using LibraryApp.Application.Notifications.Services;
+using LibraryApp.Application.Tests.Fakes;
+using LibraryApp.Domain.Notifications;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace LibraryApp.Application.Tests.Notifications;
+
+public sealed class NotificationDeliveryServiceTests
+{
+    private static readonly DateTime Now = new(2026, 10, 18, 9, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public async Task Sends_pending_email_and_marks_it_sent()
+    {
+        var store = new FakeStore(NewNotification("anna@ameriabank.am", "manager@ameriabank.am"));
+        var sender = new FakeSender();
+
+        var tried = await Service(store, sender).DeliverPendingAsync(20);
+
+        var message = Assert.Single(sender.Sent);
+        Assert.Equal("anna@ameriabank.am", message.To);
+        Assert.Equal("manager@ameriabank.am", message.Cc);
+        Assert.Equal("Subject", message.Subject);
+        Assert.Equal("<p>Body</p>", message.HtmlBody);
+        Assert.Equal(1, tried);
+        Assert.Equal(NotificationStatus.Sent, store.Notifications[0].Status);
+        Assert.Equal(Now, store.Notifications[0].SentAtUtc);
+    }
+
+    [Fact]
+    public async Task Failed_email_stays_failed()
+    {
+        var store = new FakeStore(NewNotification());
+        var sender = new FakeSender { FailFor = "anna@ameriabank.am" };
+
+        await Service(store, sender).DeliverPendingAsync(20);
+
+        var notification = store.Notifications[0];
+        Assert.Equal(NotificationStatus.Failed, notification.Status);
+        Assert.Equal(1, notification.Attempts);
+        Assert.Null(notification.NextAttemptAtUtc);
+        Assert.Equal("Mail server is down.", notification.LastError);
+    }
+
+    [Fact]
+    public async Task One_failure_does_not_stop_the_others()
+    {
+        var store = new FakeStore(NewNotification("anna@ameriabank.am"), NewNotification("gor@ameriabank.am"));
+        var sender = new FakeSender { FailFor = "anna@ameriabank.am" };
+
+        var tried = await Service(store, sender).DeliverPendingAsync(20);
+
+        Assert.Equal(2, tried);
+        Assert.Equal(NotificationStatus.Failed, store.Notifications[0].Status);
+        Assert.Equal(NotificationStatus.Sent, store.Notifications[1].Status);
+        Assert.Equal(2, store.Saves);
+    }
+
+    [Fact]
+    public async Task Asks_the_store_for_one_batch()
+    {
+        var store = new FakeStore();
+
+        var tried = await Service(store, new FakeSender()).DeliverPendingAsync(5);
+
+        Assert.Equal(5, store.RequestedMax);
+        Assert.Equal(0, tried);
+    }
+
+    [Fact]
+    public async Task Cancellation_is_not_a_failure()
+    {
+        var store = new FakeStore(NewNotification());
+        var sender = new FakeSender { Cancel = true };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(store, sender).DeliverPendingAsync(20));
+
+        Assert.Equal(NotificationStatus.Pending, store.Notifications[0].Status);
+        Assert.Equal(0, store.Saves);
+    }
+
+    private static NotificationDeliveryService Service(FakeStore store, FakeSender sender) =>
+        new(store, sender, new TestClock(Now), NullLogger<NotificationDeliveryService>.Instance);
+
+    private static Notification NewNotification(string to = "anna@ameriabank.am", string? cc = null) =>
+        Notification.Create(
+            Guid.NewGuid(), Guid.NewGuid(), NotificationType.LoanConfirmation, NotificationChannel.Outlook,
+            to, cc, "Subject", "<p>Body</p>", Now.AddMinutes(-1), DateOnly.FromDateTime(Now));
+
+    private sealed class FakeStore(params Notification[] notifications) : INotificationDeliveryStore
+    {
+        public List<Notification> Notifications { get; } = [.. notifications];
+        public int RequestedMax { get; private set; }
+        public int Saves { get; private set; }
+
+        public Task<IReadOnlyList<Notification>> GetPendingAsync(int max, CancellationToken ct = default)
+        {
+            RequestedMax = max;
+            return Task.FromResult<IReadOnlyList<Notification>>(Notifications.Take(max).ToList());
+        }
+
+        public Task SaveAsync(CancellationToken ct = default)
+        {
+            Saves++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeSender : IOutlookNotificationSender
+    {
+        public List<OutlookMessage> Sent { get; } = [];
+        public string? FailFor { get; init; }
+        public bool Cancel { get; init; }
+
+        public Task SendAsync(OutlookMessage message, CancellationToken ct = default)
+        {
+            if (Cancel)
+                throw new OperationCanceledException();
+            if (message.To == FailFor)
+                throw new NotificationDeliveryException("Mail server is down.");
+
+            Sent.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+}
