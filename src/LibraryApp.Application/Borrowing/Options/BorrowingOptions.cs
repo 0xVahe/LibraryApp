@@ -27,6 +27,11 @@ public sealed class PenaltyOptions
     public int SuspensionDays { get; set; }
     
     /// <summary>
+    /// How staff standing is determined after a suspension ends.
+    /// </summary>
+    public AfterSuspensionMode AfterSuspension { get; set; }
+    
+    /// <summary>
     /// Whether late and damaged penalties add together or only the larger applies.
     /// </summary>
     public LateAndDamagedMode LateAndDamaged { get; set; }

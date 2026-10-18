@@ -4,6 +4,7 @@ using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 using Microsoft.Extensions.Options;
@@ -22,6 +23,179 @@ public sealed class PenaltyService(
     IStaffMemberService staff,
     IOptions<BorrowingOptions> options) : IPenaltyService
 {
+        public async Task<PenaltyRecalculationResult> RecalculateStatusAsync(
+        Guid staffMemberId,
+        DateTime nowUtc,
+        CancellationToken ct = default)
+    {
+        if (staffMemberId == Guid.Empty)
+        {
+            throw new DomainException(
+                BorrowingErrors.InvalidReferenceId);
+        }
+
+        if (nowUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new DomainException(
+                BorrowingErrors.TimestampMustBeUtc);
+        }
+
+        ct.ThrowIfCancellationRequested();
+
+        IReadOnlyList<PenaltyRecord> records =
+            await penalties.GetForStaffAsync(staffMemberId, ct);
+
+        int expiredRecords = 0;
+
+        foreach (PenaltyRecord record in records)
+        {
+            if (record.Status == PenaltyRecordStatus.Active
+                && record.ExpiresAtUtc <= nowUtc)
+            {
+                record.Expire(nowUtc);
+                expiredRecords++;
+            }
+        }
+
+        int activePoints = records
+            .Where(record => record.CountsAt(nowUtc))
+            .Sum(record => record.Points);
+
+        StaffMemberStatus currentStatus =
+            await staff.GetStatusAsync(staffMemberId, ct);
+
+        // Penalties can expire, but Borrowing must never reactivate
+        // a member who has been deactivated by Staff.
+        if (currentStatus == StaffMemberStatus.Deactivated)
+        {
+            return new PenaltyRecalculationResult(
+                expiredRecords,
+                activePoints,
+                StatusChanged: false);
+        }
+
+        StaffMemberStatus byPoints = policy.GetStatus(activePoints);
+
+        StaffMemberStatus nextStatus;
+
+        // The requirements restore Active when points fall below
+        // the Restricted threshold.
+        if (byPoints == StaffMemberStatus.Active)
+        {
+            nextStatus = StaffMemberStatus.Active;
+        }
+        else if (currentStatus == StaffMemberStatus.Suspended)
+        {
+            DateTime suspensionUntilUtc =
+                GetLatestSuspensionDeadline(records, nowUtc)
+                ?? throw new DomainException(
+                    BorrowingErrors.SuspensionHistoryMissing);
+
+            if (nowUtc < suspensionUntilUtc)
+            {
+                nextStatus = StaffMemberStatus.Suspended;
+            }
+            else
+            {
+                nextStatus = GetNonSuspendedStatus(
+                    activePoints,
+                    records,
+                    nowUtc);
+            }
+        }
+        else
+        {
+            // Recalculation does not create a fresh suspension merely
+            // because existing points remain above its threshold.
+            nextStatus = GetNonSuspendedStatus(
+                activePoints,
+                records,
+                nowUtc);
+        }
+
+        if (nextStatus == currentStatus)
+        {
+            return new PenaltyRecalculationResult(
+                expiredRecords,
+                activePoints,
+                StatusChanged: false);
+        }
+
+        string reason =
+            $"Penalty standing recalculated: {activePoints} active points.";
+
+        await staff.SetStatusAsync(
+            staffMemberId,
+            nextStatus,
+            reason,
+            ct);
+
+        await events.PublishAsync(
+            new StaffStatusChanged(
+                ids.NewId(),
+                nowUtc,
+                staffMemberId,
+                currentStatus,
+                nextStatus,
+                reason,
+                EffectiveUntilUtc: null),
+            ct);
+
+        return new PenaltyRecalculationResult(
+            expiredRecords,
+            activePoints,
+            StatusChanged: true);
+    }
+    
+    private StaffMemberStatus GetNonSuspendedStatus(
+        int activePoints,
+        IReadOnlyList<PenaltyRecord> records,
+        DateTime nowUtc)
+    {
+        StaffMemberStatus byPoints = policy.GetStatus(activePoints);
+
+        if (byPoints == StaffMemberStatus.Active)
+        {
+            return StaffMemberStatus.Active;
+        }
+
+        DateTime? suspensionUntilUtc =
+            GetLatestSuspensionDeadline(records, nowUtc);
+
+        if (suspensionUntilUtc.HasValue
+            && nowUtc >= suspensionUntilUtc.Value)
+        {
+            return options.Value.Penalties.AfterSuspension switch
+            {
+                AfterSuspensionMode.RestrictedByPoints =>
+                    StaffMemberStatus.Restricted,
+
+                AfterSuspensionMode.Active =>
+                    StaffMemberStatus.Active,
+
+                _ => throw new InvalidOperationException(
+                    "Unknown after-suspension mode.")
+            };
+        }
+
+        // Starting a suspension requires a new threshold crossing
+        // in ApplyAsync. High existing points alone are insufficient.
+        return StaffMemberStatus.Restricted;
+    }
+
+    private static DateTime? GetLatestSuspensionDeadline(
+        IReadOnlyList<PenaltyRecord> records,
+        DateTime nowUtc)
+    {
+        return records
+            .Where(record =>
+                record.CreatedAtUtc <= nowUtc
+                && record.SuspensionUntilUtc.HasValue)
+            .OrderByDescending(record => record.CreatedAtUtc)
+            .ThenByDescending(record => record.SuspensionUntilUtc)
+            .Select(record => record.SuspensionUntilUtc)
+            .FirstOrDefault();
+    }
     public async Task<PenaltyApplicationResult> ApplyAsync(
         Loan loan,
         IReadOnlyList<ReturnPenaltyItem> items,
@@ -100,6 +274,8 @@ public sealed class PenaltyService(
             loan.StaffMemberId,
             previousActivePoints,
             finalActivePoints,
+            existing,
+            created,
             nowUtc,
             ct);
 
@@ -112,6 +288,8 @@ public sealed class PenaltyService(
         Guid staffMemberId,
         int previousActivePoints,
         int finalActivePoints,
+        IReadOnlyList<PenaltyRecord> existing,
+        IReadOnlyList<PenaltyRecord> created,
         DateTime nowUtc,
         CancellationToken ct)
     {
@@ -141,14 +319,22 @@ public sealed class PenaltyService(
         if (startsSuspension)
         {
             nextStatus = StaffMemberStatus.Suspended;
+
             effectiveUntilUtc =
                 nowUtc.AddDays(options.Value.Penalties.SuspensionDays);
+
+            // All records created by this operation have the same timestamp.
+            // Store the deadline on one positive-point record from this operation.
+            PenaltyRecord trigger = created.Last(record => record.Points > 0);
+
+            trigger.RecordSuspension(effectiveUntilUtc.Value);
         }
         else
         {
-            nextStatus = byPoints == StaffMemberStatus.Suspended
-                ? StaffMemberStatus.Restricted
-                : byPoints;
+            nextStatus = GetNonSuspendedStatus(
+                finalActivePoints,
+                existing,
+                nowUtc);
         }
 
         if (currentStatus == nextStatus)
