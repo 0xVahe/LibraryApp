@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.Areas.Borrowing.Components;
 using LibraryApp.Api.IntegrationTests.Ui;
@@ -8,14 +9,23 @@ using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Dto;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
+using LibraryApp.Api.Ui.Auth;
+using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
@@ -219,6 +229,121 @@ public class ReservePanelPageTests(ReservePanelHost factory) : IClassFixture<Res
         Assert.Contains("badge-green", html);
         Assert.Contains($"Pick it up before {readyUntil.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}.", html);
         Assert.DoesNotContain(ReserveButton, html);
+    }
+
+    private const string NoCopiesText = "The library has no copies of this book at the moment.";
+    private const string AllOutText = "All copies are out.";
+
+    private async Task SetCopyStatusAsync(int book, BookCopyStatus status)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        foreach (var copy in await db.BookCopies.Where(c => c.BookId == CatalogSeedIds.Book(book)).ToListAsync())
+            copy.ChangeStatus(status);
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task A_book_without_copies_can_be_reserved_for_the_first_copy_that_arrives()
+    {
+        var book = new Book(Guid.NewGuid(), "A Book Without Copies", "9780306406157", 2024, "en", null, CatalogSeedIds.Category(1), null);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            db.Books.Add(book);
+            await db.SaveChangesAsync();
+        }
+
+        string auth = await CookieAsync(Members.LevonKhachatryan);
+        var (_, html, set) = await GetAsync(auth, $"/ui-test/borrowing/reserve-panel/{book.Id}");
+        Assert.Contains(NoCopiesText, html);
+        Assert.DoesNotContain(AllOutText, html);
+        Assert.Contains(ReserveButton, html);
+
+        // The API accepts it too (BR-BOR-3 forbids only while a copy is Available); Catalog offers the next copy (BQ-G1-10).
+        string token = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
+        var post = new HttpRequestMessage(HttpMethod.Post, "/reservations")
+        {
+            Content = new FormUrlEncodedContent([new("BookId", book.Id.ToString()), new("__RequestVerificationToken", token)]),
+        };
+        post.Headers.Add("Cookie", $"{auth}; {set}");
+        var response = await UiTestClient.Anonymous(factory).SendAsync(post);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(ReservationStatus.Waiting, Assert.Single(await ReservationsAsync(Members.LevonKhachatryan)).Status);
+    }
+
+    [Theory]
+    [InlineData(55, BookCopyStatus.Withdrawn)]
+    [InlineData(56, BookCopyStatus.Lost)]
+    public async Task A_book_whose_copies_are_all_lost_or_withdrawn_has_no_copies_in_the_library(int book, BookCopyStatus status)
+    {
+        await SetCopyStatusAsync(book, status);
+
+        var (_, html, _) = await GetAsync(await CookieAsync(Members.MilenaAbrahamyan), Panel(book));
+
+        Assert.Contains(NoCopiesText, html);
+        Assert.Contains(ReserveButton, html);
+    }
+
+    [Fact]
+    public async Task A_copy_under_repair_will_come_back_so_all_copies_are_out()
+    {
+        await SetCopyStatusAsync(57, BookCopyStatus.UnderRepair);
+
+        var (_, html, _) = await GetAsync(await CookieAsync(Members.ArturMinasyan), Panel(57));
+
+        Assert.Contains(AllOutText, html);
+        Assert.DoesNotContain(NoCopiesText, html);
+        Assert.Contains(ReserveButton, html);
+    }
+
+    /// <summary>
+    /// The UI cookie of an account without a staff profile. Login refuses such an account (Staff), so no real cookie
+    /// has one; <c>ICurrentUser.StaffMemberId</c> is null only for a principal not issued by login. The cookie carries
+    /// the account's security stamp, so it passes the same check as a real one.
+    /// </summary>
+    private async Task<string> CookieWithoutStaffProfileAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var email = $"no-profile.{Guid.NewGuid():N}@ameriabank.am";
+        var user = new AppUser { Id = Guid.NewGuid(), UserName = email, Email = email };
+        Assert.True((await users.CreateAsync(user, StaffSeedData.Password)).Succeeded);
+        Assert.True((await users.AddToRoleAsync(user, StaffRoles.StaffMember)).Succeeded);
+
+        var stampClaim = factory.Services.GetRequiredService<IOptions<IdentityOptions>>().Value.ClaimsIdentity.SecurityStampClaimType;
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, email),
+                new Claim(LibraryClaimTypes.Role, StaffRoles.StaffMember),
+                new Claim(stampClaim, await users.GetSecurityStampAsync(user)),
+            ],
+            UiAuthentication.CookieScheme, JwtRegisteredClaimNames.Email, LibraryClaimTypes.Role));
+
+        var options = factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(UiAuthentication.CookieScheme);
+        var properties = new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddHours(1), IssuedUtc = DateTimeOffset.UtcNow, AllowRefresh = false };
+        return $"{options.Cookie.Name}={options.TicketDataFormat.Protect(new AuthenticationTicket(principal, properties, UiAuthentication.CookieScheme))}";
+    }
+
+    [Fact]
+    public async Task An_account_without_a_staff_profile_sees_availability_only()
+    {
+        string cookie = await CookieWithoutStaffProfileAsync();
+        await LendAllCopiesAsync(34, Members.KarenAsatryan);
+
+        var (shelfStatus, onShelf, _) = await GetAsync(cookie, Panel(1));
+        var (_, allOut, _) = await GetAsync(cookie, Panel(34));
+
+        Assert.Equal(HttpStatusCode.OK, shelfStatus);
+        Assert.Contains("A copy is on the shelf.", onShelf);
+        Assert.Contains(AllOutText, allOut);
+        foreach (string html in new[] { onShelf, allOut })
+        {
+            Assert.DoesNotContain(ReserveButton, html);
+            Assert.DoesNotContain("books on loan", html);   // no loan limits line
+        }
     }
 
     [Fact]

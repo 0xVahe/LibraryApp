@@ -4,6 +4,7 @@ using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryApp.Api.Areas.Borrowing.Components;
@@ -24,11 +25,11 @@ public sealed class ReservePanelViewComponent(
     public async Task<IViewComponentResult> InvokeAsync(Guid bookId)
     {
         CancellationToken ct = HttpContext.RequestAborted;
-        bool onShelf = await catalog.GetAvailableCopyAsync(bookId, ct) is not null;
+        ReservePanelState availability = await AvailabilityAsync(bookId, ct);
 
         // An account without a staff profile can look, not reserve.
         if (currentUser.StaffMemberId is not { } member)
-            return View("~/Areas/Borrowing/Components/ReservePanel/Default.cshtml", new ReservePanelModel(bookId, onShelf ? ReservePanelState.OnShelf : ReservePanelState.AllOut));
+            return View("~/Areas/Borrowing/Components/ReservePanel/Default.cshtml", new ReservePanelModel(bookId, availability));
 
         StaffBorrowingSummary summary = await borrowing.GetStaffSummaryAsync(member, ct);
         LendingRules rules = await staffMembers.GetLendingRulesAsync(member, ct);
@@ -37,32 +38,50 @@ public sealed class ReservePanelViewComponent(
         ReservePanelState state =
             summary.ActiveLoans.Any(loan => loan.BookId == bookId) ? ReservePanelState.OnLoanToYou
             : reservation is not null ? ReservePanelState.Reserved
-            : onShelf ? ReservePanelState.OnShelf
-            : ReservePanelState.AllOut;
+            : availability;
 
         return View("~/Areas/Borrowing/Components/ReservePanel/Default.cshtml", new ReservePanelModel(bookId, state)
         {
-            CanReserve = state == ReservePanelState.AllOut,
+            CanReserve = state is ReservePanelState.AllOut or ReservePanelState.NoCopies,
             Reservation = state == ReservePanelState.Reserved ? reservation : null,
             ReadyUntilLocal = reservation?.ReadyUntilUtc is { } until ? clock.ToLocalDate(until) : null,
             OpenLoans = summary.ActiveLoans.Count,
             Rules = rules,
         });
     }
+
+    /// <summary>
+    /// On the shelf: a copy is Available. All out: no copy is Available but one will come back (on loan, held for
+    /// someone, under repair). No copies: none at all, or all Lost or Withdrawn — a reservation then gets the next copy
+    /// Catalog adds (<c>OfferCopyAsync</c>, BQ-G1-10).
+    /// </summary>
+    private async Task<ReservePanelState> AvailabilityAsync(Guid bookId, CancellationToken ct)
+    {
+        if (await catalog.GetAvailableCopyAsync(bookId, ct) is not null)
+            return ReservePanelState.OnShelf;
+
+        IReadOnlyList<Guid> copyIds = await catalog.GetCopyIdsAsync(bookId, ct);
+        IReadOnlyList<BookCopyDto> copies = copyIds.Count == 0 ? [] : await catalog.GetCopiesAsync(copyIds, ct);
+
+        return copies.Any(copy => copy.Status is BookCopyStatus.OnLoan or BookCopyStatus.Reserved or BookCopyStatus.UnderRepair)
+            ? ReservePanelState.AllOut
+            : ReservePanelState.NoCopies;
+    }
 }
 
-/// <summary>What the panel says, first match wins: the member has the book, has reserved it, a copy is on the shelf, all out.</summary>
+/// <summary>What the panel says, first match wins: the member has the book, has reserved it, a copy is on the shelf, all out, no copies.</summary>
 public enum ReservePanelState
 {
     OnLoanToYou = 1,
     Reserved = 2,
     OnShelf = 3,
     AllOut = 4,
+    NoCopies = 5,
 }
 
 public sealed record ReservePanelModel(Guid BookId, ReservePanelState State)
 {
-    /// <summary>The "Reserve a copy" form: only when every copy is out (BR-BOR-3) and a staff member is signed in.</summary>
+    /// <summary>The "Reserve a copy" form: only when no copy is Available (BR-BOR-3) and a staff member is signed in.</summary>
     public bool CanReserve { get; init; }
 
     public OpenReservationInfo? Reservation { get; init; }

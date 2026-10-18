@@ -19,7 +19,14 @@
                 <p>A copy is on the shelf. Take it at the library desk and a librarian issues it to you.</p>
                 break;
             default:
-                <p>All copies are out. Reserve one and we hold it for you at the library desk. You get an email when it is ready.</p>
+                if (Model.State == ReservePanelState.NoCopies)
+                {
+                    <p>The library has no copies of this book at the moment. Reserve it and the first copy that arrives is held for you at the library desk. You get an email when it is ready.</p>
+                }
+                else
+                {
+                    <p>All copies are out. Reserve one and we hold it for you at the library desk. You get an email when it is ready.</p>
+                }
                 if (Model.CanReserve)
                 {
                     <form method="post" asp-area="Borrowing" asp-page="/Reserve">
