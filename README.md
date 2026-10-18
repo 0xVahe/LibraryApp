@@ -68,6 +68,13 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 
+### Notifications (`Notifications`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
+| `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
+
 ## Daily jobs
 
 A module job that must run once per local (Asia/Yerevan) day — for example the Borrowing daily job (BOR-06) or the 09:00 reminders (NOT-05) — implements `IDailyJob` (`Application/Abstractions/Common`) and is registered in the module's `Add<Module>Module`:
