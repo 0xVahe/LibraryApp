@@ -268,6 +268,7 @@ public sealed class ReturnPenaltyCalculatorTests
                 RestrictedFromPoints = 5,
                 SuspendedFromPoints = 10,
                 SuspensionDays = 30,
+                AfterSuspension = AfterSuspensionMode.RestrictedByPoints,
                 LateAndDamaged = LateAndDamagedMode.Sum
             },
             Loans = new LoanOptions
