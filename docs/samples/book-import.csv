@@ -1,6 +1,0 @@
-Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description
-Sample Import: Clean Practices,979-1-00000-001-5,2020,en,IT & Software Engineering,Robert C. Martin,Prentice Hall,Synthetic book for the CSV import demo.
-"Sample Import: Data, Systems and Scale",9791000000022,2021,en,Data & Analytics,Martin Kleppmann; Foster Provost,O'Reilly Media,"Two authors, separated by a semicolon."
-Sample Import: Risk Notes,9791000000039,2019,en,"Risk, Compliance & AML",John C. Hull,Wiley,
-Пример импорта: деловое письмо,9791000000046,2022,ru,Soft Skills & Communication,Максим Ильяхов,Альпина Паблишер,Синтетическая книга для демонстрации импорта.
-Ներմուծման օրինակ,9791000000053,2023,hy,General Reading,Հովհաննես Թումանյան,,Synthetic Armenian title without a publisher.

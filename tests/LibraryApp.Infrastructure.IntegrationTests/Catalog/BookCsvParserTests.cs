@@ -98,9 +98,19 @@ public sealed class BookCsvParserTests
     }
 
     [Fact]
+    public async Task The_optional_cover_path_column_is_read_and_may_be_empty()
+    {
+        var rows = await Parse(Header + ",CoverImagePath\n" +
+            "With Cover,9791000000022,2021,en,General Reading,A,,,library-covers/01.png\n" +
+            "Without Cover,9791000000039,2021,en,General Reading,A,,,\n");
+
+        Assert.Equal(["library-covers/01.png", null], rows.Select(row => row.CoverImagePath));
+    }
+
+    [Fact]
     public async Task The_sample_file_reads_and_uses_only_seeded_names()
     {
-        var path = Path.Combine(RepositoryRoot(), "docs", "samples", "book-import.csv");
+        var path = Path.Combine(RepositoryRoot(), "src", "LibraryApp.Api", "wwwroot", "samples", "book-import.csv");
         await using var file = File.OpenRead(path);
 
         var rows = await _parser.ParseAsync(file);
