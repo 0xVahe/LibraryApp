@@ -1,12 +1,14 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Infrastructure.Catalog;
 using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -18,6 +20,12 @@ public static class CatalogRegistrationExtensions
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<CatalogCoversOptions>()
+            .Bind(configuration.GetSection(CatalogCoversOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<CatalogCoversOptions>, CatalogCoversOptionsValidator>();
+        services.AddSingleton<ICatalogCoverUrlBuilder, CatalogCoverUrlBuilder>();
+
         // Search (CAT-05)
         services.AddScoped<IBookSearchQuery, BookSearchQuery>();
         services.AddScoped<IBookSearchService, BookSearchService>();

@@ -33,7 +33,8 @@ public sealed class BookDetailsQuery(LibraryDbContext db) : IBookDetailsQuery
                     && copy.Status != BookCopyStatus.Lost
                     && copy.Status != BookCopyStatus.Withdrawn),
                 db.BookCopies.Count(copy => copy.BookId == book.Id && copy.Status == BookCopyStatus.Available),
-                book.IsDeleted))
+                book.IsDeleted,
+                book.CoverImagePath))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }
