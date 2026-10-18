@@ -1,10 +1,12 @@
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -37,13 +39,13 @@ public class BookImportServiceTests
     {
         var books = new BookService(_books, _authors, _transaction, _transaction, _transaction, _clock);
         return new BookImportService(_parser, books, _books, _categories, _publishers, _authors,
-            new CreateBookRequestValidator(_clock));
+            new CreateBookRequestValidator(_clock, Options.Create(new CatalogCoversOptions { BaseUrl = "https://images.example.test/" })));
     }
 
     private static BookCsvRow Row(int rowNumber, string isbn, string title = "Imported Book", string year = "2020",
         string language = "en", string category = "IT & Software Engineering", string? publisher = null,
-        string authors = "Robert C. Martin", string? description = null) =>
-        new(rowNumber, title, isbn, year, language, description, category, publisher, authors);
+        string authors = "Robert C. Martin", string? description = null, string? cover = null) =>
+        new(rowNumber, title, isbn, year, language, description, category, publisher, authors, cover);
 
     private async Task<IReadOnlyList<BookImportError>> ImportErrors(params BookCsvRow[] rows)
     {
@@ -121,6 +123,19 @@ public class BookImportServiceTests
         Assert.Contains(errors, e => e is { RowNumber: 2, Field: "Isbn" });
         Assert.Contains(errors, e => e is { RowNumber: 3, Field: "Title" });
         Assert.Contains(errors, e => e is { RowNumber: 4, Field: "PublicationYear" });
+    }
+
+    [Fact]
+    public async Task A_valid_cover_path_is_saved_and_an_invalid_one_is_a_row_error()
+    {
+        _parser.Rows = [Row(2, "9791000000022", cover: " library-covers/01.png ")];
+        await Service().ImportAsync(Stream.Null, 100);
+        Assert.Equal("library-covers/01.png", Assert.Single(_books.Books).CoverImagePath);
+
+        var errors = await ImportErrors(Row(3, "9791000000039", cover: "https://example.com/cover.png"));
+
+        var error = Assert.Single(errors);
+        Assert.Equal((3, nameof(CreateBookRequest.CoverImagePath), CoverImagePathRules.Message), (error.RowNumber, error.Field, error.Message));
     }
 
     [Fact]
