@@ -1,0 +1,61 @@
+@page "/catalog/publishers"
+@model PublishersModel
+@{
+    ViewData["Title"] = "Publishers";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Publishers", "Manage catalog publishers.")' />
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-red mb-16" role="alert" asp-validation-summary="All"></div>
+}
+<section class="card mb-24" aria-labelledby="create-heading">
+    <div class="card-head"><h2 id="create-heading">Create publisher</h2></div>
+    <form class="form" method="post" asp-page-handler="Create">
+        <div class="field">
+            <label for="create-name">Name</label>
+            <input id="create-name" name="Name" value="@Model.CreateInput.Name" required>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Create publisher</button>
+        </div>
+    </form>
+</section>
+<section class="card flush" aria-labelledby="list-heading">
+    <div class="card-head"><h2 id="list-heading">Existing publishers</h2></div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Name</th><th scope="col">Edit</th><th scope="col">Delete</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Items)
+            {
+                var input = Model.EditId == item.Id ? Model.EditInput : new PublisherRequest(item.Name);
+                <tr>
+                    <td data-label="Name">@item.Name</td>
+                    <td data-label="Edit">
+                        <form class="form" method="post" asp-page-handler="Edit">
+                            <input type="hidden" name="id" value="@item.Id">
+                            <div class="field">
+                                <label for="name-@item.Id">Name</label>
+                                <input id="name-@item.Id" name="Name" value="@input.Name" required>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-secondary btn-sm" type="submit">Save changes</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td data-label="Delete">
+                        <form method="post" asp-page-handler="Delete">
+                            <input type="hidden" name="id" value="@item.Id">
+                            <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete @item.Name">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="3">No publishers yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</section>
