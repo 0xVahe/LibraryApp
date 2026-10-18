@@ -149,6 +149,10 @@ empty to turn covers off. Otherwise it must be an absolute HTTPS address ending 
 fragment or unsafe characters. Covers need internet access from the browser; when they are unavailable, the coloured
 text cover remains visible. To move to another storage, copy the files to the new location and change this one setting;
 the database, API code and contracts do not change.
+
+The seed fills only an empty database, so a Development database created before the covers keeps its books without
+cover paths. Recreate it once, as described in [Demo data](#demo-data), to get the covers.
+
 ## Browser UI
 
 Razor Pages live in the API host (UI guide in the team docs): the shared shell in `src/LibraryApp.Api/Pages` and `Ui/`, each group's pages in `src/LibraryApp.Api/Areas/<Module>`.

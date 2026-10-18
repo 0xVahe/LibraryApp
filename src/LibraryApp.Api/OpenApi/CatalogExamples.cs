@@ -1,4 +1,3 @@
-using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Domain.Catalog;
@@ -14,9 +13,7 @@ public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchema
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
-        if (context.Type == typeof(BookDto)
-            || context.Type == typeof(BookDetailsDto)
-            || context.Type == typeof(BookSearchResultDto))
+        if (context.Type == typeof(BookDetailsDto) || context.Type == typeof(BookSearchResultDto))
         {
             if (schema.Properties.TryGetValue("coverImageUrl", out var coverImageUrl)
                 && coverUrls.Build(CatalogSeedIds.CoverImagePath(1)) is { } coverUrl)

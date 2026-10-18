@@ -44,7 +44,7 @@ public sealed class CatalogSwaggerTests(ApiHostFactory factory) : IClassFixture<
         Assert.False(string.IsNullOrWhiteSpace(createBookProperties.GetProperty("title").GetProperty("description").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(createBookProperties.GetProperty("isbn").GetProperty("description").GetString()));
 
-        foreach (var schemaName in new[] { "BookDto", "BookDetailsDto", "BookSearchResultDto" })
+        foreach (var schemaName in new[] { "BookDetailsDto", "BookSearchResultDto" })
         {
             var cover = schemas.GetProperty(schemaName).GetProperty("properties").GetProperty("coverImageUrl");
             Assert.False(string.IsNullOrWhiteSpace(cover.GetProperty("example").GetString()),
