@@ -7,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Borrowing;
 
 /// <summary>
-/// <see cref="IPickupListService"/>: one query on Reservations, no tracking and no transaction. A reservation whose
-/// deadline has passed stays in the list until the daily job expires it (BOR-11), so the desk still sees it.
+/// <see cref="IPickupListService"/>: two reads of Reservations — the total, then the page — with no tracking and no
+/// transaction, as every paged list of the system (SD-14). A reservation that changes between the two reads can make the
+/// total not match the page for that request; the next request is exact. A reservation whose deadline has
+/// passed stays in the list until the daily job expires it (BOR-11), so the desk still sees it.
 /// </summary>
 public sealed class PickupListService(LibraryDbContext db) : IPickupListService
 {
