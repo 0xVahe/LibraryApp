@@ -14,13 +14,15 @@ using LibraryApp.Domain.Staff;
 namespace LibraryApp.Application.Borrowing.Services;
 
 /// <summary>
-/// Implements the loan use cases. For now: issuing a loan and reading one.
+/// Implements the loan use cases: issuing a copy and reading a loan.
 /// The input is validated by <c>IssueLoanRequestValidator</c> before the endpoint is reached (SD-15).
 /// </summary>
 public sealed class LoanService(
     IStaffMemberService staffMembers,
     ICatalogService catalog,
     ILoanRepository loans,
+    IReservationRepository reservations,
+    ReservationQueueService reservationQueue,
     IUnitOfWork unitOfWork,
     IApplicationLock locks,
     IEventBus events,
@@ -60,14 +62,47 @@ public sealed class LoanService(
                 throw new DomainException(
                     StaffErrors.LoanLimitReached(openLoans, rules.MaxLoans));
 
-            // 4. Find the copy by barcode.
+            // 4. Find the copy to identify its book, then take the book lock after the staff lock.
             BookCopyDto copy =
                 await catalog.GetCopyByBarcodeAsync(request.Barcode, token)
                 ?? throw new DomainException(BorrowingErrors.CopyNotFound);
 
-            // 5. Check availability.
-            if (copy.Status != BookCopyStatus.Available)
+            await locks.AcquireAsync(BorrowingLocks.Book(copy.BookId), token);
+
+            // Re-read after waiting for the book lock so we act on the current copy state.
+            copy = await catalog.GetCopyByBarcodeAsync(request.Barcode, token)
+                ?? throw new DomainException(BorrowingErrors.CopyNotFound);
+
+            // 5. A held copy can be collected only by the member whose ReadyForPickup reservation owns it.
+            Reservation? heldReservation = null;
+            if (copy.Status == BookCopyStatus.Reserved)
+            {
+                heldReservation = await reservations.FindReadyForCopyAsync(copy.Id, token);
+                if (heldReservation is null || heldReservation.StaffMemberId != request.StaffMemberId)
+                    throw new DomainException(BorrowingErrors.CopyNotAvailable);
+
+                heldReservation.Fulfil();
+            }
+            else if (copy.Status != BookCopyStatus.Available)
                 throw new DomainException(BorrowingErrors.CopyNotAvailable);
+
+            // BQ-BA-08: issuing any copy fulfills this member's ready reservation for the same book. Its held copy
+            // is then offered to the next waiting member, or released to Available when the queue is empty.
+            if (heldReservation is null && copy.Status == BookCopyStatus.Available)
+            {
+                heldReservation = await reservations.FindReadyForStaffAndBookAsync(request.StaffMemberId, copy.BookId, token);
+                if (heldReservation is not null)
+                {
+                    Guid heldCopyId = heldReservation.CopyId
+                        ?? throw new DomainException(BorrowingErrors.CopyNotAvailable);
+                    heldReservation.Fulfil();
+
+                    bool reassigned = await reservationQueue.TryOfferCopyUnderBookLockAsync(
+                        heldCopyId, copy.BookId, BookCopyStatus.Reserved, token);
+                    if (!reassigned)
+                        await catalog.SetCopyStatusAsync(heldCopyId, BookCopyStatus.Available, token);
+                }
+            }
 
             // 6. Create and stage the loan.
             DateTime now = clock.UtcNow;

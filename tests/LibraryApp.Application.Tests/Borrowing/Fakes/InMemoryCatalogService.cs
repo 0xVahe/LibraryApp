@@ -52,9 +52,13 @@ public sealed class InMemoryCatalogService : ICatalogService
                 "catalog.copy_not_found",
                 "The copy was not found."));
 
-        // This test fake supports only the issue-loan transition.
-        if (copy.Status != BookCopyStatus.Available ||
-            status != BookCopyStatus.OnLoan)
+        bool allowed = (copy.Status, status) switch
+        {
+            (BookCopyStatus.Available, BookCopyStatus.OnLoan or BookCopyStatus.Reserved) => true,
+            (BookCopyStatus.Reserved, BookCopyStatus.OnLoan or BookCopyStatus.Available) => true,
+            _ => false,
+        };
+        if (!allowed)
         {
             throw new DomainException(
                 CatalogErrors.CopyStatusChangeNotAllowed(

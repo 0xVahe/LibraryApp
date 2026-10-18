@@ -14,6 +14,13 @@ public interface IReservationRepository
     /// saves their changes.
     /// </summary>
     Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default);
+
+    /// <summary>Loads a tracked ReadyForPickup reservation holding the specified copy, if any.</summary>
+    Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default);
+
+    /// <summary>Loads a tracked ReadyForPickup reservation for this staff member and book, if any.</summary>
+    Task<Reservation?> FindReadyForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default);
+
     Task AddAsync(Reservation reservation, CancellationToken ct = default);
 
     /// <summary>The reservation with this id, read only; null when there is none.</summary>
