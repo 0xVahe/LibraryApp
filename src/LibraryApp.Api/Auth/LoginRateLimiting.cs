@@ -83,7 +83,8 @@ public static class LoginRateLimiting
 
         return services;
     }
-    
+
+    /// <summary>The rejected page itself with its query (e.g. <c>returnUrl</c>) plus <see cref="TooManyAttemptsParameter"/>.</summary>
     public static string TooManyAttemptsUrl(HttpRequest request)
     {
         var query = QueryHelpers.ParseQuery(request.QueryString.Value)
