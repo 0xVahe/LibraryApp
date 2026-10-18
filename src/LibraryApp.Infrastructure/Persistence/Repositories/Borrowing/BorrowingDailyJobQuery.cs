@@ -38,6 +38,7 @@ public sealed class BorrowingDailyJobQuery(LibraryDbContext db)
     {
         return await db.PenaltyRecords
             .AsNoTracking()
+            .Where(penalty => penalty.Status == PenaltyRecordStatus.Active)
             .Select(penalty => penalty.StaffMemberId)
             .Distinct()
             .OrderBy(staffMemberId => staffMemberId)
