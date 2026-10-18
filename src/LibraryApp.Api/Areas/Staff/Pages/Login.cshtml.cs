@@ -17,7 +17,7 @@ namespace LibraryApp.Api.Areas.Staff.Pages;
 /// <summary>
 /// MEM-02 sign-in page: the same login as POST /api/auth/login (<see cref="IAuthService"/>: corporate email, lockout,
 /// deactivated accounts), then the cookie sign-in of the shell. POSTs share the API's per-IP limit; a rejected POST
-/// comes back here with <see cref="TooManyAttemptsParameter"/> (see <c>LoginRateLimiting.OnRejected</c>).
+/// comes back here with <see cref="LoginRateLimiting.TooManyAttemptsParameter"/> (see <c>LoginRateLimiting.OnRejected</c>).
 /// </summary>
 [AllowAnonymous]
 [EnableRateLimiting(LoginRateLimiting.PolicyName)] // the policy counts POSTs only
@@ -57,8 +57,7 @@ public sealed class LoginModel(IAuthService auth, IUiSignIn signIn, IOptions<Ide
         {
             login = await auth.LoginAsync(Input, ct);
         }
-        catch (DomainException
-               ex) // deactivated account (403) or not corporate: shown on the form, not as the Forbidden page
+        catch (DomainException ex) // deactivated account (403) or not corporate: shown on the form, not as the Forbidden page
         {
             Alert = new AlertModel(AlertKind.Red, ex.Error.Message);
             return Page();

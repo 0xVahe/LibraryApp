@@ -2,8 +2,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
-using Microsoft.AspNetCore.Hosting;
 using LibraryApp.Api.Auth;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
