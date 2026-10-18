@@ -106,16 +106,54 @@ public class AuditLogTests(AuditFixture fixture) : IClassFixture<AuditFixture>
             return Task.CompletedTask;
         });
         await fixture.InTransactionAsync(userId, async db =>
+        {
+            Book book = await db.Books.SingleAsync(b => b.Id == bookId);
+            book.Update("Audited Book, 2nd edition", book.Isbn, 2021, book.Language, null, book.CategoryId, null);
+        });
+        await fixture.InTransactionAsync(userId, async db =>
             (await db.Books.SingleAsync(b => b.Id == bookId)).Delete(AuditFixture.Now));
 
+        // A soft delete (BR-CAT-3) is the delete action NFR-14 names.
         List<AuditLog> rows = await fixture.RowsAsync(bookId);
-        Assert.Equal([AuditActions.Created, AuditActions.Updated], rows.Select(r => r.Action));
+        Assert.Equal([AuditActions.Created, AuditActions.Updated, AuditActions.Deleted], rows.Select(r => r.Action));
         Assert.All(rows, row =>
         {
             Assert.Equal("Book", row.EntityName);
             Assert.Equal(userId, row.UserId);
             Assert.Equal(AuditFixture.Now, row.TimestampUtc);
         });
+    }
+
+    [Fact]
+    public async Task Changing_the_authors_of_a_book_records_the_book_once_and_a_new_book_with_authors_only_as_created()
+    {
+        var userId = Guid.NewGuid();
+        var bookId = Guid.NewGuid();
+        var first = new Author(Guid.NewGuid(), $"First {bookId:N}");
+        var second = new Author(Guid.NewGuid(), $"Second {bookId:N}");
+        var third = new Author(Guid.NewGuid(), $"Third {bookId:N}");
+
+        // Created together with its authors: one Created row, no extra Updated.
+        await fixture.InTransactionAsync(userId, db =>
+        {
+            var category = new Category(Guid.NewGuid(), $"Authors {bookId:N}");
+            db.Categories.Add(category);
+            db.Authors.AddRange(first, second, third);
+            db.Books.Add(new Book(bookId, "Book With Authors", Isbn(bookId), 2020, "en", null, category.Id, null));
+            db.BookAuthors.Add(new BookAuthor(bookId, first.Id));
+            return Task.CompletedTask;
+        });
+
+        // CAT-02: only the links change (one removed, two added) — the book row itself stays Unchanged.
+        await fixture.InTransactionAsync(userId, async db =>
+        {
+            db.BookAuthors.Remove(await db.BookAuthors.SingleAsync(l => l.BookId == bookId && l.AuthorId == first.Id));
+            db.BookAuthors.AddRange(new BookAuthor(bookId, second.Id), new BookAuthor(bookId, third.Id));
+        });
+
+        List<AuditLog> rows = await fixture.RowsAsync(bookId);
+        Assert.Equal([AuditActions.Created, AuditActions.Updated], rows.Select(r => r.Action));
+        Assert.All(rows, row => Assert.Equal(("Book", userId), (row.EntityName, row.UserId)));
     }
 
     [Fact]
