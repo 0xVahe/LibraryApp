@@ -30,6 +30,7 @@ public sealed class CatalogBookSeedTests(CatalogReferenceFixture fixture) : ICla
             Assert.Equal(seedBook.Isbn, book.Isbn);
             Assert.Equal(seedBook.Title, book.Title);
             Assert.Equal(seedBook.Language, book.Language);
+            Assert.Equal(CatalogSeedIds.CoverImagePath(seedBook.Number), book.CoverImagePath);
             Assert.Equal(seedBook.Authors.Count, await verify.BookAuthors.CountAsync(link => link.BookId == book.Id));
         }
     }

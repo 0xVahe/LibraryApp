@@ -12,6 +12,7 @@ public sealed class BookConfiguration : IEntityTypeConfiguration<Book>
         builder.Property(x => x.Isbn).HasMaxLength(Book.IsbnLength).IsRequired();          // 13 digits (G1-02)
         builder.Property(x => x.Language).HasMaxLength(Book.LanguageLength).IsRequired();  // ISO 639-1 (G1-03)
         builder.Property(x => x.Description).HasMaxLength(-1);                              // nvarchar(max)
+        builder.Property(x => x.CoverImagePath).HasMaxLength(Book.CoverImagePathMaxLength);
 
         // BR-CAT-1: the ISBN is unique among books that are not deleted (G1-02).
         builder.HasIndex(x => x.Isbn)

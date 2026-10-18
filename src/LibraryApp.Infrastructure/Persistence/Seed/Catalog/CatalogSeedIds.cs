@@ -19,4 +19,7 @@ public static class CatalogSeedIds
     /// <summary>Barcode of that copy, for example BK-0001-01 for the first copy of book 1 (BR-CAT-2).</summary>
     public static string CopyBarcode(int bookNumber, int copyNumber) =>
         $"BK-{bookNumber:D4}-{copyNumber:D2}";
+
+    public static string CoverImagePath(int bookNumber) =>
+        $"library-covers/{bookNumber:D2}.png";
 }

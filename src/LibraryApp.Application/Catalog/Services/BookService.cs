@@ -127,7 +127,8 @@ public sealed class BookService : IBookService
             request.Language,
             request.Description,
             request.CategoryId,
-            request.PublisherId);
+            request.PublisherId,
+            request.CoverImagePath);
 
         _bookRepository.Add(book);
 
@@ -190,7 +191,8 @@ public sealed class BookService : IBookService
                 request.Language,
                 request.Description,
                 request.CategoryId,
-                request.PublisherId);
+                request.PublisherId,
+                request.CoverImagePath);
         }, ct);
     }
 
