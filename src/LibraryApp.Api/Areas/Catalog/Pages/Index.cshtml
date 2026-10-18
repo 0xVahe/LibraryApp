@@ -8,13 +8,15 @@
     var lastResult = Model.Result.Items.Count == 0
         ? 0
         : firstResult + Model.Result.Items.Count - 1;
+    var suggest = new PageAction("Suggest a book", SuggestionsModel.Path);
     var actions = Model.CanManageBooks
         ? new[]
         {
+            suggest,
             new PageAction("Import CSV", "/catalog/import"),
             new PageAction("Add book", "/catalog/books/new", Primary: true),
         }
-        : null;
+        : new[] { suggest };
 }
 <partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Catalog", "Browse the library collection and find your next book.", actions)' />
 
