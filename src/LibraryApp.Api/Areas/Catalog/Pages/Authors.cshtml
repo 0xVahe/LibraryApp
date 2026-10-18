@@ -3,7 +3,7 @@
 @{
     ViewData["Title"] = "Authors";
 }
-<partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Authors", "Manage catalog authors.")' />
+<partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Authors", "Manage catalog authors.", Crumbs: [new("Catalog", "/catalog")])' />
 @if (!ViewData.ModelState.IsValid)
 {
     <div class="alert alert-red mb-16" role="alert" asp-validation-summary="All"></div>
@@ -47,6 +47,7 @@
                     <td data-label="Delete">
                         <form method="post" asp-page-handler="Delete">
                             <input type="hidden" name="id" value="@item.Id">
+                            <label class="check"><input type="checkbox" name="confirmDelete" value="true"> I want to delete this author</label>
                             <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete @item.FullName">Delete</button>
                         </form>
                     </td>

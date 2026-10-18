@@ -35,13 +35,16 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         var html = await response.Content.ReadAsStringAsync();
         var items = await ListAsync(page);
         Assert.NotEmpty(items);
+        Assert.Contains("<a href=\"/catalog\">Catalog</a>", html);
         Assert.Contains($"Create {singular.ToLowerInvariant()}", html);
         Assert.Contains($"name=\"{field}\"", Form(html, "Create"));
         foreach (var item in items)
         {
             Assert.Contains(item.Name, WebUtility.HtmlDecode(html));
             Assert.Contains(item.Name, WebUtility.HtmlDecode(Form(html, "Edit", item.Id)));
-            Assert.Contains("Delete", Form(html, "Delete", item.Id));
+            var deleteForm = Form(html, "Delete", item.Id);
+            Assert.Contains("type=\"checkbox\" name=\"confirmDelete\" value=\"true\"", deleteForm);
+            Assert.Contains($"I want to delete this {singular.ToLowerInvariant()}", deleteForm);
         }
 
         foreach (Match form in Regex.Matches(html, "<form\\b.*?</form>", RegexOptions.Singleline))
@@ -71,11 +74,30 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         Assert.Contains(renamed, editHtml);
         Assert.Equal(renamed, (await ListAsync(page)).Single(row => row.Id == item.Id).Name);
 
-        // Delete binds only the ID; an empty, unrelated name must not prevent deletion.
-        using var deleted = await PostAsync(client, page, "Delete", new() { ["id"] = item.Id.ToString() });
+        // Delete binds only the ID and confirmation; no unrelated name is needed.
+        using var deleted = await PostAsync(client, page, "Delete", new() { ["id"] = item.Id.ToString(), ["confirmDelete"] = "true" });
         var deleteHtml = await AssertSuccessAsync(client, deleted, page, $"{singular} deleted.");
         Assert.DoesNotContain(renamed, deleteHtml);
         Assert.DoesNotContain(await ListAsync(page), row => row.Id == item.Id);
+    }
+
+    [Theory]
+    [MemberData(nameof(Pages))]
+    public async Task Deleting_without_confirmation_keeps_an_unused_item(string page, string singular, string field)
+    {
+        using var client = await SignedIn(StaffSeedIds.StaffMembers.AramSargsyan);
+        var beforeCreate = await ListAsync(page);
+        using var created = await PostAsync(client, page, "Create", new() { [field] = $"Unconfirmed {singular}" });
+        Assert.Equal(HttpStatusCode.Redirect, created.StatusCode);
+        var beforeDelete = await ListAsync(page);
+        var item = Assert.Single(beforeDelete, item => beforeCreate.All(old => old.Id != item.Id));
+
+        using var response = await PostAsync(client, page, "Delete", new() { ["id"] = item.Id.ToString() });
+
+        var html = await AssertErrorAsync(response, $"Tick \"I want to delete this {singular.ToLowerInvariant()}\" to confirm.");
+        Assert.Equal(beforeDelete, await ListAsync(page));
+        Assert.Contains(item.Name, Form(html, "Edit", item.Id));
+        Assert.DoesNotContain($"{singular} deleted.", html);
     }
 
     [Theory]
@@ -92,7 +114,7 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         };
         var before = (await ListAsync(page)).Single(item => item.Id == id);
         using var client = await SignedIn(StaffSeedIds.StaffMembers.AramSargsyan);
-        using var response = await PostAsync(client, page, "Delete", new() { ["id"] = id.ToString() });
+        using var response = await PostAsync(client, page, "Delete", new() { ["id"] = id.ToString(), ["confirmDelete"] = "true" });
 
         var html = await AssertErrorAsync(response, error);
         Assert.Equal(before, (await ListAsync(page)).Single(item => item.Id == id));
@@ -145,7 +167,9 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
 
         AssertParentOptions(Form(html, "Create"), roots);
         foreach (var category in categories)
-            AssertParentOptions(Form(html, "Edit", category.Id), roots.Where(id => id != category.Id.ToString()));
+            AssertParentOptions(Form(html, "Edit", category.Id), categories.Any(item => item.ParentCategoryId == category.Id)
+                ? [] : roots.Where(id => id != category.Id.ToString()));
+        Assert.Contains($"<td data-label=\"Name\">{parent.Name} / {child.Name}</td>", WebUtility.HtmlDecode(html));
         Assert.Contains($"value=\"{parent.Id}\" selected=\"selected\"", Form(html, "Edit", child.Id));
     }
 
@@ -200,9 +224,8 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         Assert.Equal(before, await CategoriesAsync());
         Assert.Contains("Submitted category name", Form(html, "Edit", item.Id));
         AssertParentOptions(Form(html, "Edit", item.Id),
-            before.Where(category => category.ParentCategoryId is null && category.Id != item.Id).Select(category => category.Id.ToString()));
-        if (change == "has-children")
-            Assert.Contains($"value=\"{parentId}\" selected=\"selected\"", Form(html, "Edit", item.Id));
+            change == "has-children" ? [] : before.Where(category => category.ParentCategoryId is null && category.Id != item.Id)
+                .Select(category => category.Id.ToString()));
     }
 
     [Fact]
@@ -230,7 +253,7 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         await CreateCategoryAsync("Delete child", parent.Id);
         var before = await CategoriesAsync();
         using var client = await SignedIn(StaffSeedIds.StaffMembers.AramSargsyan);
-        using var response = await PostAsync(client, "categories", "Delete", new() { ["id"] = parent.Id.ToString() });
+        using var response = await PostAsync(client, "categories", "Delete", new() { ["id"] = parent.Id.ToString(), ["confirmDelete"] = "true" });
 
         await AssertErrorAsync(response, CatalogErrors.CategoryInUse.Message);
         Assert.Equal(before, await CategoriesAsync());
@@ -264,6 +287,7 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
             using var response = await PostAsync(client, page, handler, new()
             {
                 ["id"] = item.Id.ToString(), [field] = "Unauthorized change",
+                ["confirmDelete"] = "true",
             }, tokenPath: "/forbidden");
             await AssertForbiddenAsync(client, response);
             Assert.Equal(before, await ListAsync(page));

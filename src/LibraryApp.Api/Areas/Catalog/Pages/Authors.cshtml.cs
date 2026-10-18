@@ -67,8 +67,11 @@ public sealed class AuthorsModel(IAuthorService service) : PageModel
         return RedirectToPage();
     }
 
-    public async Task<IActionResult> OnPostDeleteAsync(Guid id, CancellationToken ct)
+    public async Task<IActionResult> OnPostDeleteAsync(Guid id, bool confirmDelete, CancellationToken ct)
     {
+        if (!confirmDelete)
+            ModelState.AddModelError(string.Empty, "Tick \"I want to delete this author\" to confirm.");
+
         if (!ModelState.IsValid)
         {
             await LoadAsync(ct);
