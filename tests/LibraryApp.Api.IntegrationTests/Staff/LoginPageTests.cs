@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Hosting;
+using LibraryApp.Api.Auth;
+using Microsoft.AspNetCore.Http;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
@@ -126,12 +128,29 @@ public class LoginRateLimitPageTests(LoginRateLimitHostFactory factory) : IClass
 
         // Even the right password is rejected now; the GETs of the form were never counted.
         var rejected = await LoginPage.PostAsync(client, email, StaffSeedData.Password, "?returnUrl=%2Fcatalog");
-        Assert.Equal(HttpStatusCode.Redirect, rejected.StatusCode);
-        Assert.Equal("/login?tooManyAttempts=true&returnUrl=%2Fcatalog", rejected.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.SeeOther, rejected.StatusCode);
+        Assert.Equal("/login?returnUrl=%2Fcatalog&tooManyAttempts=true", rejected.Headers.Location!.OriginalString);
+        Assert.NotNull(rejected.Headers.RetryAfter);
         Assert.False(LoginPage.SetsAuthCookie(rejected));
 
         var page = await client.GetAsync(rejected.Headers.Location);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
         Assert.Contains("Too many attempts", await page.Content.ReadAsStringAsync());
+    }
+}
+
+public class TooManyAttemptsUrlTests
+{
+    [Theory]
+    [InlineData("/login", "?returnUrl=%2Fcatalog", "/login?returnUrl=%2Fcatalog&tooManyAttempts=true")]
+    [InlineData("/change-password", "", "/change-password?tooManyAttempts=true")]
+    [InlineData("/change-password", "?tooManyAttempts=true", "/change-password?tooManyAttempts=true")]
+    public void A_rejected_page_post_goes_back_to_its_own_page(string path, string query, string expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        context.Request.QueryString = new QueryString(query);
+
+        Assert.Equal(expected, LoginRateLimiting.TooManyAttemptsUrl(context.Request));
     }
 }

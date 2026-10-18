@@ -10,7 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@(ViewData["Title"] is string title ? $"{title} · Ameria Library" : "Ameria Library")</title>
-    <link rel="icon" href="~/img/green-on-white-cube.ico">
+    <link rel="icon" href="~/img/logo-green.svg" type="image/svg+xml">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true">
 </head>
 <body>
@@ -36,7 +36,7 @@
                 <span class="user-name">@UiNavigation.DisplayName(User)<span class="small">@UiNavigation.RoleName(User)</span></span>
             </a>
             <form class="signout" method="post" action="@UiPaths.Logout" asp-antiforgery="true">
-                <button class="btn btn-secondary btn-sm " type="submit">Sign out</button>
+                <button class="btn btn-secondary btn-sm" type="submit">Sign out</button>
             </form>
             <details class="menu">
                 <summary>Menu</summary>

@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.RateLimiting;
-using LibraryApp.Api.Areas.Staff.Pages;
 using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Api.Ui;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.Auth;
@@ -22,8 +22,13 @@ public static class LoginRateLimiting
 {
     public const string PolicyName = "login";
 
+    /// <summary>Query flag of a page whose POST was rejected; the page shows "Too many attempts".</summary>
+    public const string TooManyAttemptsParameter = "tooManyAttempts";
+
     /// <summary>
-    /// Limits POST /api/auth/login and /api/auth/change-password per client IP (brute force across many accounts). Over the limit → 429.
+    /// Limits POST /api/auth/login, /api/auth/change-password and the pages with this policy per client IP (brute force
+    /// across many accounts). Over the limit: 429 ProblemDetails for the API; for a page, 303 back to the same page with
+    /// <see cref="TooManyAttemptsParameter"/>. Both send <c>Retry-After</c>.
     /// Behind a reverse proxy, configure ForwardedHeaders with the known proxies, otherwise every user shares the
     /// proxy's address and therefore one limit.
     /// </summary>
@@ -54,25 +59,38 @@ public static class LoginRateLimiting
 
             options.OnRejected = async (context, ct) =>
             {
-                // The Login page cannot show ProblemDetails: back to the form, which says "Too many attempts".
-                if (!UiPaths.IsApi(context.HttpContext))
+                var http = context.HttpContext;
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    http.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+
+                // A page cannot show ProblemDetails: 303 back to the same page (GET), which says "Too many attempts".
+                if (!UiPaths.IsApi(http))
                 {
-                    context.HttpContext.Response.Redirect(LoginModel.TooManyAttemptsUrl(context.HttpContext.Request));
+                    http.Response.StatusCode = StatusCodes.Status303SeeOther;
+                    http.Response.Headers.Location = TooManyAttemptsUrl(http.Request);
                     return;
                 }
-                var detail = context.HttpContext.Request.Path.StartsWithSegments("/api/auth/login")
+
+                var detail = http.Request.Path.StartsWithSegments("/api/auth/login")
                     ? "Too many login attempts. Try again later."
                     : null;   // HttpErrors default: "Too many requests. Try again later."
                 var problem = GlobalExceptionHandler.Problem(HttpErrors.TooManyRequests, detail);
-                problem.Extensions["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+                problem.Extensions["traceId"] = Activity.Current?.Id ?? http.TraceIdentifier;
 
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    context.HttpContext.Response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
-
-                await context.HttpContext.Response.WriteAsJsonAsync(problem, (JsonSerializerOptions?)null, "application/problem+json", ct);
+                await http.Response.WriteAsJsonAsync(problem, (JsonSerializerOptions?)null, "application/problem+json", ct);
             };
         });
 
         return services;
+    }
+    
+    /// <summary>The rejected page itself with its query (e.g. <c>returnUrl</c>) plus <see cref="TooManyAttemptsParameter"/>.</summary>
+    public static string TooManyAttemptsUrl(HttpRequest request)
+    {
+        var query = QueryHelpers.ParseQuery(request.QueryString.Value)
+            .Where(pair => !string.Equals(pair.Key, TooManyAttemptsParameter, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(pair => pair.Value.Select(value => new KeyValuePair<string, string?>(pair.Key, value)))
+            .Append(new(TooManyAttemptsParameter, "true"));
+        return QueryHelpers.AddQueryString((request.PathBase + request.Path).ToString(), query);
     }
 }
