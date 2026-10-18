@@ -23,112 +23,49 @@ public sealed class PenaltyService(
     IStaffMemberService staff,
     IOptions<BorrowingOptions> options) : IPenaltyService
 {
-        public async Task<PenaltyRecalculationResult> RecalculateStatusAsync(
+    /// <inheritdoc />
+    public async Task<PenaltyRecalculationResult> RecalculateStatusAsync(
         Guid staffMemberId,
         DateTime nowUtc,
         CancellationToken ct = default)
     {
         if (staffMemberId == Guid.Empty)
-        {
-            throw new DomainException(
-                BorrowingErrors.InvalidReferenceId);
-        }
+            throw new DomainException(BorrowingErrors.InvalidReferenceId);
 
         if (nowUtc.Kind != DateTimeKind.Utc)
-        {
-            throw new DomainException(
-                BorrowingErrors.TimestampMustBeUtc);
-        }
+            throw new DomainException(BorrowingErrors.TimestampMustBeUtc);
 
         ct.ThrowIfCancellationRequested();
 
-        IReadOnlyList<PenaltyRecord> records =
-            await penalties.GetForStaffAsync(staffMemberId, ct);
+        IReadOnlyList<PenaltyRecord> records = await penalties.GetForStaffAsync(staffMemberId, ct);
 
+        // BOR-06: records past their 90 days stop counting and are marked Expired.
         int expiredRecords = 0;
-
         foreach (PenaltyRecord record in records)
         {
-            if (record.Status == PenaltyRecordStatus.Active
-                && record.ExpiresAtUtc <= nowUtc)
+            if (record.Status == PenaltyRecordStatus.Active && record.ExpiresAtUtc <= nowUtc)
             {
                 record.Expire(nowUtc);
                 expiredRecords++;
             }
         }
 
-        int activePoints = records
-            .Where(record => record.CountsAt(nowUtc))
-            .Sum(record => record.Points);
+        int activePoints = records.Where(record => record.CountsAt(nowUtc)).Sum(record => record.Points);
 
-        StaffMemberStatus currentStatus =
-            await staff.GetStatusAsync(staffMemberId, ct);
+        StaffMemberStatus currentStatus = await staff.GetStatusAsync(staffMemberId, ct);
 
-        // Penalties can expire, but Borrowing must never reactivate
-        // a member who has been deactivated by Staff.
+        // Borrowing never reactivates a member deactivated by Staff.
         if (currentStatus == StaffMemberStatus.Deactivated)
-        {
-            return new PenaltyRecalculationResult(
-                expiredRecords,
-                activePoints,
-                StatusChanged: false);
-        }
+            return new PenaltyRecalculationResult(expiredRecords, activePoints, StatusChanged: false);
 
-        StaffMemberStatus byPoints = policy.GetStatus(activePoints);
-
-        StaffMemberStatus nextStatus;
-
-        // The requirements restore Active when points fall below
-        // the Restricted threshold.
-        if (byPoints == StaffMemberStatus.Active)
-        {
-            nextStatus = StaffMemberStatus.Active;
-        }
-        else if (currentStatus == StaffMemberStatus.Suspended)
-        {
-            DateTime suspensionUntilUtc =
-                GetLatestSuspensionDeadline(records, nowUtc)
-                ?? throw new DomainException(
-                    BorrowingErrors.SuspensionHistoryMissing);
-
-            if (nowUtc < suspensionUntilUtc)
-            {
-                nextStatus = StaffMemberStatus.Suspended;
-            }
-            else
-            {
-                nextStatus = GetNonSuspendedStatus(
-                    activePoints,
-                    records,
-                    nowUtc);
-            }
-        }
-        else
-        {
-            // Recalculation does not create a fresh suspension merely
-            // because existing points remain above its threshold.
-            nextStatus = GetNonSuspendedStatus(
-                activePoints,
-                records,
-                nowUtc);
-        }
+        StaffMemberStatus nextStatus = NextStatus(currentStatus, activePoints, SuspensionEndsAtUtc(records, nowUtc), nowUtc);
 
         if (nextStatus == currentStatus)
-        {
-            return new PenaltyRecalculationResult(
-                expiredRecords,
-                activePoints,
-                StatusChanged: false);
-        }
+            return new PenaltyRecalculationResult(expiredRecords, activePoints, StatusChanged: false);
 
-        string reason =
-            $"Penalty standing recalculated: {activePoints} active points.";
+        string reason = $"Penalty standing recalculated: {activePoints} active points.";
 
-        await staff.SetStatusAsync(
-            staffMemberId,
-            nextStatus,
-            reason,
-            ct);
+        await staff.SetStatusAsync(staffMemberId, nextStatus, reason, ct);
 
         await events.PublishAsync(
             new StaffStatusChanged(
@@ -141,61 +78,59 @@ public sealed class PenaltyService(
                 EffectiveUntilUtc: null),
             ct);
 
-        return new PenaltyRecalculationResult(
-            expiredRecords,
-            activePoints,
-            StatusChanged: true);
+        return new PenaltyRecalculationResult(expiredRecords, activePoints, StatusChanged: true);
     }
-    
-    private StaffMemberStatus GetNonSuspendedStatus(
+
+    /// <summary>
+    /// The policy table (section 8) with BQ-BA-01: below the Restricted threshold the member is Active; a suspension
+    /// lasts until its end; after it, and whenever points are at or above the Restricted threshold, the member is
+    /// Restricted. A suspension is never started here: only a return that crosses the threshold starts one
+    /// (<see cref="ApplyAsync"/>).
+    /// </summary>
+    private StaffMemberStatus NextStatus(
+        StaffMemberStatus currentStatus,
         int activePoints,
-        IReadOnlyList<PenaltyRecord> records,
+        DateTime? suspensionEndsAtUtc,
         DateTime nowUtc)
     {
-        StaffMemberStatus byPoints = policy.GetStatus(activePoints);
-
-        if (byPoints == StaffMemberStatus.Active)
-        {
+        if (policy.GetStatus(activePoints) == StaffMemberStatus.Active)
             return StaffMemberStatus.Active;
-        }
 
-        DateTime? suspensionUntilUtc =
-            GetLatestSuspensionDeadline(records, nowUtc);
+        if (currentStatus == StaffMemberStatus.Suspended && suspensionEndsAtUtc is { } end && nowUtc < end)
+            return StaffMemberStatus.Suspended;
 
-        if (suspensionUntilUtc.HasValue
-            && nowUtc >= suspensionUntilUtc.Value)
-        {
-            return options.Value.Penalties.AfterSuspension switch
-            {
-                AfterSuspensionMode.RestrictedByPoints =>
-                    StaffMemberStatus.Restricted,
-
-                AfterSuspensionMode.Active =>
-                    StaffMemberStatus.Active,
-
-                _ => throw new InvalidOperationException(
-                    "Unknown after-suspension mode.")
-            };
-        }
-
-        // Starting a suspension requires a new threshold crossing
-        // in ApplyAsync. High existing points alone are insufficient.
         return StaffMemberStatus.Restricted;
     }
 
-    private static DateTime? GetLatestSuspensionDeadline(
-        IReadOnlyList<PenaltyRecord> records,
-        DateTime nowUtc)
+    /// <summary>
+    /// End of the latest suspension, computed from the records (BQ-G2-03, no stored field): the suspension starts at the
+    /// creation time of the record with which the counting points first reached the Suspended threshold, and lasts
+    /// <c>Borrowing:Penalties:SuspensionDays</c>. Waived records never count, so waiving the record that made the
+    /// threshold moves the start (intended by the decision). Null when the points never reached the threshold.
+    /// </summary>
+    private DateTime? SuspensionEndsAtUtc(IReadOnlyList<PenaltyRecord> records, DateTime nowUtc)
     {
-        return records
-            .Where(record =>
-                record.CreatedAtUtc <= nowUtc
-                && record.SuspensionUntilUtc.HasValue)
-            .OrderByDescending(record => record.CreatedAtUtc)
-            .ThenByDescending(record => record.SuspensionUntilUtc)
-            .Select(record => record.SuspensionUntilUtc)
-            .FirstOrDefault();
+        List<PenaltyRecord> counted = records.Where(record => record.Status != PenaltyRecordStatus.Waived).ToList();
+
+        // Points that counted at a moment of the past: created by then and not yet expired then.
+        int PointsAt(DateTime moment, bool includeMoment) => counted
+            .Where(record => (includeMoment ? record.CreatedAtUtc <= moment : record.CreatedAtUtc < moment)
+                             && moment < record.ExpiresAtUtc)
+            .Sum(record => record.Points);
+
+        // Records of one return share one timestamp: each moment is one operation.
+        DateTime? start = counted
+            .Select(record => record.CreatedAtUtc)
+            .Where(moment => moment <= nowUtc)
+            .Distinct()
+            .Where(moment => policy.GetStatus(PointsAt(moment, includeMoment: false)) != StaffMemberStatus.Suspended
+                             && policy.GetStatus(PointsAt(moment, includeMoment: true)) == StaffMemberStatus.Suspended)
+            .Select(moment => (DateTime?)moment)
+            .Max();
+
+        return start?.AddDays(options.Value.Penalties.SuspensionDays);
     }
+
     public async Task<PenaltyApplicationResult> ApplyAsync(
         Loan loan,
         IReadOnlyList<ReturnPenaltyItem> items,
@@ -274,8 +209,6 @@ public sealed class PenaltyService(
             loan.StaffMemberId,
             previousActivePoints,
             finalActivePoints,
-            existing,
-            created,
             nowUtc,
             ct);
 
@@ -288,8 +221,6 @@ public sealed class PenaltyService(
         Guid staffMemberId,
         int previousActivePoints,
         int finalActivePoints,
-        IReadOnlyList<PenaltyRecord> existing,
-        IReadOnlyList<PenaltyRecord> created,
         DateTime nowUtc,
         CancellationToken ct)
     {
@@ -319,22 +250,14 @@ public sealed class PenaltyService(
         if (startsSuspension)
         {
             nextStatus = StaffMemberStatus.Suspended;
-
             effectiveUntilUtc =
                 nowUtc.AddDays(options.Value.Penalties.SuspensionDays);
-
-            // All records created by this operation have the same timestamp.
-            // Store the deadline on one positive-point record from this operation.
-            PenaltyRecord trigger = created.Last(record => record.Points > 0);
-
-            trigger.RecordSuspension(effectiveUntilUtc.Value);
         }
         else
         {
-            nextStatus = GetNonSuspendedStatus(
-                finalActivePoints,
-                existing,
-                nowUtc);
+            nextStatus = byPoints == StaffMemberStatus.Suspended
+                ? StaffMemberStatus.Restricted
+                : byPoints;
         }
 
         if (currentStatus == nextStatus)
