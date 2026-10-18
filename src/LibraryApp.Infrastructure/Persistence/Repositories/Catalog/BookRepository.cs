@@ -15,6 +15,20 @@ public sealed class BookRepository(LibraryDbContext db) : IBookRepository
     public Task<bool> PublisherExistsAsync(Guid id, CancellationToken ct) =>
         db.Publishers.AnyAsync(x => x.Id == id, ct);
 
+    public async Task<IReadOnlyCollection<string>> GetExistingIsbnsAsync(
+        IReadOnlyCollection<string> isbns,
+        CancellationToken ct)
+    {
+        if (isbns.Count == 0)
+            return Array.Empty<string>();
+
+        return await db.Books
+            .Where(x => !x.IsDeleted && isbns.Contains(x.Isbn))
+            .Select(x => x.Isbn)
+            .Distinct()
+            .ToListAsync(ct);
+    }
+
     public Task<bool> IsbnExistsAsync(
         string isbn,
         Guid? excludeBookId,
