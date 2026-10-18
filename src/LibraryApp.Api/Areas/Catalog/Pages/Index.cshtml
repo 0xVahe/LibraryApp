@@ -1,0 +1,91 @@
+@page "/catalog"
+@model IndexModel
+@{
+    ViewData["Title"] = "Catalog";
+    var firstResult = Model.Result.Items.Count == 0
+        ? 0
+        : (Model.Result.Page - 1) * Model.Result.PageSize + 1;
+    var lastResult = Model.Result.Items.Count == 0
+        ? 0
+        : firstResult + Model.Result.Items.Count - 1;
+    var actions = Model.CanManageBooks
+        ? new[]
+        {
+            new PageAction("Import CSV", "/catalog/import"),
+            new PageAction("Add book", "/catalog/books/new", Primary: true),
+        }
+        : null;
+}
+<partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Catalog", "Browse the library collection and find your next book.", actions)' />
+
+<section class="card card-filters mb-24" aria-label="Catalog filters">
+    <form method="get" action="/catalog" class="form catalog-filters">
+        <div class="field search-field">
+            <label for="catalog-search">Search</label>
+            <input type="search" id="catalog-search" name="search" value="@Model.Search" placeholder="Title, author or ISBN">
+        </div>
+        @if (Model.CategoryId is Guid selectedCategoryId)
+        {
+            <input type="hidden" name="categoryId" value="@selectedCategoryId">
+        }
+        <div class="field">
+            <label for="catalog-language">Language</label>
+            <select id="catalog-language" name="language">
+                <option value="">Any language</option>
+                @foreach (var language in Model.Languages)
+                {
+                    <option value="@language.Code" selected="@(string.Equals(Model.Language, language.Code, StringComparison.OrdinalIgnoreCase))">@language.Name</option>
+                }
+            </select>
+        </div>
+        <label class="check catalog-available">
+            <input type="checkbox" name="available" value="true" checked="@(Model.Available ? "checked" : null)">
+            Available now
+        </label>
+        <button class="btn btn-primary catalog-submit" type="submit">Search</button>
+    </form>
+</section>
+
+<div class="catalog-category-row">
+    <nav class="chips" aria-label="Categories">
+        <a class="chip" href="@Model.CategoryHref(null)" aria-current="@(Model.CategoryId is null ? "true" : null)">All</a>
+        @foreach (var category in Model.CategoryTree.TopLevel)
+        {
+            <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.CategoryId == category.Id ? "true" : null)">@category.Name</a>
+        }
+    </nav>
+    <p class="catalog-count">Showing @firstResult–@lastResult of @Model.Result.TotalCount</p>
+</div>
+
+@if (Model.Result.Items.Count == 0)
+{
+    <section class="card" aria-live="polite"><p>No books match your filters.</p></section>
+}
+else
+{
+    <section class="grid grid-4" aria-label="Books">
+        @for (var index = 0; index < Model.Result.Items.Count; index++)
+        {
+            var book = Model.Result.Items[index];
+            var hasCover = !string.IsNullOrWhiteSpace(book.CoverImageUrl);
+            var availability = book.TotalCopies == 0
+                ? "No copies"
+                : book.AvailableCopies > 0 ? $"{book.AvailableCopies} available" : "Not available now";
+            <a class="book-card" href="/catalog/books/@book.Id">
+                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)" aria-hidden="true">
+                    @if (hasCover)
+                    {
+                        <img class="cover-img" src="@book.CoverImageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
+                    }
+                    <span>@book.Title</span>
+                    <span class="small">@string.Join(", ", book.Authors)</span>
+                </div>
+                <span class="title">@book.Title</span>
+                <span>@string.Join(", ", book.Authors) · @book.PublicationYear</span>
+                <span class="badge @(book.AvailableCopies > 0 ? "badge-green" : "badge-grey")">@availability</span>
+            </a>
+        }
+    </section>
+}
+
+<partial name="/Pages/Shared/_Pager.cshtml" model="PagerModel.From(Model.Result, Request)" />
