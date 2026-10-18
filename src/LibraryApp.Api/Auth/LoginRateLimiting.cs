@@ -2,8 +2,9 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using LibraryApp.Api.ErrorHandling;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using LibraryApp.Api.Areas.Staff.Pages;
+using LibraryApp.Api.Ui;
 
 namespace LibraryApp.Api.Auth;
 
@@ -36,6 +37,10 @@ public static class LoginRateLimiting
 
             options.AddPolicy(PolicyName, httpContext =>
             {
+                // Only POSTs count: the Login page itself (GET) stays open, also after a rejected POST sends the user back to it.
+                if (!HttpMethods.IsPost(httpContext.Request.Method))
+                    return RateLimitPartition.GetNoLimiter("get");
+
                 var settings = httpContext.RequestServices.GetRequiredService<IOptions<LoginRateLimitOptions>>().Value;
                 return RateLimitPartition.GetFixedWindowLimiter(
                     httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -49,6 +54,12 @@ public static class LoginRateLimiting
 
             options.OnRejected = async (context, ct) =>
             {
+                // The Login page cannot show ProblemDetails: back to the form, which says "Too many attempts".
+                if (!UiPaths.IsApi(context.HttpContext))
+                {
+                    context.HttpContext.Response.Redirect(LoginModel.TooManyAttemptsUrl(context.HttpContext.Request));
+                    return;
+                }
                 var detail = context.HttpContext.Request.Path.StartsWithSegments("/api/auth/login")
                     ? "Too many login attempts. Try again later."
                     : null;   // HttpErrors default: "Too many requests. Try again later."

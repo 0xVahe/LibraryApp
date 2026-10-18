@@ -89,7 +89,6 @@ strong { color: var(--ink); font-weight: 600; }
   z-index: 10;
 }
 .topbar-inner {
-  max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
   min-height: 72px;
@@ -109,18 +108,12 @@ strong { color: var(--ink); font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
-.logo-mark {
+.logo-img {
   width: 32px; height: 32px;
-  border-radius: 8px;
-  background: var(--green);
-  color: var(--white);
-  display: grid;
-  place-items: center;
-  font-size: 16px;
 }
 .logo span.light { font-weight: 400; color: var(--text); }
 
-.nav { display: flex; gap: 4px; flex: 1; }
+.nav { margin: 0 auto; display: flex; gap: 4px; }
 .nav a {
   display: flex;
   align-items: center;
@@ -297,6 +290,12 @@ main {
 .btn-block { width: 100%; }
 .link-btn { min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; }
 
+.logout-btn {
+  border-color: transparent !important;
+}
+.logout-btn:hover {
+  background: var(--green-soft);
+}
 /* ---------- Badges ---------- */
 .badge {
   display: inline-flex;
@@ -513,7 +512,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
   min-height: 100vh;
 }
 .auth-brand {
-  background: var(--dark);
+  /*background: var(--dark);*/
+  background: url("../img/lib-background.jpg");
+  background-size: cover;
   color: #d4d4d4;
   padding: 48px;
   display: flex;
@@ -528,7 +529,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .auth-points { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .auth-points li { display: flex; gap: 12px; align-items: center; }
 .auth-points li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
-.auth-form { display: grid; place-items: center; padding: 48px 24px; background: var(--white); }
+.auth-form { display: grid; place-items: center; padding: 48px 24px; background: var(--white); box-shadow: 5px 5px 20px 20px var(--dark); }
 .auth-form .box { width: 100%; max-width: 400px; }
 
 /* ---------- Error page ---------- */
