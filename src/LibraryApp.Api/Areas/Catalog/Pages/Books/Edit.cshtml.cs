@@ -11,7 +11,8 @@ namespace LibraryApp.Api.Areas.Catalog.Pages.Books;
 
 /// <summary>
 /// Edit book (CAT-01): change the details, or delete the book (soft delete; BR-CAT-3 refuses it while a copy is on
-/// loan or reserved). The copies panel (CAT-04) and the authors picker (CAT-02) are added to this page by their owners.
+/// loan or reserved). The authors picker (CAT-02) and the copies panel (CAT-04) post to their own pages, which come
+/// back here with an alert.
 /// An unknown or deleted book shows the Not found page.
 /// </summary>
 [Authorize(Policy = UiPolicies.LibraryStaff)]
@@ -26,9 +27,11 @@ public sealed class EditModel(
 
     public string BookTitle { get; private set; } = "";
 
+    /// <summary>Every author, by name, for the authors picker (CAT-02).</summary>
     public IReadOnlyList<AuthorDto> Authors { get; private set; } = [];
 
-    public IReadOnlyList<Guid> AuthorIds { get; set; } = [];
+    /// <summary>The book's current authors, pre-selected in the authors picker (CAT-02).</summary>
+    public IReadOnlyList<Guid> AuthorIds { get; private set; } = [];
 
     public async Task OnGetAsync(Guid id, CancellationToken ct)
     {

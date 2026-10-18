@@ -1,18 +1,17 @@
 @model EditModel
+@* The authors picker of the Edit book page (CAT-02). It posts to the Authors page, which comes back here with an alert. *@
 <section class="card" aria-labelledby="authors-title">
     <h2 id="authors-title" class="mb-16">Authors</h2>
-    <form method="post" asp-page="./Authors" class="form">
-        <input type="hidden" name="BookId" value="@Model.BookId" />
+    <form method="post" class="form" asp-area="Catalog" asp-page="/Books/Authors" asp-route-bookId="@Model.BookId">
         <div class="field">
-            <label for="book-authors">Authors</label>
-            <select id="book-authors" name="AuthorIds" multiple size="8" aria-describedby="authors-hint authors-error">
+            <label for="book-authors">Authors of this book</label>
+            <select id="book-authors" name="AuthorIds" multiple size="8" aria-describedby="authors-hint">
                 @foreach (var author in Model.Authors)
                 {
                     <option value="@author.Id" selected="@Model.AuthorIds.Contains(author.Id)">@author.FullName</option>
                 }
             </select>
             <span id="authors-hint" class="hint">Pick one or more (Ctrl or Cmd for several). A new author is added on the <a href="/catalog/authors">Authors</a> page first.</span>
-            <span id="authors-error" class="error-text" asp-validation-for="AuthorIds"></span>
         </div>
         <div class="form-actions">
             <button class="btn btn-primary" type="submit">Save authors</button>

@@ -10,13 +10,15 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
+/// <summary>CAT-02: the authors picker of the Edit book page and its Authors page, with the real host and database.</summary>
 public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
     private const string Librarian = "aram.sargsyan@ameriabank.am";
     private const string StaffMember = "anna.petrosyan@ameriabank.am";
-    private const string AuthorsPath = "/catalog/books/authors";
 
     private static string EditPath(Guid bookId) => $"/catalog/books/{bookId}/edit";
+
+    private static string AuthorsPath(Guid bookId) => $"/catalog/books/{bookId}/authors";
 
     private async Task<(Book Book, Author First, Author Second, Author Third)> SeedAsync()
     {
@@ -60,19 +62,21 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         return option;
     }
 
+    /// <summary>
+    /// Posts the picker with the antiforgery token and cookie of a fresh GET of <paramref name="tokenPath"/> (the Edit
+    /// page by default), as the browser does.
+    /// </summary>
     private async Task<HttpResponseMessage> PostAsync(HttpClient client, Guid bookId, Guid[] authorIds,
-        bool staffMember = false, bool ajax = false)
+        string? tokenPath = null, bool ajax = false)
     {
-        // Staff cannot open Edit; the layout on Forbidden issues a token for that same signed-in user.
-        using var page = await client.GetAsync(staffMember ? "/forbidden" : EditPath(bookId));
+        using var page = await client.GetAsync(tokenPath ?? EditPath(bookId));
         var html = await page.Content.ReadAsStringAsync();
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
         Assert.NotEmpty(token);
         var cookies = $"{client.DefaultRequestHeaders.GetValues("Cookie").Single()}; {UiTestClient.SetCookies(page)}";
         var fields = authorIds.Select(id => new KeyValuePair<string, string>("AuthorIds", id.ToString()))
-            .Append(new("BookId", bookId.ToString()))
             .Append(new("__RequestVerificationToken", token));
-        using var post = new HttpRequestMessage(HttpMethod.Post, AuthorsPath)
+        using var post = new HttpRequestMessage(HttpMethod.Post, AuthorsPath(bookId))
         {
             Content = new FormUrlEncodedContent(fields),
         };
@@ -81,6 +85,18 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         if (ajax)
             post.Headers.Add("X-Requested-With", "XMLHttpRequest");
         return await client.SendAsync(post);
+    }
+
+    /// <summary>Follows the redirect back to the Edit page with the alert cookie, as the browser does.</summary>
+    private static async Task<string> FollowAsync(HttpClient client, HttpResponseMessage redirect, Guid bookId)
+    {
+        Assert.Equal(HttpStatusCode.Redirect, redirect.StatusCode);
+        Assert.Equal(EditPath(bookId), redirect.Headers.Location!.OriginalString);
+        using var request = new HttpRequestMessage(HttpMethod.Get, redirect.Headers.Location);
+        request.Headers.Add("Cookie", $"{client.DefaultRequestHeaders.GetValues("Cookie").Single()}; {UiTestClient.SetCookies(redirect)}");
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsStringAsync();
     }
 
     [Fact]
@@ -99,8 +115,7 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         Assert.Contains("selected", Option(select, third.Id));
         Assert.Contains($">{first.FullName}</option>", Option(select, first.Id));
         Assert.Contains($">{second.FullName}</option>", Option(select, second.Id));
-        Assert.Contains($"action=\"{AuthorsPath}\"", html);
-        Assert.Contains($"name=\"BookId\" value=\"{book.Id}\"", html);
+        Assert.Contains($"action=\"{AuthorsPath(book.Id)}\"", html);
         Assert.Contains("href=\"/catalog/authors\"", html);
         Assert.Contains("id=\"copies-title\"", html);
         foreach (Match form in Regex.Matches(html, "<form\\b.*?</form>", RegexOptions.Singleline))
@@ -116,9 +131,8 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         var (book, first, second, third) = await SeedAsync();
         using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
 
-        using var withoutToken = await client.PostAsync(AuthorsPath, new FormUrlEncodedContent(
+        using var withoutToken = await client.PostAsync(AuthorsPath(book.Id), new FormUrlEncodedContent(
         [
-            new("BookId", book.Id.ToString()),
             new("AuthorIds", second.Id.ToString()),
         ]));
         Assert.Equal(HttpStatusCode.BadRequest, withoutToken.StatusCode);
@@ -129,43 +143,71 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
 
         using var response = await PostAsync(client, book.Id, [second.Id, third.Id]);
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.Equal(EditPath(book.Id), response.Headers.Location!.OriginalString);
+        var html = await FollowAsync(client, response, book.Id);
+        Assert.Contains("alert alert-green", html);
+        Assert.Contains("Authors saved.", html);
         var saved = await SavedAuthorIdsAsync(book.Id);
         Assert.Equal(2, saved.Length);
         Assert.Contains(second.Id, saved);
         Assert.Contains(third.Id, saved);
         Assert.DoesNotContain(first.Id, saved);
-        var select = AuthorSelect(await client.GetStringAsync(EditPath(book.Id)));
+        var select = AuthorSelect(html);
         Assert.DoesNotContain("selected", Option(select, first.Id));
         Assert.Contains("selected", Option(select, second.Id));
         Assert.Contains("selected", Option(select, third.Id));
     }
 
     [Fact]
-    public async Task Missing_selection_renders_Edit_with_BR_CAT_5_and_leaves_saved_authors_unchanged()
+    public async Task Missing_selection_comes_back_to_Edit_with_BR_CAT_5_and_leaves_saved_authors_unchanged()
     {
         var (book, first, second, third) = await SeedAsync();
         using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
 
         using var response = await PostAsync(client, book.Id, []);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var html = await response.Content.ReadAsStringAsync();
+        var html = await FollowAsync(client, response, book.Id);
+        Assert.Contains("alert alert-red", html);
+        Assert.Contains("The authors were not saved.", html);
         Assert.Contains(HtmlEncoder.Default.Encode(CatalogErrors.BookAuthorsRequired.Message), html);
-        Assert.Contains($"value=\"{book.Isbn}\"", html);
-        Assert.Contains($"action=\"{EditPath(book.Id)}\"", html);
-        Assert.Contains($"action=\"{EditPath(book.Id)}?handler=Delete\"", html);
-        Assert.Contains("id=\"copies-title\"", html);
         var select = AuthorSelect(html);
-        Assert.DoesNotContain("selected", select);
-        Option(select, first.Id);
-        Option(select, second.Id);
-        Option(select, third.Id);
+        Assert.Contains("selected", Option(select, first.Id));
+        Assert.DoesNotContain("selected", Option(select, second.Id));
+        Assert.Contains("selected", Option(select, third.Id));
         var saved = await SavedAuthorIdsAsync(book.Id);
         Assert.Equal(2, saved.Length);
         Assert.Contains(first.Id, saved);
         Assert.Contains(third.Id, saved);
+    }
+
+    [Fact]
+    public async Task An_author_deleted_meanwhile_comes_back_to_Edit_with_an_alert()
+    {
+        var (book, first, _, third) = await SeedAsync();
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await PostAsync(client, book.Id, [first.Id, Guid.NewGuid()]);
+
+        var html = await FollowAsync(client, response, book.Id);
+        Assert.Contains("alert alert-red", html);
+        Assert.Contains("One of the chosen authors no longer exists.", html);
+        var saved = await SavedAuthorIdsAsync(book.Id);
+        Assert.Equal(2, saved.Length);
+        Assert.Contains(first.Id, saved);
+        Assert.Contains(third.Id, saved);
+    }
+
+    [Fact]
+    public async Task An_unknown_book_shows_the_Not_found_page_and_a_GET_goes_back_to_Edit()
+    {
+        var (book, first, _, _) = await SeedAsync();
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var unknown = await PostAsync(client, Guid.NewGuid(), [first.Id], tokenPath: EditPath(book.Id));
+        using var get = await client.GetAsync(AuthorsPath(book.Id));
+
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, get.StatusCode);
+        Assert.Equal(EditPath(book.Id), get.Headers.Location!.OriginalString);
     }
 
     [Fact]
@@ -174,11 +216,12 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         var (book, first, second, third) = await SeedAsync();
         using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
 
-        using var response = await PostAsync(client, book.Id, [second.Id], staffMember: true, ajax: true);
+        // Staff cannot open Edit; the layout on Forbidden issues a token for that same signed-in user.
+        using var response = await PostAsync(client, book.Id, [second.Id], tokenPath: "/forbidden", ajax: true);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         // Normal form posts follow the shared cookie scheme to the existing HTTP 403 page.
-        using var browserResponse = await PostAsync(client, book.Id, [second.Id], staffMember: true);
+        using var browserResponse = await PostAsync(client, book.Id, [second.Id], tokenPath: "/forbidden");
         Assert.Equal(HttpStatusCode.Redirect, browserResponse.StatusCode);
         Assert.Equal("/forbidden", browserResponse.Headers.Location!.AbsolutePath);
         using var forbidden = await client.GetAsync(browserResponse.Headers.Location);

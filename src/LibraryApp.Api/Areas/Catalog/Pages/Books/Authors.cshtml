@@ -1,6 +1,3 @@
-@page "/catalog/books/authors"
+@page "/catalog/books/{bookId:guid}/authors"
 @model AuthorsModel
-@{
-    ViewData["Title"] = $"Edit {Model.Edit.BookTitle}";
-}
-<partial name="_EditBook" model="Model.Edit" />
+@* POST only: the authors picker on the Edit book page. A GET goes back to that page. *@
