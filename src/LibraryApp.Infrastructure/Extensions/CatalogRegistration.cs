@@ -3,6 +3,7 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Infrastructure.Catalog;
 using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.Extensions.Configuration;
@@ -57,6 +58,10 @@ public static class CatalogRegistrationExtensions
         // Book CRUD (CAT-01)
         services.AddScoped<IBookRepository, BookRepository>();
         services.AddScoped<IBookService, BookService>();
+
+        // Book CSV import (CAT-09)
+        services.AddSingleton<IBookCsvParser, BookCsvParser>();
+        services.AddScoped<IBookImportService, BookImportService>();
 
         // Book purchase suggestions (CAT-10)
         services.AddScoped<IBookSuggestionRepository, BookSuggestionRepository>();

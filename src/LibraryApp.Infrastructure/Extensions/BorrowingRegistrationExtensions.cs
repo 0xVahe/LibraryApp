@@ -63,6 +63,9 @@ public static class BorrowingRegistrationExtensions
         // Contract for Catalog: next expected return date of a book (CAT-08)
         services.AddScoped<ILoanQueryService, LoanQueryService>();
 
+        // Loan desk: copies held for pickup (BOR-07)
+        services.AddScoped<IPickupListService, PickupListService>();
+
         // Demo data, Development only (SD-17)
         services.AddScoped<IModuleSeeder, BorrowingSeeder>();
 
