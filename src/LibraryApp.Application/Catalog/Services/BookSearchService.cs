@@ -6,7 +6,7 @@ using LibraryApp.Application.Common;
 namespace LibraryApp.Application.Catalog.Services;
 
 /// <summary>Prepares the client's search (CAT-05) and passes it to the database query.</summary>
-public sealed class BookSearchService(IBookSearchQuery query, ICatalogCoverUrlBuilder? coverUrls = null) : IBookSearchService
+public sealed class BookSearchService(IBookSearchQuery query, ICatalogCoverUrlBuilder coverUrls) : IBookSearchService
 {
     public Task<PagedResult<BookSearchResultDto>> SearchAsync(
         BookSearchRequest request,
@@ -30,13 +30,10 @@ public sealed class BookSearchService(IBookSearchQuery query, ICatalogCoverUrlBu
         IBookSearchQuery query,
         BookSearchFilter filter,
         PageRequest paging,
-        ICatalogCoverUrlBuilder? coverUrls,
+        ICatalogCoverUrlBuilder coverUrls,
         CancellationToken cancellationToken)
     {
         PagedResult<BookSearchResultDto> result = await query.SearchAsync(filter, paging, cancellationToken);
-        if (coverUrls is null)
-            return result;
-
         return new PagedResult<BookSearchResultDto>(
             result.Items.Select(book => book with { CoverImageUrl = coverUrls.Build(book.CoverImageUrl) }).ToArray(),
             result.TotalCount,

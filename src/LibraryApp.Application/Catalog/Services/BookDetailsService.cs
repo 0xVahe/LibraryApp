@@ -13,7 +13,7 @@ public sealed class BookDetailsService(
     IBookDetailsQuery query,
     ILoanQueryService loanQuery,
     IClock clock,
-    ICatalogCoverUrlBuilder? coverUrls = null) : IBookDetailsService
+    ICatalogCoverUrlBuilder coverUrls) : IBookDetailsService
 {
     public async Task<BookDetailsDto> GetBookDetailsAsync(Guid bookId, CancellationToken cancellationToken = default)
     {
@@ -43,6 +43,6 @@ public sealed class BookDetailsService(
             book.AvailableCopies,
             Availability: $"{book.AvailableCopies} of {book.TotalCopies} available",
             nextExpectedReturnDate,
-            coverUrls?.Build(book.CoverImageUrl) ?? book.CoverImageUrl);
+            coverUrls.Build(book.CoverImageUrl));
     }
 }

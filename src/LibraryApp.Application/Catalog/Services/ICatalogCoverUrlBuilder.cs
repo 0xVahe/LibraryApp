@@ -1,4 +1,4 @@
-namespace LibraryApp.Application.Abstractions.Catalog;
+namespace LibraryApp.Application.Catalog.Services;
 
 /// <summary>Builds the public cover URL from a stored relative path.</summary>
 public interface ICatalogCoverUrlBuilder
