@@ -75,6 +75,8 @@ Point values are at most 10 per record (database constraint). The Development se
 | `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
 | `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
 
+Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
+
 ## Daily jobs
 
 A module job that must run once per local (Asia/Yerevan) day — for example the Borrowing daily job (BOR-06) or the 09:00 reminders (NOT-05) — implements `IDailyJob` (`Application/Abstractions/Common`) and is registered in the module's `Add<Module>Module`:
