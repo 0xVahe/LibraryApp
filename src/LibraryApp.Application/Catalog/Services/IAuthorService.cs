@@ -9,6 +9,7 @@ public interface IAuthorService
     Task<AuthorDto> CreateAsync(AuthorRequest request, CancellationToken ct = default);
     Task UpdateAsync(Guid id, AuthorRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyList<Guid>> GetBookAuthorIdsAsync(Guid bookId, CancellationToken ct);
     /// <summary>Replaces an existing book's authors atomically; at least one author is required (BR-CAT-5).</summary>
     Task SetBookAuthorsAsync(Guid bookId, BookAuthorsRequest request, CancellationToken ct = default);
 }
