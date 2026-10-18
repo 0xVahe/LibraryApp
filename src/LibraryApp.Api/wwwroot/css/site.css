@@ -89,7 +89,6 @@ strong { color: var(--ink); font-weight: 600; }
   z-index: 10;
 }
 .topbar-inner {
-  max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
   min-height: 72px;
@@ -109,18 +108,12 @@ strong { color: var(--ink); font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
-.logo-mark {
+.logo-img {
   width: 32px; height: 32px;
-  border-radius: 8px;
-  background: var(--green);
-  color: var(--white);
-  display: grid;
-  place-items: center;
-  font-size: 16px;
 }
 .logo span.light { font-weight: 400; color: var(--text); }
 
-.nav { display: flex; gap: 4px; flex: 1; }
+.nav { margin: 0 auto; display: flex; gap: 4px; }
 .nav a {
   display: flex;
   align-items: center;
@@ -199,7 +192,9 @@ strong { color: var(--ink); font-weight: 600; }
   border-radius: var(--radius-sm);
   color: var(--ink);
   text-decoration: none;
+  transition: background 0.2s var(--ease);
 }
+.menu nav a:hover { background: var(--surface); }
 .menu nav a[aria-current="page"] { background: var(--green-soft); font-weight: 600; }
 
 /* ---------- Layout ---------- */
@@ -383,6 +378,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .table td { padding: 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .table tr:last-child td { border-bottom: 0; }
 .table td.actions { text-align: right; white-space: nowrap; }
+.table td.nowrap { white-space: nowrap; }
 .table th:first-child, .table td:first-child { padding-left: 24px; }
 .table th:last-child, .table td:last-child { padding-right: 24px; }
 .table a.row-link { color: var(--ink); font-weight: 600; text-decoration: none; }
@@ -513,7 +509,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
   min-height: 100vh;
 }
 .auth-brand {
-  background: var(--dark);
+  background: linear-gradient(color-mix(in srgb, var(--green) 20%, transparent), color-mix(in srgb, var(--dark) 55%, transparent)),
+  url("../img/lib-background.jpg") center / cover,
+  var(--dark);
   color: #d4d4d4;
   padding: 48px;
   display: flex;
@@ -575,10 +573,14 @@ input[readonly] { background: var(--surface); color: var(--text); }
   .topbar-inner { gap: 16px; }
 }
 
-@media (max-width: 1024px) {
-  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* The Administrator nav (7 items) needs about 1080 px next to the logo, user chip and Sign out; below 1120 px the menu takes over. */
+@media (max-width: 1120px) {
   .nav, .user { display: none; }
   .menu { display: block; }
+}
+
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid-2, .grid-3, .grid-side { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -633,7 +635,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
 /* ---------- Shell (Integration Owner): pieces the static demo did not need ---------- */
 /* Sign-out is a POST form; its button looks like the links around it. */
 .signout { margin: 0; }
-@media (max-width: 1024px) { .signout { display: none; } }   /* the mobile menu has its own sign-out, like .user */
+.signout .btn { border-color: transparent; white-space: nowrap; }
+.signout .btn:hover { background: var(--green-soft); }
+@media (max-width: 1120px) { .signout { display: none; } }   /* the mobile menu has its own sign-out, like .user */
 .menu nav form { margin: 0; }
 .menu nav form button {
   width: 100%;
@@ -647,6 +651,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
   color: var(--ink);
   font: inherit;
   cursor: pointer;
+  transition: background 0.2s var(--ease);
 }
 .menu nav form button:hover { background: var(--surface); }
 .error-page h1 { margin-top: 8px; }
