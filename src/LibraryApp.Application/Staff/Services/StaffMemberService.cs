@@ -40,4 +40,15 @@ public sealed class StaffMemberService(IStaffMemberRepository staffMembers) : IS
 
         member.ChangeStatus(status); // refuses Deactivated and a Deactivated member
     }
+    
+    public async Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+        IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(staffMemberIds);
+
+        if (staffMemberIds.Count == 0)
+            return new Dictionary<Guid, string>();
+
+        return await staffMembers.GetNamesAsync(staffMemberIds.Distinct().ToArray(), ct);
+    }
 }

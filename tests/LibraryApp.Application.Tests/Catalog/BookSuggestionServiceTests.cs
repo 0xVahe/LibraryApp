@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
@@ -5,6 +6,7 @@ using LibraryApp.Application.Common;
 using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -14,17 +16,22 @@ public class BookSuggestionServiceTests
     private readonly FakeCurrentUser _user = new();
     private readonly TestClock _clock = new(new DateTime(2026, 10, 11, 8, 0, 0, DateTimeKind.Utc));
 
-    private BookSuggestionService Service(Repository repository) =>
-        new(repository, _transaction, _transaction, _user, _clock, _transaction);
+    private BookSuggestionService Service(Repository repository, StaffNames? staff = null) =>
+        new(repository, staff ?? new StaffNames(), _transaction, _transaction, _user, _clock, _transaction);
+
+    private BookSuggestion Suggestion(Guid staffMemberId) =>
+        new(Guid.NewGuid(), staffMemberId, "Title", "Author", null, "Reason", _clock.UtcNow);
 
     [Fact]
     public async Task Creation_uses_current_staff_and_clock_inside_transaction()
     {
         var repository = new Repository(_transaction);
-        var dto = await Service(repository).CreateAsync(new("Title", "Author", null, "Reason"));
+        var staff = new StaffNames();
+        var dto = await Service(repository, staff).CreateAsync(new("Title", "Author", null, "Reason"));
         Assert.NotEqual(Guid.Empty, dto.Id);
         Assert.Equal(_user.StaffMemberId, dto.StaffMemberId);
         Assert.Equal("Test Member", dto.StaffMemberName);
+        Assert.Equal(new[] { _user.StaffMemberId!.Value }, Assert.Single(staff.Calls));
         Assert.Equal(_clock.UtcNow, dto.CreatedAtUtc);
         Assert.Equal(BookSuggestionStatus.Pending, dto.Status);
         Assert.Equal(dto.Id, repository.Suggestion!.Id);
@@ -89,6 +96,35 @@ public class BookSuggestionServiceTests
         Assert.Equal(reject ? BookSuggestionStatus.Rejected : BookSuggestionStatus.Approved, result.Status);
     }
 
+    [Fact]
+    public async Task A_list_page_reads_all_staff_names_in_one_call()
+    {
+        var anna = Guid.NewGuid();
+        var mariam = Guid.NewGuid();
+        var repository = new Repository(_transaction);
+        repository.Page.AddRange([Suggestion(anna), Suggestion(mariam), Suggestion(anna)]);
+        var staff = new StaffNames { Everyone = null };
+        staff.Names[anna] = "Anna Petrosyan";
+        staff.Names[mariam] = "Mariam Sargsyan";
+
+        var page = await Service(repository, staff).ListAsync(new(null, 1, 20));
+
+        Assert.Equal(new[] { "Anna Petrosyan", "Mariam Sargsyan", "Anna Petrosyan" }, page.Items.Select(x => x.StaffMemberName));
+        Assert.Equal(new[] { anna, mariam }, Assert.Single(staff.Calls));   // one call, each id once
+        Assert.Equal(3, page.TotalCount);
+    }
+
+    [Fact]
+    public async Task A_staff_member_without_a_name_is_shown_as_unknown()
+    {
+        var repository = new Repository(_transaction);
+        repository.Page.Add(Suggestion(Guid.NewGuid()));
+
+        var page = await Service(repository, new StaffNames { Everyone = null }).ListMineAsync(new PageRequest());
+
+        Assert.Equal(BookSuggestionService.UnknownStaffMemberName, Assert.Single(page.Items).StaffMemberName);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -107,6 +143,8 @@ public class BookSuggestionServiceTests
         public BookSuggestionStatus? Status { get; private set; }
         public PageRequest? Paging { get; private set; }
         public int ListCalls { get; private set; }
+        /// <summary>What <see cref="ListAsync"/> returns as the page.</summary>
+        public List<BookSuggestion> Page { get; } = [];
 
         public void Add(BookSuggestion suggestion)
         {
@@ -121,19 +159,40 @@ public class BookSuggestionServiceTests
             return Task.FromResult(Suggestion?.Id == id ? Suggestion : null);
         }
 
-        public Task<string> GetStaffMemberNameAsync(Guid staffMemberId, CancellationToken ct)
-        {
-            Assert.True(transaction.Active);
-            Assert.Equal(Suggestion!.StaffMemberId, staffMemberId);
-            return Task.FromResult("Test Member");
-        }
-
-        public Task<PagedResult<BookSuggestionDto>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,
+        public Task<PagedResult<BookSuggestion>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,
             PageRequest paging, CancellationToken ct)
         {
             ListCalls++;
             (Owner, Status, Paging) = (staffMemberId, status, paging);
-            return Task.FromResult(PagedResult<BookSuggestionDto>.Empty(paging));
+            return Task.FromResult(new PagedResult<BookSuggestion>(Page.ToList(), Page.Count, paging.Page, paging.PageSize));
         }
+    }
+
+    /// <summary>The Staff contract as Catalog uses it: only GetNamesAsync. Records the ids of every call.</summary>
+    private sealed class StaffNames : IStaffMemberService
+    {
+        /// <summary>When set, every id has this name; when null, only the ids in <see cref="Names"/> have one.</summary>
+        public string? Everyone { get; init; } = "Test Member";
+        public Dictionary<Guid, string> Names { get; } = new();
+        public List<Guid[]> Calls { get; } = [];
+
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(IReadOnlyCollection<Guid> staffMemberIds,
+            CancellationToken ct = default)
+        {
+            Calls.Add(staffMemberIds.ToArray());
+            IReadOnlyDictionary<Guid, string> names = Everyone is { } name
+                ? staffMemberIds.Distinct().ToDictionary(id => id, _ => name)
+                : staffMemberIds.Where(Names.ContainsKey).Distinct().ToDictionary(id => id, id => Names[id]);
+            return Task.FromResult(names);
+        }
+
+        public Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<LendingRules> GetLendingRulesAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task SetStatusAsync(Guid staffMemberId, StaffMemberStatus status, string reason, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }
