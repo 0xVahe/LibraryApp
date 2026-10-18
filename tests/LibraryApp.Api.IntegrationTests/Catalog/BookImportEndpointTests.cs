@@ -145,9 +145,10 @@ public class BookImportEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         var file = schema.GetProperty("properties").GetProperty("file");
         Assert.Equal("binary", file.GetProperty("format").GetString());
 
-        var csvExample = multipart.GetProperty("example").GetProperty("file").GetString();
-        Assert.NotNull(csvExample);
-        Assert.StartsWith("Title,Isbn,PublicationYear,Language,Category,Authors,Description,Publisher", csvExample);
-        Assert.Contains("Example Imported Book", csvExample);
+        var description = swagger.GetProperty("paths").GetProperty(Route).GetProperty("post")
+            .GetProperty("description").GetString();
+        Assert.NotNull(description);
+        Assert.Contains("Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description,CoverImagePath", description);
+        Assert.Contains("Example Imported Book", description);
     }
 }

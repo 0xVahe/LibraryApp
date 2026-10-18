@@ -106,7 +106,10 @@ public sealed class BooksController(
     /// and the optional Description, Publisher and CoverImagePath (a path in the cover storage, checked like on the book
     /// form). Category, publisher and author names must already exist.
     /// A 400 <c>catalog.import_invalid</c> answer lists every problem in <c>rows</c> (rowNumber, field, message).
-    /// Sample file: /samples/book-import.csv.
+    /// <code>
+    /// Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description,CoverImagePath
+    /// Example Imported Book,9780132350884,2020,en,IT &amp; Software Engineering,Robert C. Martin,Prentice Hall,Imported from CSV,
+    /// </code>
     /// </remarks>
     /// <param name="file">The CSV file.</param>
     /// <param name="cancellationToken">Cancelled when the client disconnects.</param>
