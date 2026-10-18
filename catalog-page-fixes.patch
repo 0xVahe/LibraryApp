@@ -1,0 +1,163 @@
+diff --git a/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml b/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml
+index d714230..22ff189 100644
+--- a/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml
++++ b/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml
+@@ -9,7 +9,11 @@
+         ? 0
+         : firstResult + Model.Result.Items.Count - 1;
+     var actions = Model.CanManageBooks
+-        ? new[] { new PageAction("Add book", "/catalog/books/new", Primary: true) }
++        ? new[]
++        {
++            new PageAction("Import CSV", "/catalog/import"),
++            new PageAction("Add book", "/catalog/books/new", Primary: true),
++        }
+         : null;
+ }
+ <partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Catalog", "Browse the library collection and find your next book.", actions)' />
+@@ -68,15 +72,13 @@ else
+                 ? "No copies"
+                 : book.AvailableCopies > 0 ? $"{book.AvailableCopies} available" : "Not available now";
+             <a class="book-card" href="/catalog/books/@book.Id">
+-                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)">
++                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)" aria-hidden="true">
+                     @if (hasCover)
+                     {
+                         <img class="cover-img" src="@book.CoverImageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
+                     }
+-                    <div class="cover-copy">
+-                        <span>@book.Title</span>
+-                        <span class="small">@string.Join(", ", book.Authors)</span>
+-                    </div>
++                    <span>@book.Title</span>
++                    <span class="small">@string.Join(", ", book.Authors)</span>
+                 </div>
+                 <span class="title">@book.Title</span>
+                 <span>@string.Join(", ", book.Authors) · @book.PublicationYear</span>
+diff --git a/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml.cs b/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml.cs
+index 5a6c194..823009c 100644
+--- a/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml.cs
++++ b/src/LibraryApp.Api/Areas/Catalog/Pages/Index.cshtml.cs
+@@ -15,7 +15,7 @@ namespace LibraryApp.Api.Areas.Catalog.Pages;
+ /// <summary>The Catalog page for every signed-in role (CAT-05).</summary>
+ [Authorize(Policy = UiPolicies.SignedIn)]
+ public sealed class IndexModel(
+-    IBookSearchService search,
++    IBookSearchService searchService,
+     ICategoryService categories) : PageModel
+ {
+     public const int PageSize = PageRequest.DefaultPageSize;
+@@ -49,7 +49,7 @@ public sealed class IndexModel(
+             ? requestedPage
+             : 1;
+ 
+-        Result = await search.SearchAsync(
++        Result = await searchService.SearchAsync(
+             new BookSearchRequest(Search, CategoryId, Language, Available ? true : null,
+                 new PageRequest(pageNumber, PageSize)), ct);
+     }
+diff --git a/src/LibraryApp.Api/wwwroot/css/site.css b/src/LibraryApp.Api/wwwroot/css/site.css
+index f142c03..e14c8a5 100644
+--- a/src/LibraryApp.Api/wwwroot/css/site.css
++++ b/src/LibraryApp.Api/wwwroot/css/site.css
+@@ -423,11 +423,8 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
+   background: #2d4a22;
+ }
+ .cover .small { font-family: var(--font-text); font-weight: 400; opacity: 0.9; }
+-.cover.has-image { padding: 0; overflow: hidden; }
+-.cover-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+-.cover.has-image { position: relative; }
+-.cover.has-image .cover-img { position: absolute; inset: 0; z-index: 1; }
+-.cover-copy { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 100%; position: relative; z-index: 0; }
++.cover.has-image { position: relative; overflow: hidden; }
++.cover-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+ .cover.c2 { background: #1d4f91; }
+ .cover.c3 { background: #6b2d5c; }
+ .cover.c4 { background: #7a4a12; }
+diff --git a/src/LibraryApp.Domain/Catalog/Book.cs b/src/LibraryApp.Domain/Catalog/Book.cs
+index 09a9167..d1293f0 100644
+--- a/src/LibraryApp.Domain/Catalog/Book.cs
++++ b/src/LibraryApp.Domain/Catalog/Book.cs
+@@ -84,12 +84,6 @@ public sealed class Book : Entity
+         CoverImagePath = string.IsNullOrWhiteSpace(coverImagePath) ? null : coverImagePath.Trim();
+     }
+ 
+-    /// <summary>Sets the stored cover path without changing the librarian's other book edits.</summary>
+-    public void SetCoverImagePath(string? coverImagePath)
+-    {
+-        CoverImagePath = string.IsNullOrWhiteSpace(coverImagePath) ? null : coverImagePath.Trim();
+-    }
+-
+     /// <summary>Soft delete. The check "no copy is OnLoan or Reserved" (BR-CAT-3) is made by the service before this call.</summary>
+     public void Delete(DateTime deletedAtUtc)
+     {
+diff --git a/src/LibraryApp.Infrastructure/Persistence/Seed/Catalog/CatalogSeeder.cs b/src/LibraryApp.Infrastructure/Persistence/Seed/Catalog/CatalogSeeder.cs
+index 246f3a0..b5a1291 100644
+--- a/src/LibraryApp.Infrastructure/Persistence/Seed/Catalog/CatalogSeeder.cs
++++ b/src/LibraryApp.Infrastructure/Persistence/Seed/Catalog/CatalogSeeder.cs
+@@ -34,8 +34,7 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
+ 
+     private async Task SeedBooksAsync(CancellationToken ct)
+     {
+-        var existingBooks = await db.Books.ToDictionaryAsync(x => x.Id, ct);
+-        var existingBookIds = existingBooks.Keys.ToHashSet();
++        var existingBookIds = (await db.Books.Select(x => x.Id).ToListAsync(ct)).ToHashSet();
+         var authorIds = CatalogSeedData.Authors
+             .ToDictionary(x => x.Name, x => x.Id, StringComparer.Ordinal);
+         var publisherIds = CatalogSeedData.Publishers
+@@ -45,15 +44,7 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
+         {
+             Guid bookId = CatalogSeedIds.Book(seedBook.Number);
+             if (existingBookIds.Contains(bookId))
+-            {
+-                // Existing development databases predate cover paths. Backfill only an empty path;
+-                // never overwrite a librarian's deliberate cover choice.
+-                Book existingBook = existingBooks[bookId];
+-                if (string.IsNullOrWhiteSpace(existingBook.CoverImagePath))
+-                    existingBook.SetCoverImagePath(CatalogSeedIds.CoverImagePath(seedBook.Number));
+-
+                 continue;
+-            }
+ 
+             Guid categoryId = CatalogSeedIds.Category(seedBook.CategoryNumber);
+             Guid? publisherId = seedBook.Publisher is null ? null : publisherIds[seedBook.Publisher];
+diff --git a/tests/LibraryApp.Api.IntegrationTests/Catalog/CatalogPageTests.cs b/tests/LibraryApp.Api.IntegrationTests/Catalog/CatalogPageTests.cs
+index 4e91dfa..13c89a7 100644
+--- a/tests/LibraryApp.Api.IntegrationTests/Catalog/CatalogPageTests.cs
++++ b/tests/LibraryApp.Api.IntegrationTests/Catalog/CatalogPageTests.cs
+@@ -15,6 +15,7 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
+ {
+     private const string StaffMember = "anna.petrosyan@ameriabank.am";
+     private const string Librarian = "aram.sargsyan@ameriabank.am";
++    private const string Administrator = "lilit.grigoryan@ameriabank.am";
+ 
+     [Fact]
+     public async Task A_staff_member_can_open_catalog_and_search_returns_expected_book()
+@@ -31,18 +32,23 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
+         Assert.Contains("name=\"language\"", html);
+         Assert.Contains("name=\"available\"", html);
+         Assert.DoesNotContain("Add book", html);
++        Assert.DoesNotContain("Import CSV", html);
++        Assert.DoesNotContain("href=\"/catalog/import\"", html);
+     }
+ 
+-    [Fact]
+-    public async Task A_librarian_sees_the_add_book_action()
++    [Theory]
++    [InlineData(Librarian)]
++    [InlineData(Administrator)]
++    public async Task Library_staff_see_the_add_book_and_import_actions(string email)
+     {
+-        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
++        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
+ 
+         var html = await client.GetStringAsync("/catalog");
+ 
+         Assert.Contains("href=\"/catalog/books/new\"", html);
+         Assert.Contains("Add book", html);
+-        Assert.DoesNotContain("Import CSV", html);
++        Assert.Contains("href=\"/catalog/import\"", html);
++        Assert.Contains("Import CSV", html);
+     }
+ 
+     [Fact]
