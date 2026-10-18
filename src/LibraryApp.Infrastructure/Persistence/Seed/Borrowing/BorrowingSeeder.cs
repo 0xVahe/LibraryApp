@@ -146,13 +146,29 @@ public sealed class BorrowingSeeder(
         Loan hayk = await IssueAsync(11, (16, 2), Members.HaykManukyan, now.AddDays(-200), ct, lend: false);
         hayk.Return(hayk.DueAtUtc.AddDays(-2));
 
+        DateTime lostAtUtc = lost.ReturnedAtUtc!.Value;
+
+        PenaltyRecord lostPenalty = PenaltyRecord.Create(
+            Ids.Penalty(3),
+            Members.SonaVardanyan,
+            lost.Id,
+            policy.CalculateLostPoints(),
+            "Copy lost",
+            lostAtUtc,
+            policy.ExpiresAtUtc(lostAtUtc));
+
+        if (policy.GetStatus(lostPenalty.Points)
+            == LibraryApp.Domain.Staff.StaffMemberStatus.Suspended)
+        {
+            lostPenalty.RecordSuspension(
+                lostAtUtc.AddDays(
+                    options.Value.Penalties.SuspensionDays));
+        }
+
         db.PenaltyRecords.AddRange(
             LatePenalty(1, gorLate1),
             LatePenalty(2, gorLate2),
-            // Sona: the lost copy, 10 points by default — Suspended (BR-BOR-6).
-            PenaltyRecord.Create(Ids.Penalty(3), Members.SonaVardanyan, lost.Id, policy.CalculateLostPoints(),
-                "Copy lost", lost.ReturnedAtUtc!.Value, policy.ExpiresAtUtc(lost.ReturnedAtUtc!.Value)));
-
+            lostPenalty);
         PenaltyRecord waived = LatePenalty(4, annaLate);
         waived.Waive("Late because of a business trip");
         PenaltyRecord expired = LatePenalty(5, davitLate);

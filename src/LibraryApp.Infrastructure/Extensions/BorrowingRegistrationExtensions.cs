@@ -9,7 +9,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-
+using LibraryApp.Infrastructure.Jobs.Borrowing;
 namespace LibraryApp.Infrastructure.Extensions;
 
 public static class BorrowingRegistrationExtensions
@@ -34,6 +34,14 @@ public static class BorrowingRegistrationExtensions
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
         services.AddScoped<IPenaltyRepository, PenaltyRepository>();
+        services.AddScoped<IBorrowingDailyJobQuery, BorrowingDailyJobQuery>();
+        services.AddScoped<
+            IBorrowingDailyJobService,
+            BorrowingDailyJobService>();
+        // Daily Borrowing maintenance (BOR-06, BR-BOR-6).
+        services.AddDailyJob<BorrowingDailyJob>(
+            BorrowingDailyJob.Name);
+        
         services.AddScoped<OverdueRule>();
         services.AddScoped<ReturnPenaltyCalculator>();
         services.AddScoped<IPenaltyService, PenaltyService>();
