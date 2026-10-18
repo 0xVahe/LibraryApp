@@ -36,19 +36,6 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
             .ThenBy(reservation => reservation.Id)
             .ToListAsync(ct);
 
-    public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) =>
-        db.Reservations.SingleOrDefaultAsync(
-            reservation => reservation.CopyId == copyId
-                           && reservation.Status == ReservationStatus.ReadyForPickup,
-            ct);
-
-    public Task<Reservation?> FindReadyForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) =>
-        db.Reservations.SingleOrDefaultAsync(
-            reservation => reservation.StaffMemberId == staffMemberId
-                           && reservation.BookId == bookId
-                           && reservation.Status == ReservationStatus.ReadyForPickup,
-            ct);
-
     public async Task AddAsync(Reservation reservation, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reservation);

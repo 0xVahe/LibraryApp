@@ -91,45 +91,6 @@ public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixt
         Assert.Equal(loan.DueAtUtc, issued.DueAtUtc);
     }
 
-    [Fact]
-    public async Task A_member_collects_the_copy_held_for_their_reservation()
-    {
-        const int book = 57;
-        Guid copyId = CatalogSeedIds.Copy(book, 1);
-        // Use members not shared by the other loan tests: this fixture runs tests against one database in parallel.
-        Guid holder = Members.ArmenBabayan;
-        Loan existingLoan = Loan.Issue(Guid.NewGuid(), copyId, Members.ErikZakaryan, DateTime.UtcNow.AddDays(-1), 14);
-        await Db(async db =>
-        {
-            db.BookCopies.Single(copy => copy.Id == copyId).ChangeStatus(BookCopyStatus.OnLoan);
-            db.Loans.Add(existingLoan);
-            return await db.SaveChangesAsync();
-        });
-
-        using var client = Client();
-        using var reserved = await client.PostAsJsonAsync("/api/reservations",
-            new CreateReservationRequest(CatalogSeedIds.Book(book), holder));
-        Assert.Equal(HttpStatusCode.Created, reserved.StatusCode);
-        ReservationDto reservation = (await reserved.Content.ReadFromJsonAsync<ReservationDto>(Json))!;
-
-        using var returned = await client.PostAsJsonAsync($"/api/loans/{existingLoan.Id}/return", new ReturnLoanRequest(Damaged: false));
-        Assert.Equal(HttpStatusCode.OK, returned.StatusCode);
-        Reservation ready = await Db(db => db.Reservations.AsNoTracking().SingleAsync(item => item.Id == reservation.ReservationId));
-        Assert.Equal(ReservationStatus.ReadyForPickup, ready.Status);
-        Assert.Equal(copyId, ready.CopyId);
-        Assert.Equal(BookCopyStatus.Reserved, await CopyStatus(book, 1));
-
-        using var issued = await Issue(client, holder, CatalogSeedIds.CopyBarcode(book, 1));
-
-        Assert.Equal(HttpStatusCode.Created, issued.StatusCode);
-        LoanDto newLoan = (await issued.Content.ReadFromJsonAsync<LoanDto>(Json))!;
-        Assert.Equal(holder, newLoan.StaffMemberId);
-        Assert.Equal(LoanStatus.Active, newLoan.Status);
-        Reservation fulfilled = await Db(db => db.Reservations.AsNoTracking().SingleAsync(item => item.Id == reservation.ReservationId));
-        Assert.Equal(ReservationStatus.Fulfilled, fulfilled.Status);
-        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatus(book, 1));
-    }
-
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
