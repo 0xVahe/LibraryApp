@@ -1,6 +1,5 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Services;
-using LibraryApp.Api.Controllers.Catalog;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.OpenApi.Any;
@@ -10,7 +9,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace LibraryApp.Api.OpenApi;
 
 /// <summary>Valid request and cover response examples for Catalog endpoints (NFR-11).</summary>
-public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchemaFilter, IOperationFilter
+public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchemaFilter
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
@@ -65,23 +64,6 @@ public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchema
 
         if (example is not null)
             schema.Example = example;
-    }
-
-    public void Apply(OpenApiOperation operation, OperationFilterContext context)
-    {
-        if (context.MethodInfo.DeclaringType != typeof(BooksController)
-            || context.MethodInfo.Name != nameof(BooksController.Import)
-            || operation.RequestBody is null
-            || !operation.RequestBody.Content.TryGetValue("multipart/form-data", out var multipart)
-            || multipart is null)
-            return;
-
-        var csv = "Title,Isbn,PublicationYear,Language,Category,Authors,Description,Publisher\n"
-                + "Example Imported Book,9780132350884,2020,en,IT & Software Engineering,Robert C. Martin,Imported from CSV,Prentice Hall\n";
-        var example = new OpenApiObject { ["file"] = new OpenApiString(csv) };
-
-        multipart.Example = example;
-        multipart.Schema.Example = example;
     }
 
     private static OpenApiObject CreateBook() => new()

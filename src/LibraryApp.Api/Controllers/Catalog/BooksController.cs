@@ -110,6 +110,7 @@ public sealed class BooksController(
     /// Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description,CoverImagePath
     /// Example Imported Book,9780132350884,2020,en,IT &amp; Software Engineering,Robert C. Martin,Prentice Hall,Imported from CSV,
     /// </code>
+    /// Sample file with more cases (two authors, quoted commas, Russian and Armenian titles, no publisher): /samples/book-import.csv.
     /// </remarks>
     /// <param name="file">The CSV file.</param>
     /// <param name="cancellationToken">Cancelled when the client disconnects.</param>

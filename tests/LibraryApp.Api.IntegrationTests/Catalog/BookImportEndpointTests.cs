@@ -150,5 +150,6 @@ public class BookImportEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.NotNull(description);
         Assert.Contains("Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description,CoverImagePath", description);
         Assert.Contains("Example Imported Book", description);
+        Assert.Contains("/samples/book-import.csv", description);
     }
 }
