@@ -14,7 +14,8 @@ namespace LibraryApp.Application.Catalog.Services;
 public sealed class CatalogService(
     ICatalogCopyQuery copyQuery,
     IBookCopyRepository copies,
-    IBookDetailsQuery books) : ICatalogService
+    IBookDetailsQuery books,
+    ICatalogCoverUrlBuilder coverUrls) : ICatalogService
 {
     public Task<BookCopyDto?> GetAvailableCopyAsync(Guid bookId, CancellationToken ct = default) =>
         copyQuery.GetAvailableCopyAsync(bookId, ct);
@@ -28,8 +29,13 @@ public sealed class CatalogService(
         copy.ChangeStatus(status);
     }
 
-    public Task<BookDto?> GetBookAsync(Guid bookId, CancellationToken ct = default) =>
-        books.GetBookAsync(bookId, ct);
+    public async Task<BookDto?> GetBookAsync(Guid bookId, CancellationToken ct = default)
+    {
+        BookDto? book = await books.GetBookAsync(bookId, ct);
+        return book is null
+            ? book
+            : book with { CoverImageUrl = coverUrls.Build(book.CoverImageUrl) };
+    }
 
     public Task<BookCopyDto?> GetCopyByBarcodeAsync(string barcode, CancellationToken ct = default)
     {

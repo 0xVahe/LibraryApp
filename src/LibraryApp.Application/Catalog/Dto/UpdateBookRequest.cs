@@ -8,6 +8,7 @@ namespace LibraryApp.Application.Catalog.Dto;
 /// <param name="Description">Optional book description.</param>
 /// <param name="CategoryId">Existing category assigned to the book.</param>
 /// <param name="PublisherId">Optional existing publisher.</param>
+/// <param name="CoverImagePath">Optional relative path to the stored cover image.</param>
 public sealed record UpdateBookRequest(
     string Title,
     string Isbn,
@@ -15,4 +16,5 @@ public sealed record UpdateBookRequest(
     string Language,
     string? Description,
     Guid CategoryId,
-    Guid? PublisherId);
+    Guid? PublisherId,
+    string? CoverImagePath = null);

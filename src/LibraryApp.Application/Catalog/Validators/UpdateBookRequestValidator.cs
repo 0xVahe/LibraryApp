@@ -1,13 +1,15 @@
 using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Domain.Catalog;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Catalog.Validators;
 
 public sealed class UpdateBookRequestValidator : AbstractValidator<UpdateBookRequest>
 {
-    public UpdateBookRequestValidator(IClock clock)
+    public UpdateBookRequestValidator(IClock clock, IOptions<CatalogCoversOptions>? covers = null)
     {
         RuleFor(x => x.Title)
             .NotEmpty()
@@ -33,5 +35,11 @@ public sealed class UpdateBookRequestValidator : AbstractValidator<UpdateBookReq
 
         RuleFor(x => x.PublisherId)
             .NotEqual(Guid.Empty);
+
+        RuleFor(x => x.CoverImagePath)
+            .Cascade(CascadeMode.Stop)
+            .MaximumLength(Book.CoverImagePathMaxLength)
+            .Must(path => CoverImagePathRules.IsValid(path, !string.IsNullOrEmpty(covers?.Value.BaseUrl)))
+            .WithMessage(CoverImagePathRules.Message);
     }
 }

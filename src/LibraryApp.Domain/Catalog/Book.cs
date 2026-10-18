@@ -12,6 +12,7 @@ public sealed class Book : Entity
     public const int TitleMaxLength = 300;
     public const int IsbnLength = 13;
     public const int LanguageLength = 2;
+    public const int CoverImagePathMaxLength = 300;
 
     private Book() { }                                           // for EF Core only
 
@@ -23,9 +24,10 @@ public sealed class Book : Entity
         string language,
         string? description,
         Guid categoryId,
-        Guid? publisherId) : base(id)
+        Guid? publisherId,
+        string? coverImagePath = null) : base(id)
     {
-        Update(title, isbn, publicationYear, language, description, categoryId, publisherId);
+        Update(title, isbn, publicationYear, language, description, categoryId, publisherId, coverImagePath);
     }
 
     public string Title { get; private set; } = null!;
@@ -44,6 +46,8 @@ public sealed class Book : Entity
 
     public Guid? PublisherId { get; private set; }
 
+    public string? CoverImagePath { get; private set; }
+
     public bool IsDeleted { get; private set; }
 
     public DateTime? DeletedAtUtc { get; private set; }
@@ -55,7 +59,8 @@ public sealed class Book : Entity
         string language,
         string? description,
         Guid categoryId,
-        Guid? publisherId)
+        Guid? publisherId,
+        string? coverImagePath = null)
     {
         if (string.IsNullOrWhiteSpace(title))
             throw new DomainException(CatalogErrors.BookTitleRequired);
@@ -76,6 +81,7 @@ public sealed class Book : Entity
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         CategoryId = categoryId;
         PublisherId = publisherId;
+        CoverImagePath = string.IsNullOrWhiteSpace(coverImagePath) ? null : coverImagePath.Trim();
     }
 
     /// <summary>Soft delete. The check "no copy is OnLoan or Reserved" (BR-CAT-3) is made by the service before this call.</summary>

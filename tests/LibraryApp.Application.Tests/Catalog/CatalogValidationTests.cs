@@ -2,7 +2,9 @@ using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Tests.Fakes;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -94,5 +96,28 @@ public class CatalogValidationTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(CreateBookRequest.Isbn));
+    }
+
+    [Fact]
+    public void Create_book_rejects_a_cover_path_when_cover_storage_is_disabled()
+    {
+        var validator = new CreateBookRequestValidator(
+            new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)),
+            Options.Create(new CatalogCoversOptions()));
+
+        var result = validator.Validate(new CreateBookRequest(
+            "Test book",
+            "9780306406157",
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            [Guid.NewGuid()],
+            "library-covers/01.png"));
+
+        var error = Assert.Single(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.CoverImagePath));
+        Assert.Equal(CoverImagePathRules.Message, error.ErrorMessage);
     }
 }

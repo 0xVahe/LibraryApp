@@ -426,6 +426,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
   background: #2d4a22;
 }
 .cover .small { font-family: var(--font-text); font-weight: 400; opacity: 0.9; }
+.cover.has-image { padding: 0; overflow: hidden; }
+.cover-img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
+.cover img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 .cover.c2 { background: #1d4f91; }
 .cover.c3 { background: #6b2d5c; }
 .cover.c4 { background: #7a4a12; }

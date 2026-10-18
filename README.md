@@ -134,6 +134,15 @@ The seed only fills an empty database; it never changes existing data. Before a 
 
 - with Docker: `docker compose down -v`, then `docker compose up --build`;
 - with the API run from the IDE: stop the API, run `dotnet ef database drop --force --project src/LibraryApp.Infrastructure` (the database of `LIBRARYAPP_DESIGNTIME_DB` in `.env`), then start the API: it applies the migrations and the seed.
+
+### Catalog covers (`Catalog:Covers`)
+
+`Catalog:Covers:BaseUrl` is the address of the cover storage. The database stores only relative paths such as
+`library-covers/01.png`; the API combines each path with this setting before returning `CoverImageUrl`. The value may be
+empty to turn covers off. Otherwise it must be an absolute HTTPS address ending in `/`, without userinfo, query,
+fragment or unsafe characters. Covers need internet access from the browser; when they are unavailable, the coloured
+text cover remains visible. To move to another storage, copy the files to the new location and change this one setting;
+the database, API code and contracts do not change.
 ## Browser UI
 
 Razor Pages live in the API host (UI guide in the team docs): the shared shell in `src/LibraryApp.Api/Pages` and `Ui/`, each group's pages in `src/LibraryApp.Api/Areas/<Module>`.
