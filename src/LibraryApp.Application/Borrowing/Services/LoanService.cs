@@ -104,6 +104,16 @@ public sealed class LoanService(
     public async Task<LoanDto> GetAsync(Guid loanId, CancellationToken ct = default) =>
         ToDto(await loans.FindAsync(loanId, ct) ?? throw new DomainException(BorrowingErrors.LoanNotFound));
 
+    /// <inheritdoc />
+    public async Task<LoanDto> FindOpenByBarcodeAsync(string barcode, CancellationToken ct = default)
+    {
+        BookCopyDto copy = await catalog.GetCopyByBarcodeAsync(barcode, ct)
+                           ?? throw new DomainException(BorrowingErrors.CopyNotFound);
+
+        return ToDto(await loans.FindOpenByCopyAsync(copy.Id, ct)
+                     ?? throw new DomainException(BorrowingErrors.NoOpenLoanForCopy));
+    }
+
     // Maps the entity to the DTO. Entities never leave the Application layer.
     private static LoanDto ToDto(Loan loan) => new(
         loan.Id,
