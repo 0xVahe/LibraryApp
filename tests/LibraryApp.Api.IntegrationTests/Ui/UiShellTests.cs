@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.Ui;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Ui;
 
@@ -154,6 +156,16 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
         Assert.Contains("frame-ancestors 'none'", page.Headers.GetValues("Content-Security-Policy").Single());
         Assert.Equal("nosniff", page.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.False(api.Headers.Contains("Content-Security-Policy"));
+    }
+
+    [Fact]
+    public async Task Pages_allow_images_from_the_configured_cover_base_url()
+    {
+        var page = await UiTestClient.Anonymous(factory).GetAsync("/notfound");
+        var baseUrl = factory.Services.GetRequiredService<IOptions<CatalogCoversOptions>>().Value.BaseUrl;
+        var csp = page.Headers.GetValues("Content-Security-Policy").Single();
+
+        Assert.Contains($"img-src 'self' data: {baseUrl};", csp, StringComparison.Ordinal);
     }
 
     [Fact]

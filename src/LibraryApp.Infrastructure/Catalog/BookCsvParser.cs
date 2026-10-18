@@ -9,12 +9,12 @@ namespace LibraryApp.Infrastructure.Catalog;
 /// <summary>
 /// Reads the book CSV (CAT-09) with <see cref="TextFieldParser"/> from .NET itself, so no package is needed:
 /// comma separated, a header line first, quotes around cells that contain commas, UTF-8 (with or without BOM).
-/// Columns may come in any order and any case; Description and Publisher are optional.
+/// Columns may come in any order and any case; Description, Publisher and CoverImagePath are optional.
 /// </summary>
 public sealed class BookCsvParser : IBookCsvParser
 {
     private static readonly string[] RequiredColumns = ["Title", "Isbn", "PublicationYear", "Language", "Category", "Authors"];
-    private static readonly string[] OptionalColumns = ["Description", "Publisher"];
+    private static readonly string[] OptionalColumns = ["Description", "Publisher", "CoverImagePath"];
 
     public async Task<IReadOnlyList<BookCsvRow>> ParseAsync(Stream csv, CancellationToken ct = default)
     {
@@ -81,7 +81,8 @@ public sealed class BookCsvParser : IBookCsvParser
                 Description: Cell(cells, columnIndexes, "Description"),
                 Category: Cell(cells, columnIndexes, "Category") ?? "",
                 Publisher: Cell(cells, columnIndexes, "Publisher"),
-                Authors: Cell(cells, columnIndexes, "Authors") ?? ""));
+                Authors: Cell(cells, columnIndexes, "Authors") ?? "",
+                CoverImagePath: Cell(cells, columnIndexes, "CoverImagePath")));
         }
 
         return rows;

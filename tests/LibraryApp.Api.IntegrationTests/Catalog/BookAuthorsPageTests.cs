@@ -102,6 +102,7 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         Assert.Contains($"action=\"{AuthorsPath}\"", html);
         Assert.Contains($"name=\"BookId\" value=\"{book.Id}\"", html);
         Assert.Contains("href=\"/catalog/authors\"", html);
+        Assert.Contains("id=\"copies-title\"", html);
         foreach (Match form in Regex.Matches(html, "<form\\b.*?</form>", RegexOptions.Singleline))
         {
             Assert.Single(Regex.Matches(form.Value, "<form\\b").Cast<Match>());
@@ -155,6 +156,7 @@ public class BookAuthorsPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         Assert.Contains($"value=\"{book.Isbn}\"", html);
         Assert.Contains($"action=\"{EditPath(book.Id)}\"", html);
         Assert.Contains($"action=\"{EditPath(book.Id)}?handler=Delete\"", html);
+        Assert.Contains("id=\"copies-title\"", html);
         var select = AuthorSelect(html);
         Assert.DoesNotContain("selected", select);
         Option(select, first.Id);

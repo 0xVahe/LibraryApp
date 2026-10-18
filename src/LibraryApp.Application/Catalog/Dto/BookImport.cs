@@ -11,6 +11,7 @@ public static class BookImportLimits
 /// One data row of the book CSV, as text (CAT-09). <paramref name="RowNumber"/> is the line where the row begins;
 /// the header is line 1. Empty optional cells are null.
 /// </summary>
+/// <param name="CoverImagePath">Optional path inside the cover storage, checked like on the book form (CAT-01).</param>
 public sealed record BookCsvRow(
     int RowNumber,
     string Title,
@@ -20,7 +21,8 @@ public sealed record BookCsvRow(
     string? Description,
     string Category,
     string? Publisher,
-    string Authors);
+    string Authors,
+    string? CoverImagePath = null);
 
 /// <summary>One problem in the CSV: the line, the column and what is wrong.</summary>
 public sealed record BookImportError(int RowNumber, string Field, string Message);

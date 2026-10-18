@@ -1,0 +1,70 @@
+@page "/catalog/import"
+@model ImportModel
+@{
+    ViewData["Title"] = "Import books";
+    var languages = string.Join(", ", CatalogLanguages.All.Select(language => language.Code));
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Import books", "Add many books at once from a CSV file.", Crumbs: [new("Catalog", "/catalog")]))" />
+
+@if (Model.RowErrors.Count > 0)
+{
+    <partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "Nothing was imported.", Model.RowErrors.Count == 1 ? "Fix the error below and upload the file again." : $"Fix the {Model.RowErrors.Count} errors below and upload the file again."))" />
+    <section class="card flush mb-24" aria-labelledby="errors-title">
+        <div class="card-head"><h2 id="errors-title">Row errors</h2></div>
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Row</th><th scope="col">Field</th><th scope="col">Message</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var error in Model.RowErrors)
+                {
+                    <tr>
+                        <td data-label="Row">@error.RowNumber</td>
+                        <td data-label="Field">@error.Field</td>
+                        <td data-label="Message">@error.Message</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+else if (Model.FormError is { } formError)
+{
+    <partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "Nothing was imported.", formError))" />
+}
+
+<section class="card mb-24" aria-labelledby="upload-title">
+    <h2 id="upload-title" class="mb-16">Upload</h2>
+    <form method="post" enctype="multipart/form-data" class="form">
+        <div class="field">
+            <label for="csv-file">CSV file</label>
+            <input id="csv-file" type="file" name="Csv" accept=".csv,text/csv" required aria-describedby="csv-hint">
+            <span id="csv-hint" class="hint">UTF-8, comma separated, at most @BookImportLimits.MaximumRows books and 1 MB. If one row has an error, no book is added.</span>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Import books</button>
+            <a class="btn btn-secondary" href="@ImportModel.SamplePath" download>Download the sample CSV</a>
+        </div>
+    </form>
+</section>
+
+<section class="card flush" aria-labelledby="format-title">
+    <div class="card-head"><h2 id="format-title">File format</h2></div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Column</th><th scope="col">Required</th><th scope="col">What to write</th><th scope="col">Example</th></tr>
+        </thead>
+        <tbody>
+            <tr><td data-label="Column">Title</td><td data-label="Required">Yes</td><td data-label="What to write">The book title</td><td data-label="Example">Clean Code</td></tr>
+            <tr><td data-label="Column">Isbn</td><td data-label="Required">Yes</td><td data-label="What to write">ISBN-10 or ISBN-13, hyphens allowed, not used by another book</td><td data-label="Example">978-0-13-235088-4</td></tr>
+            <tr><td data-label="Column">PublicationYear</td><td data-label="Required">Yes</td><td data-label="What to write">The year</td><td data-label="Example">2008</td></tr>
+            <tr><td data-label="Column">Language</td><td data-label="Required">Yes</td><td data-label="What to write">One of: @languages</td><td data-label="Example">en</td></tr>
+            <tr><td data-label="Column">Category</td><td data-label="Required">Yes</td><td data-label="What to write">The name of an existing category</td><td data-label="Example">IT &amp; Software Engineering</td></tr>
+            <tr><td data-label="Column">Authors</td><td data-label="Required">Yes</td><td data-label="What to write">Names of existing authors, separated by ;</td><td data-label="Example">Robert C. Martin</td></tr>
+            <tr><td data-label="Column">Publisher</td><td data-label="Required">No</td><td data-label="What to write">The name of an existing publisher</td><td data-label="Example">Prentice Hall</td></tr>
+            <tr><td data-label="Column">Description</td><td data-label="Required">No</td><td data-label="What to write">Short text; in quotes if it contains a comma</td><td data-label="Example">"Readable, simple code."</td></tr>
+            <tr><td data-label="Column">CoverImagePath</td><td data-label="Required">No</td><td data-label="What to write">A file in the library's cover storage: letters, digits, - _ /, ending in .png, .jpg or .webp</td><td data-label="Example">library-covers/01.png</td></tr>
+        </tbody>
+    </table>
+    <p class="hint card-foot">The first line names the columns, in any order. Missing names are added first on the <a href="/catalog/categories">Categories</a>, <a href="/catalog/authors">Authors</a> and <a href="/catalog/publishers">Publishers</a> pages.</p>
+</section>
