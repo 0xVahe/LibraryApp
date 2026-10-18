@@ -23,7 +23,7 @@
     </section>
 
     <aside class="stack-lg">
-        @* The copies panel (CAT-04) and the authors picker (CAT-02) are added here, one partial each. *@
+        <partial name="_BookAuthors" model="Model" />
         <section class="card" aria-labelledby="delete-title">
             <h2 id="delete-title" class="mb-12">Delete book</h2>
             <form method="post" asp-page-handler="Delete" class="form">
