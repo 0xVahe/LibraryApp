@@ -20,11 +20,9 @@ public sealed class LoansController(
 
     /// <summary>Issues a copy, found by its barcode, to a staff member (BOR-01, BOR-02).</summary>
     /// <remarks>
-    /// The due date is the issue date plus the loan days of the staff member's category. A Reserved copy can be issued
-    /// only to the staff member whose ReadyForPickup reservation holds it. Issuing an Available copy also fulfills
-    /// that member's ReadyForPickup reservation for the same book and offers its held copy to the next member.
-    /// Refused with 422 when the staff member may not borrow, the loan limit is reached ("Loan limit reached (3/3)")
-    /// or the copy is unavailable to them; 404 when no copy has the barcode.
+    /// The due date is the issue date plus the loan days of the staff member's category. Refused with 422 when the
+    /// staff member may not borrow, the loan limit is reached ("Loan limit reached (3/3).") or the copy is not
+    /// Available; 404 when no copy has the barcode.
     /// </remarks>
     [HttpPost]
     [ProducesResponseType<LoanDto>(StatusCodes.Status201Created)]

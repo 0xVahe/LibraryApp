@@ -89,10 +89,9 @@ public sealed class LoanReturnService(
                 }
                 else
                 {
-                    bool assigned = await queue.TryOfferCopyUnderBookLockAsync(
+                    bool assigned = await queue.TryOfferCopyAsync(
                         loan.BookCopyId,
                         copy.BookId,
-                        BookCopyStatus.OnLoan,
                         token);
 
                     if (!assigned)

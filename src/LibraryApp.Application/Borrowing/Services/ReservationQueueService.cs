@@ -46,21 +46,23 @@ public sealed class ReservationQueueService(
         Guid bookId,
         CancellationToken ct = default)
     {
-        await applicationLock.AcquireAsync(BorrowingLocks.Book(bookId), ct);
-        await TryOfferCopyUnderBookLockAsync(copyId, bookId, BookCopyStatus.Available, ct);
+        await TryOfferCopyAsync(copyId, bookId, ct);
     }
 
     /// <summary>
     /// Offers the copy to the first waiting reservation.
     /// Returns false when nobody is waiting, leaving the copy unchanged.
-    /// The caller must already hold the book lock and run inside the transaction that saves the surrounding operation.
+    /// Runs inside the caller's transaction.
     /// </summary>
-    internal async Task<bool> TryOfferCopyUnderBookLockAsync(
+    internal async Task<bool> TryOfferCopyAsync(
         Guid copyId,
         Guid bookId,
-        BookCopyStatus currentCopyStatus,
         CancellationToken ct = default)
     {
+        // The queue of the book changes one request at a time: the same lock as creating a reservation.
+        await applicationLock.AcquireAsync(
+            BorrowingLocks.Book(bookId), ct);
+
         IReadOnlyList<Reservation> waiting =
             await reservations.GetWaitingForBookAsync(bookId, ct);
 
@@ -77,11 +79,12 @@ public sealed class ReservationQueueService(
         for (int index = 1; index < waiting.Count; index++)
             waiting[index].SetQueuePosition(index);
 
-        // Supports newly available copies, returned OnLoan copies, and a copy already Reserved for the member who
-        // just collected a different copy. The latter needs no status transition. A new copy is not saved yet when
-        // Catalog calls; SetCopyStatusAsync finds it in the same DbContext. Only Borrowing sets Reserved (BR-CAT-4).
-        if (currentCopyStatus != BookCopyStatus.Reserved)
-            await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Reserved, ct);
+        // Supports both newly available copies and returned OnLoan copies. The copy is not read back here: a new copy
+        // is not saved yet when Catalog calls (the caller's unit of work saves it together with this change), and
+        // SetCopyStatusAsync finds it in the same DbContext. Catalog's transition rules apply; only Borrowing sets
+        // Reserved (BR-CAT-4).
+        await catalog.SetCopyStatusAsync(
+            copyId, BookCopyStatus.Reserved, ct);
 
         await events.PublishAsync(
             new ReservationReady(
