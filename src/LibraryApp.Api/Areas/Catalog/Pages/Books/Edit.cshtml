@@ -1,0 +1,38 @@
+@page "/catalog/books/{id:guid}/edit"
+@model EditModel
+@{
+    ViewData["Title"] = $"Edit {Model.BookTitle}";
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Edit book", "Book details are shared by all copies.", Crumbs: [new("Catalog", "/catalog"), new(Model.BookTitle, $"/catalog/books/{Model.BookId}")]))" />
+
+@if (Model.FormError is { } formError)
+{
+    <partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "The book was not changed.", formError))" />
+}
+
+<div class="grid grid-side">
+    <section class="card" aria-labelledby="details-title">
+        <h2 id="details-title" class="mb-16">Details</h2>
+        <form method="post" class="form form-2">
+            <partial name="_BookFields" model="Model" />
+            <div class="form-actions field-wide">
+                <button class="btn btn-primary" type="submit">Save</button>
+                <a class="btn btn-secondary" href="/catalog/books/@Model.BookId">Cancel</a>
+            </div>
+        </form>
+    </section>
+
+    <aside class="stack-lg">
+        @* The copies panel (CAT-04) and the authors picker (CAT-02) are added here, one partial each. *@
+        <section class="card" aria-labelledby="delete-title">
+            <h2 id="delete-title" class="mb-12">Delete book</h2>
+            <form method="post" asp-page-handler="Delete" class="form">
+                <p class="small muted">The book leaves the catalog and its copies are withdrawn. It cannot be deleted while a copy is on loan or reserved.</p>
+                <label class="check"><input type="checkbox" name="confirmDelete" value="true" /> I want to delete this book</label>
+                <div class="form-actions">
+                    <button class="btn btn-danger" type="submit">Delete book</button>
+                </div>
+            </form>
+        </section>
+    </aside>
+</div>
