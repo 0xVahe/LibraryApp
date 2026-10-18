@@ -42,6 +42,13 @@ public sealed class PenaltyRecord : Entity
     /// Gets the UTC timestamp at which the points expire.
     /// </summary>
     public DateTime ExpiresAtUtc { get; private set; }
+    
+    /// <summary>
+    /// The suspension deadline established by this penalty, if this
+    /// penalty triggered a suspension.
+    /// Retained when the penalty expires or is waived.
+    /// </summary>
+    public DateTime? SuspensionUntilUtc { get; private set; }
 
     /// <summary>
     /// Gets the current penalty state.
@@ -219,5 +226,26 @@ public sealed class PenaltyRecord : Entity
             throw new DomainException(
                 BorrowingErrors.TimestampMustBeUtc);
         }
+    }
+    
+    /// <summary>
+    /// Records the deadline when this penalty triggers a suspension.
+    /// The caller determines whether the suspension threshold was crossed.
+    /// </summary>
+    public void RecordSuspension(DateTime untilUtc)
+    {
+        EnsureUtc(untilUtc);
+
+        if (Status != PenaltyRecordStatus.Active
+            || Points <= 0
+            || untilUtc <= CreatedAtUtc
+            || (SuspensionUntilUtc.HasValue
+                && SuspensionUntilUtc.Value != untilUtc))
+        {
+            throw new DomainException(
+                BorrowingErrors.InvalidSuspensionDeadline);
+        }
+
+        SuspensionUntilUtc = untilUtc;
     }
 }
