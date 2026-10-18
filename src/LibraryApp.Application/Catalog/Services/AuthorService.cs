@@ -42,15 +42,6 @@ public sealed class AuthorService(
             repository.Remove(author);
         }, ct);
 
-    public async Task<IReadOnlyList<Guid>> GetBookAuthorIdsAsync(Guid bookId, CancellationToken ct = default)
-    {
-        if (!await repository.BookExistsAsync(bookId, ct))
-            throw new DomainException(CatalogErrors.BookNotFound);
-
-        var authors = await repository.GetBookAuthorsAsync(bookId, ct);
-        return authors.Select(x => x.AuthorId).ToArray();
-    }
-
     public Task SetBookAuthorsAsync(Guid bookId, BookAuthorsRequest request, CancellationToken ct = default) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {

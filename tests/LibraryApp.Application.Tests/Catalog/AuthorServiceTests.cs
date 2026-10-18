@@ -1,5 +1,4 @@
 using LibraryApp.Application.Catalog.Dto;
-using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
@@ -92,80 +91,5 @@ public class AuthorServiceTests
     {
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.GetAsync(Guid.NewGuid()));
         Assert.Equal(CatalogErrors.AuthorNotFound, error.Error);
-    }
-
-    [Fact]
-    public async Task Book_author_ids_include_all_linked_authors_even_when_names_match()
-    {
-        var first = await Service.CreateAsync(new AuthorRequest("Same Name"));
-        var second = await Service.CreateAsync(new AuthorRequest("Same Name"));
-        _repository.Links.Add(new BookAuthor(_repository.BookId, first.Id));
-        _repository.Links.Add(new BookAuthor(_repository.BookId, second.Id));
-        var repository = new BookAuthorsRepository(_repository);
-        IAuthorService service = new AuthorService(repository, _transaction, _transaction, _transaction);
-        using var cancellation = new CancellationTokenSource();
-
-        var ids = await service.GetBookAuthorIdsAsync(_repository.BookId, cancellation.Token);
-
-        Assert.Equal(new[] { first.Id, second.Id }.OrderBy(x => x), ids.OrderBy(x => x));
-        Assert.Equal((_repository.BookId, cancellation.Token), Assert.Single(repository.BookExistsCalls));
-        Assert.Equal((_repository.BookId, cancellation.Token), Assert.Single(repository.BookAuthorsCalls));
-    }
-
-    [Fact]
-    public async Task Unknown_or_deleted_book_returns_not_found_without_reading_authors()
-    {
-        var bookId = Guid.NewGuid();
-        var repository = new BookAuthorsRepository(_repository);
-        var service = new AuthorService(repository, _transaction, _transaction, _transaction);
-        using var cancellation = new CancellationTokenSource();
-
-        var error = await Assert.ThrowsAsync<DomainException>(() =>
-            service.GetBookAuthorIdsAsync(bookId, cancellation.Token));
-
-        Assert.Equal(CatalogErrors.BookNotFound, error.Error);
-        Assert.Equal((bookId, cancellation.Token), Assert.Single(repository.BookExistsCalls));
-        Assert.Empty(repository.BookAuthorsCalls);
-    }
-
-    [Fact]
-    public async Task Book_without_linked_authors_returns_empty_ids()
-    {
-        var repository = new BookAuthorsRepository(_repository);
-        var service = new AuthorService(repository, _transaction, _transaction, _transaction);
-        using var cancellation = new CancellationTokenSource();
-
-        var ids = await service.GetBookAuthorIdsAsync(_repository.BookId, cancellation.Token);
-
-        Assert.Empty(ids);
-        Assert.Equal((_repository.BookId, cancellation.Token), Assert.Single(repository.BookExistsCalls));
-        Assert.Equal((_repository.BookId, cancellation.Token), Assert.Single(repository.BookAuthorsCalls));
-    }
-
-    private sealed class BookAuthorsRepository(FakeAuthors repository) : IAuthorRepository
-    {
-        public List<(Guid BookId, CancellationToken Token)> BookExistsCalls { get; } = [];
-        public List<(Guid BookId, CancellationToken Token)> BookAuthorsCalls { get; } = [];
-
-        public Task<bool> BookExistsAsync(Guid bookId, CancellationToken ct)
-        {
-            BookExistsCalls.Add((bookId, ct));
-            return repository.BookExistsAsync(bookId, ct);
-        }
-
-        public Task<IReadOnlyList<BookAuthor>> GetBookAuthorsAsync(Guid bookId, CancellationToken ct)
-        {
-            BookAuthorsCalls.Add((bookId, ct));
-            return repository.GetBookAuthorsAsync(bookId, ct);
-        }
-
-        public Task<IReadOnlyList<AuthorDto>> ListAsync(CancellationToken ct) => throw new NotSupportedException();
-        public Task<Author?> FindAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
-        public void Add(Author author) => throw new NotSupportedException();
-        public void Remove(Author author) => throw new NotSupportedException();
-        public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
-        public Task<int> CountAuthorsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) => throw new NotSupportedException();
-        public void AddLink(BookAuthor link) => throw new NotSupportedException();
-        public void RemoveLink(BookAuthor link) => throw new NotSupportedException();
     }
 }
