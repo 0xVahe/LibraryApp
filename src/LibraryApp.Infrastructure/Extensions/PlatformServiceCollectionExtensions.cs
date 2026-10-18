@@ -55,6 +55,9 @@ public static class PlatformServiceCollectionExtensions
 
         services.AddEventBus(configuration);
 
+        // Daily jobs of the modules run once per local day across instances (SD-10); schedules in "Jobs".
+        services.AddDailyJobs(configuration);
+
         services.AddScoped<DatabaseInitializer>();
 
         services.AddHealthChecks()

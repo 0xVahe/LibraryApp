@@ -166,4 +166,58 @@ public class StaffMemberServiceTests
         Assert.Equal("staff.loan_limit_reached", error.Code);
         Assert.Equal("Loan limit reached (3/3).", error.Message);
     }
+    
+    // ---- GetNamesAsync (names for Borrowing lists) ----
+
+    [Fact]
+    public async Task GetNames_returns_first_and_last_name_by_id()
+    {
+        var anna = _repository.Add(firstName: "Anna");
+        var mariam = _repository.Add(firstName: "Mariam");
+
+        var names = await _service.GetNamesAsync([anna.Id, mariam.Id]);
+
+        Assert.Equal(2, names.Count);
+        Assert.Equal("Anna Petrosyan", names[anna.Id]);
+        Assert.Equal("Mariam Petrosyan", names[mariam.Id]);
+    }
+
+    [Fact]
+    public async Task GetNames_leaves_out_unknown_ids()
+    {
+        var anna = _repository.Add();
+
+        var names = await _service.GetNamesAsync([anna.Id, Guid.NewGuid()]);
+
+        Assert.Equal([anna.Id], names.Keys);
+    }
+
+    [Fact]
+    public async Task GetNames_includes_a_Deactivated_member()
+    {
+        var member = _repository.Add(StaffMemberStatus.Deactivated);
+
+        var names = await _service.GetNamesAsync([member.Id]);
+
+        Assert.Equal("Anna Petrosyan", names[member.Id]);
+    }
+
+    [Fact]
+    public async Task GetNames_asks_for_a_repeated_id_once()
+    {
+        var anna = _repository.Add();
+
+        var names = await _service.GetNamesAsync([anna.Id, anna.Id]);
+
+        Assert.Single(names);
+    }
+
+    [Fact]
+    public async Task GetNames_of_an_empty_list_is_empty_without_a_query()
+    {
+        var names = await _service.GetNamesAsync([]);
+
+        Assert.Empty(names);
+        Assert.Equal(0, _repository.GetNamesCalls);
+    }
 }

@@ -46,4 +46,10 @@ public sealed class FakeStaffMemberService : IStaffMemberService
         CancellationToken ct = default)
         => throw new NotSupportedException(
             "Issuing a loan should not change the staff status.");
+    
+    public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+        IReadOnlyCollection<Guid> staffMemberIds,
+        CancellationToken ct = default)
+        => throw new NotSupportedException(
+            "Issuing a loan should not read staff names.");
 }

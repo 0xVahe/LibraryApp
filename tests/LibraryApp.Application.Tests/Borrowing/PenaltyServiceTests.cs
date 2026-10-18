@@ -155,6 +155,11 @@ public sealed class PenaltyServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default)
+        {
+            throw new NotSupportedException();
+        }
+
         public Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 

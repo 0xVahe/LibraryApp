@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Common;
@@ -40,6 +41,7 @@ public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
             services.Replace(ServiceDescriptor.Singleton<IBookSuggestionRepository>(sp => sp.GetRequiredService<Store>()));
             services.Replace(ServiceDescriptor.Singleton<IUnitOfWork>(sp => sp.GetRequiredService<Store>()));
             services.Replace(ServiceDescriptor.Singleton<IApplicationLock>(sp => sp.GetRequiredService<Store>()));
+            services.Replace(ServiceDescriptor.Singleton<IStaffMemberService, StaffNames>());
             services.Replace(ServiceDescriptor.Singleton<IClock, FixedClock>());
         });
     }
@@ -59,20 +61,34 @@ public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
         private readonly List<BookSuggestion> _items = [];
         public void Add(BookSuggestion suggestion) => _items.Add(suggestion);
         public Task<BookSuggestion?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(_items.SingleOrDefault(x => x.Id == id));
-        public Task<string> GetStaffMemberNameAsync(Guid staffMemberId, CancellationToken ct) => Task.FromResult("Test Member");
         public Task AcquireAsync(string resource, CancellationToken ct = default) => Task.CompletedTask;
         public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
         public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
-        public Task<PagedResult<BookSuggestionDto>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,
+        public Task<PagedResult<BookSuggestion>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,
             PageRequest paging, CancellationToken ct)
         {
             var matches = _items.Where(x => staffMemberId is null || x.StaffMemberId == staffMemberId)
                 .Where(x => status is null || x.Status == status).OrderByDescending(x => x.CreatedAtUtc).ThenBy(x => x.Id).ToArray();
-            var items = matches.Skip(paging.Skip)
-                .Take(paging.PageSize).Select(x => new BookSuggestionDto(x.Id, x.StaffMemberId, "Test Member", x.Title, x.AuthorName,
-                    x.Isbn, x.Reason, x.Status, x.CreatedAtUtc, x.ReviewedAtUtc, x.ReviewedByUserId, x.ReviewComment)).ToArray();
-            return Task.FromResult(new PagedResult<BookSuggestionDto>(items, matches.Length, paging.Page, paging.PageSize));
+            var items = matches.Skip(paging.Skip).Take(paging.PageSize).ToArray();
+            return Task.FromResult(new PagedResult<BookSuggestion>(items, matches.Length, paging.Page, paging.PageSize));
         }
+    }
+
+    /// <summary>Every staff member is "Test Member"; the other Staff methods are not used by CAT-10.</summary>
+    private sealed class StaffNames : IStaffMemberService
+    {
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(IReadOnlyCollection<Guid> staffMemberIds,
+            CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, string>>(staffMemberIds.Distinct().ToDictionary(id => id, _ => "Test Member"));
+
+        public Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<LendingRules> GetLendingRulesAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task SetStatusAsync(Guid staffMemberId, StaffMemberStatus status, string reason, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }
 
