@@ -56,7 +56,7 @@ public sealed class BorrowingDailyJob(
                 cutoffUtc,
                 ct);
 
-            staffIds = await query.GetStaffIdsWithPenaltyHistoryAsync(
+            staffIds = await query.GetStaffIdsWithActivePenaltiesAsync(
                 ct);
         }
 

@@ -15,9 +15,9 @@ public interface IBorrowingDailyJobQuery
         CancellationToken ct = default);
 
     /// <summary>
-    /// Finds staff members with penalty history, including expired and waived
-    /// records, so expiry and the end of a suspension can be checked.
+    /// Finds staff members with at least one Active penalty record: the only ones
+    /// whose points can expire or whose suspension can end.
     /// </summary>
-    Task<IReadOnlyList<Guid>> GetStaffIdsWithPenaltyHistoryAsync(
+    Task<IReadOnlyList<Guid>> GetStaffIdsWithActivePenaltiesAsync(
         CancellationToken ct = default);
 }

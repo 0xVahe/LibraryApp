@@ -300,7 +300,7 @@ public sealed class BorrowingDailyJobTests
                 state.LoanIds.ToArray());
         }
 
-        public Task<IReadOnlyList<Guid>> GetStaffIdsWithPenaltyHistoryAsync(
+        public Task<IReadOnlyList<Guid>> GetStaffIdsWithActivePenaltiesAsync(
             CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();

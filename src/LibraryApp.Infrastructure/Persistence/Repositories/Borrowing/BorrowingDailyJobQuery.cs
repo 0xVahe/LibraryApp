@@ -33,7 +33,7 @@ public sealed class BorrowingDailyJobQuery(LibraryDbContext db)
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetStaffIdsWithPenaltyHistoryAsync(
+    public async Task<IReadOnlyList<Guid>> GetStaffIdsWithActivePenaltiesAsync(
         CancellationToken ct = default)
     {
         return await db.PenaltyRecords
