@@ -1,0 +1,11 @@
+@page "/staff/{id:guid}/edit"
+@model EditModel
+@{
+    ViewData["Title"] = "Edit staff member";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Edit staff member",
+             $"{Model.Member.FirstName} {Model.Member.LastName}",
+             Actions: [new PageAction("View staff member", $"/staff/{Model.Member.Id}")],
+             Crumbs: [new PageAction("Staff members", "/staff")]))' />
+<partial name="_EditStaffForm" model="Model" />
