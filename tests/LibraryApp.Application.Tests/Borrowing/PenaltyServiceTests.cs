@@ -6,7 +6,6 @@ using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Application.Borrowing.Options;
-using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
@@ -184,7 +183,7 @@ public sealed class PenaltyServiceTests
     [InlineData(-1, StaffMemberStatus.Suspended, false)]
     [InlineData(0, StaffMemberStatus.Restricted, true)]
     [InlineData(1, StaffMemberStatus.Restricted, true)]
-    public async Task Suspension_ends_exactly_at_its_recorded_deadline(
+    public async Task Suspension_ends_exactly_SuspensionDays_after_the_crossing(
         int ticksFromDeadline,
         StaffMemberStatus expectedStatus,
         bool expectedChange)
@@ -197,8 +196,6 @@ public sealed class PenaltyServiceTests
             "Penalty that triggered suspension",
             Now.AddDays(-30),
             Now.AddDays(60));
-
-        record.RecordSuspension(Now);
 
         _penalties.Records.Add(record);
         _staff.Status = StaffMemberStatus.Suspended;
@@ -231,8 +228,6 @@ public sealed class PenaltyServiceTests
             "Earlier suspension",
             Now.AddDays(-31),
             Now.AddDays(59));
-
-        record.RecordSuspension(Now.AddDays(-1));
 
         _penalties.Records.Add(record);
         _staff.Status = StaffMemberStatus.Suspended;
@@ -301,14 +296,10 @@ public sealed class PenaltyServiceTests
 
         _events.Commit();
 
-        PenaltyRecord record = Assert.Single(_penalties.Added);
-
-        Assert.Equal(Now.AddDays(14), record.SuspensionUntilUtc);
-
         var changed = Assert.Single(
             _events.Published.OfType<StaffStatusChanged>());
 
-        Assert.Equal(record.SuspensionUntilUtc, changed.EffectiveUntilUtc);
+        Assert.Equal(Now.AddDays(14), changed.EffectiveUntilUtc);
         Assert.Equal(StaffMemberStatus.Suspended, _staff.Status);
 
         await service.RecalculateStatusAsync(
@@ -321,59 +312,59 @@ public sealed class PenaltyServiceTests
     }
 
     [Fact]
-    public async Task Active_mode_restores_Active_after_suspension()
+    public async Task The_suspension_follows_the_latest_record_that_crossed_the_threshold()
     {
-        var record = PenaltyRecord.Create(
-            Guid.NewGuid(),
-            StaffId,
-            Guid.NewGuid(),
-            10,
-            "Earlier suspension",
-            Now.AddDays(-30),
-            Now.AddDays(60));
-
-        record.RecordSuspension(Now);
-
-        _penalties.Records.Add(record);
+        // An old suspension (expired points) and a new crossing 10 days ago: 6 + 5 points.
+        _penalties.Records.Add(PenaltyRecord.Create(Guid.NewGuid(), StaffId, Guid.NewGuid(), 10, "Old",
+            Now.AddDays(-200), Now.AddDays(-110)));
+        _penalties.Records.Add(PenaltyRecord.Create(Guid.NewGuid(), StaffId, Guid.NewGuid(), 6, "First",
+            Now.AddDays(-40), Now.AddDays(50)));
+        _penalties.Records.Add(PenaltyRecord.Create(Guid.NewGuid(), StaffId, Guid.NewGuid(), 5, "Crossing",
+            Now.AddDays(-10), Now.AddDays(80)));
         _staff.Status = StaffMemberStatus.Suspended;
+        PenaltyService service = Service();
 
-        PenaltyService service = Service(options =>
-            options.Penalties.AfterSuspension =
-                AfterSuspensionMode.Active);
+        var during = await service.RecalculateStatusAsync(StaffId, Now.AddDays(20).AddTicks(-1));
+        Assert.False(during.StatusChanged);
+        Assert.Equal(StaffMemberStatus.Suspended, _staff.Status);
 
-        await service.RecalculateStatusAsync(StaffId, Now);
+        var after = await service.RecalculateStatusAsync(StaffId, Now.AddDays(20));
         _events.Commit();
 
-        PenaltyRecalculationResult second =
-            await service.RecalculateStatusAsync(
-                StaffId,
-                Now.AddDays(1));
-
-        _events.Commit();
-
-        Assert.Equal(StaffMemberStatus.Active, _staff.Status);
-        Assert.False(second.StatusChanged);
-        Assert.Equal(1, _staff.SetStatusCalls);
+        Assert.True(after.StatusChanged);
+        Assert.Equal(StaffMemberStatus.Restricted, _staff.Status);
+        Assert.Equal(StaffMemberStatus.Restricted, Assert.Single(_events.Published.OfType<StaffStatusChanged>()).NewStatus);
     }
 
     [Fact]
-    public async Task Missing_suspension_history_is_reported_instead_of_guessed()
+    public async Task Waiving_the_record_that_made_the_threshold_ends_the_suspension()
     {
-        PriorPoints(10);
+        _penalties.Records.Add(PenaltyRecord.Create(Guid.NewGuid(), StaffId, Guid.NewGuid(), 6, "First",
+            Now.AddDays(-40), Now.AddDays(50)));
+        var crossing = PenaltyRecord.Create(Guid.NewGuid(), StaffId, Guid.NewGuid(), 5, "Crossing",
+            Now.AddDays(-10), Now.AddDays(80));
+        crossing.Waive("Business trip");
+        _penalties.Records.Add(crossing);
         _staff.Status = StaffMemberStatus.Suspended;
 
-        DomainException exception = await Assert.ThrowsAsync<DomainException>(
-            () => Service().RecalculateStatusAsync(StaffId, Now));
+        var result = await Service().RecalculateStatusAsync(StaffId, Now);
 
-        Assert.Equal(
-            new DomainException(BorrowingErrors.SuspensionHistoryMissing).Message,
-            exception.Message);
+        // 6 points remain: no crossing without the waived record, so no suspension; Restricted by points.
+        Assert.True(result.StatusChanged);
+        Assert.Equal(6, result.ActivePointsTotal);
+        Assert.Equal(StaffMemberStatus.Restricted, _staff.Status);
+    }
 
-        Assert.Equal(StaffMemberStatus.Suspended, _staff.Status);
-        Assert.Equal(0, _staff.SetStatusCalls);
+    [Fact]
+    public async Task High_points_without_a_new_crossing_do_not_suspend_a_Restricted_member()
+    {
+        PriorPoints(10);
+        _staff.Status = StaffMemberStatus.Restricted;
 
-        _events.Commit();
-        Assert.Empty(_events.Published);
+        var result = await Service().RecalculateStatusAsync(StaffId, Now.AddDays(31));
+
+        Assert.False(result.StatusChanged);
+        Assert.Equal(StaffMemberStatus.Restricted, _staff.Status);
     }
 
     private sealed class InMemoryPenalties : IPenaltyRepository

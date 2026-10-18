@@ -21,7 +21,6 @@ public static class BorrowingTestSettings
             RestrictedFromPoints = 5,
             SuspendedFromPoints = 10,
             SuspensionDays = 30,
-            AfterSuspension = AfterSuspensionMode.RestrictedByPoints,
             LateAndDamaged = LateAndDamagedMode.Sum,
         },
         Loans = new LoanOptions

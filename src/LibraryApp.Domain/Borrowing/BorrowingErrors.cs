@@ -7,17 +7,6 @@ namespace LibraryApp.Domain.Borrowing;
 /// </summary>
 public static class BorrowingErrors
 {
-    public static readonly Error InvalidSuspensionDeadline =
-        Error.BusinessRule(
-            "borrowing.invalid_suspension_deadline",
-            "A suspension deadline must follow the creation of an active, "
-            + "positive-point penalty and cannot replace an existing deadline.");
-
-    public static readonly Error SuspensionHistoryMissing =
-        Error.Conflict(
-            "borrowing.suspension_history_missing",
-            "The suspended staff member has no recorded suspension deadline.");
-    
     /// <summary>No loan has this id.</summary>
     public static readonly Error LoanNotFound =
         Error.NotFound("borrowing.loan_not_found", "The loan does not exist.");

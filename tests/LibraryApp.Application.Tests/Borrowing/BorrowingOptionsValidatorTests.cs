@@ -28,7 +28,6 @@ public sealed class BorrowingOptionsValidatorTests
                      "Borrowing:Penalties:SuspensionDays", "Borrowing:Penalties:LateAndDamaged",
                      "Borrowing:Loans:OverdueFrom",
                      "Borrowing:Reservations:MaxActive", "Borrowing:Reservations:PickupWorkingDays",
-                     "Borrowing:Penalties:AfterSuspension",
                  })
             Assert.Contains(key, result.FailureMessage);
     }
@@ -86,7 +85,6 @@ public sealed class BorrowingOptionsValidatorTests
         options.Penalties.SuspensionDays = 14;
         options.Penalties.LateAndDamaged = LateAndDamagedMode.Highest;
         options.Loans.OverdueFrom = OverdueFromMode.DueTime;
-        options.Penalties.AfterSuspension = AfterSuspensionMode.Active;
 
         Assert.True(Validator.Validate(null, options).Succeeded);
     }
@@ -96,14 +94,6 @@ public sealed class BorrowingOptionsValidatorTests
         { "Borrowing:Penalties:SuspensionDays", o => o.Penalties.SuspensionDays = 0 },
         { "Borrowing:Penalties:LateAndDamaged", o => o.Penalties.LateAndDamaged = (LateAndDamagedMode)99 },
         { "Borrowing:Loans:OverdueFrom", o => o.Loans.OverdueFrom = (OverdueFromMode)99 },
-        {
-            "Borrowing:Penalties:AfterSuspension",
-            o => o.Penalties.AfterSuspension = (AfterSuspensionMode)0
-        },
-        {
-            "Borrowing:Penalties:AfterSuspension",
-            o => o.Penalties.AfterSuspension = (AfterSuspensionMode)99
-        },
     };
 
     [Theory]

@@ -26,7 +26,6 @@ public class BorrowingRegistrationTests
         ["Borrowing:Reservations:MaxActive"] = "2",
         ["Borrowing:Reservations:PickupWorkingDays"] = "5",
         ["Borrowing:Reservations:PickupCountsReleaseDay"] = "true",
-        ["Borrowing:Penalties:AfterSuspension"] = "RestrictedByPoints",
     };
 
     private static ServiceProvider Services(Dictionary<string, string?> settings)
@@ -52,9 +51,6 @@ public class BorrowingRegistrationTests
         Assert.Equal(21, options.Penalties.SuspensionDays);
         Assert.Equal(LateAndDamagedMode.Highest, options.Penalties.LateAndDamaged);
         Assert.Equal(OverdueFromMode.DueTime, options.Loans.OverdueFrom);
-        Assert.Equal(
-            AfterSuspensionMode.RestrictedByPoints,
-            options.Penalties.AfterSuspension);
     }
 
     [Fact]

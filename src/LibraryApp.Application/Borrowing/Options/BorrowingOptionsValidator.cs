@@ -53,16 +53,6 @@ public sealed class BorrowingOptionsValidator : IValidateOptions<BorrowingOption
                 $"{Loans}:{nameof(options.Loans.OverdueFrom)} " +
                 "must be NextLocalDay or DueTime.");
         }
-        
-        if (!Enum.IsDefined(
-                typeof(AfterSuspensionMode),
-                penalties.AfterSuspension))
-        {
-            failures.Add(
-                $"{Penalties}:{nameof(penalties.AfterSuspension)} "
-                + "must be RestrictedByPoints or Active.");
-        }
-        
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 
