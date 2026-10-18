@@ -8,6 +8,14 @@ public interface IBookService
         CreateBookRequest request,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Creates several books in one transaction (CAT-09): all of them, or none when one breaks a rule.
+    /// The IDs come back in the order of the requests.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> CreateBatchAsync(
+        IReadOnlyList<CreateBookRequest> requests,
+        CancellationToken ct = default);
+
     Task UpdateAsync(
         Guid id,
         UpdateBookRequest request,

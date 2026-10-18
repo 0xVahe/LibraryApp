@@ -10,7 +10,11 @@ namespace LibraryApp.Api.Controllers.Catalog;
 
 [ApiController]
 [Route("api/books")]
-public sealed class BooksController(IBookSearchService searchService, IBookDetailsService detailsService, IBookService bookService) : ControllerBase
+public sealed class BooksController(
+    IBookSearchService searchService,
+    IBookDetailsService detailsService,
+    IBookService bookService,
+    IBookImportService importService) : ControllerBase
 {
     private const string Writers =
         StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
@@ -93,6 +97,33 @@ public sealed class BooksController(IBookSearchService searchService, IBookDetai
         await bookService.UpdateAsync(id, request, cancellationToken);
 
         return NoContent();
+    }
+
+    /// <summary>Imports up to 500 books from a CSV file (CAT-09). All rows are saved together, or none are.</summary>
+    /// <remarks>
+    /// Upload multipart/form-data with the <c>file</c> field: UTF-8, comma separated, at most 1 MB, a header line first.
+    /// Columns: Title, Isbn, PublicationYear, Language (hy, en or ru), Category, Authors (names separated by ';'),
+    /// and the optional Description and Publisher. Category, publisher and author names must already exist.
+    /// A 400 <c>catalog.import_invalid</c> answer lists every problem in <c>rows</c> (rowNumber, field, message).
+    /// Sample file: docs/samples/book-import.csv.
+    /// </remarks>
+    /// <param name="file">The CSV file.</param>
+    /// <param name="cancellationToken">Cancelled when the client disconnects.</param>
+    [HttpPost("import")]
+    [Authorize(Roles = Writers)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(BookImportLimits.MaximumFileBytes + 100_000)]
+    [RequestFormLimits(MultipartBodyLengthLimit = BookImportLimits.MaximumFileBytes + 100_000)]
+    [ProducesResponseType<BookImportResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<BookImportResult>> Import(
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = file.OpenReadStream();
+        return Ok(await importService.ImportAsync(stream, file.Length, cancellationToken));
     }
 
     /// <summary>Soft-deletes a book (CAT-01).</summary>
