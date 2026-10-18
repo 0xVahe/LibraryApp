@@ -28,7 +28,11 @@ public class CopiesPanelPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         var withdrawn = await AddCopyAsync(bookId, $"{prefix}-W", BookCopyStatus.Withdrawn);
         var onLoan = await AddCopyAsync(bookId, $"{prefix}-O");
         using (var scope = factory.Services.CreateScope())
+        {
+            // SetCopyStatusAsync runs inside Borrowing's unit of work, which saves; here the test saves itself.
             await scope.ServiceProvider.GetRequiredService<ICatalogService>().SetCopyStatusAsync(onLoan.Id, BookCopyStatus.OnLoan);
+            await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().SaveChangesAsync();
+        }
         using var client = await SignedInAsync(StaffSeedIds.StaffMembers.AramSargsyan);
 
         var html = await client.GetStringAsync(EditPath(bookId));
