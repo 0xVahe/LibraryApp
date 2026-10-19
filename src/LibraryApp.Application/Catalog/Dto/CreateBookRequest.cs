@@ -9,6 +9,7 @@ namespace LibraryApp.Application.Catalog.Dto;
 /// <param name="CategoryId">Existing category assigned to the book.</param>
 /// <param name="PublisherId">Optional existing publisher.</param>
 /// <param name="AuthorIds">One or more existing authors for the book.</param>
+/// <param name="CoverImagePath">Optional relative path to the stored cover image.</param>
 public sealed record CreateBookRequest(
     string Title,
     string Isbn,
@@ -17,4 +18,5 @@ public sealed record CreateBookRequest(
     string? Description,
     Guid CategoryId,
     Guid? PublisherId,
-    IReadOnlyList<Guid> AuthorIds);
+    IReadOnlyList<Guid> AuthorIds,
+    string? CoverImagePath = null);

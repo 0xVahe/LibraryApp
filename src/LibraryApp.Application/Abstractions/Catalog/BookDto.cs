@@ -22,6 +22,7 @@ namespace LibraryApp.Application.Abstractions.Catalog;
 /// <param name="TotalCopies">Copies the library still has: every status except Lost and Withdrawn (CAT-06).</param>
 /// <param name="AvailableCopies">Copies with status Available (CAT-06).</param>
 /// <param name="IsDeleted">True for a soft-deleted book (CAT-01, BR-CAT-3).</param>
+/// <param name="CoverImageUrl">Full public cover URL, or null when the book has no cover.</param>
 public sealed record BookDto(
     Guid Id,
     string Title,
@@ -36,4 +37,5 @@ public sealed record BookDto(
     IReadOnlyList<string> Authors,
     int TotalCopies,
     int AvailableCopies,
-    bool IsDeleted);
+    bool IsDeleted,
+    string? CoverImageUrl = null);
