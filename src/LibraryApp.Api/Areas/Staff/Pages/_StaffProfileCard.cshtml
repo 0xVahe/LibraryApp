@@ -1,0 +1,24 @@
+@using System.Globalization
+@using LibraryApp.Application.Staff.Dto
+@using LibraryApp.Domain.Staff
+@model StaffMemberDto
+@inject LibraryApp.Application.Abstractions.Common.IClock Clock
+@{
+    var role = Model.Role == StaffRoles.LibraryAdministrator ? "Library administrator"
+        : Model.Role == StaffRoles.Librarian ? "Librarian" : "Staff member";
+    var joinedOn = Clock.ToLocalDate(Model.JoinedLibraryAtUtc);
+}
+<section class="card" aria-labelledby="profile-title">
+    <div class="card-head"><h2 id="profile-title">Profile</h2></div>
+    <dl class="dl">
+        <dt>Employee ID</dt><dd>@Model.EmployeeId</dd>
+        <dt>Corporate email</dt><dd>@Model.CorporateEmail</dd>
+        <dt>Department</dt><dd>@Model.DepartmentName</dd>
+        <dt>Position</dt><dd>@Model.Position</dd>
+        <dt>Line manager</dt><dd>@(Model.LineManagerEmail ?? "Not set")</dd>
+        <dt>Category</dt><dd>@Model.StaffCategoryName</dd>
+        <dt>Role</dt><dd>@role</dd>
+        <dt>In the library since</dt>
+        <dd><time datetime="@joinedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@joinedOn.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</time></dd>
+    </dl>
+</section>
