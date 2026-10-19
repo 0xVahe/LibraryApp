@@ -65,6 +65,7 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Reservations:PickupCountsReleaseDay` | false | The day the copy is held counts as the first pickup day | BOR-07 |
 | `Reservations:RestrictedMayReserve` | false | A Restricted employee may place reservations | BR-MEM-3 |
 | `Reservations:SuspendedMayReserve` | false | A Suspended employee may place reservations | BR-BOR-6 |
+| `Reservations:AnyCopyFulfils` | true | Issuing any copy of a book closes the employee's active reservation for it: a ready one is fulfilled and its held copy goes to the next in the queue, a waiting one is cancelled. false: only collecting the held copy fulfils | BOR-07 (BQ-BA-08) |
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 

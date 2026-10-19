@@ -2,7 +2,8 @@
 @{
     var home = User.Identity?.IsAuthenticated == true ? UiNavigation.StartPath(User) : UiPaths.Login;
 }
-<div class="card error-page">
+<div class="error-page">
+    <img class="error-art" src="~/img/error-fallback.webp" alt="" width="200" height="173">
     <p class="error-code">@Model.Code</p>
     <h1>@Model.Title</h1>
     <p>@Model.Text</p>
