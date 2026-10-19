@@ -197,7 +197,7 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
 
         Assert.Contains("--green: #72bf44;", css);
         Assert.Contains("--green-hover: #5f9f39;", css);
-        Assert.Contains(".btn-primary { background: var(--green); color: var(--ink); }", css);
+        Assert.Contains(".btn-primary { background: var(--green); color: var(--white); }", css);
         Assert.DoesNotContain("--green-solid", css);
     }
 

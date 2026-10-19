@@ -1,5 +1,5 @@
 /* Ameria Library — one stylesheet for every page (copy of the UI demo's design/styles.css; shared file, see design.md).
-   Colours from ameriabank.am: brand green #72BF44 (hover #5F9F39) with dark text (design.md), text #171717 / #565656, footer #222.
+   Colours from ameriabank.am: brand green #72BF44 (hover #5F9F39) with white text, text #171717 / #565656, footer #222.
    Type scale 14/16/20/24/32, spacing on a 4px scale. */
 
 /* Fonts served from wwwroot/fonts (SIL Open Font License, see OFL-*.txt there), never from Google Fonts. Latin only:
@@ -282,7 +282,7 @@ main {
   transition: background 0.2s var(--ease), border-color 0.2s var(--ease), transform 0.2s var(--ease);
 }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--green); color: var(--ink); }
+.btn-primary { background: var(--green); color: var(--white); }
 .btn-primary:hover { background: var(--green-hover); }
 .btn-secondary { background: var(--white); color: var(--ink); border-color: #a3a3a3; font-weight: 400; }
 .btn-secondary:hover { border-color: var(--ink); }
@@ -303,7 +303,7 @@ main {
   font-weight: 600;
   white-space: nowrap;
 }
-.badge-green { background: var(--green); color: var(--ink); }
+.badge-green { background: var(--green); color: var(--white); }
 .badge-red { background: var(--red-soft); color: var(--red); }
 .badge-amber { background: var(--amber-soft); color: var(--amber); }
 .badge-blue { background: var(--blue-soft); color: var(--blue); }
@@ -504,7 +504,7 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
   color: var(--ink);
   text-decoration: none;
 }
-.pager a[aria-current="page"] { background: var(--green); border-color: var(--green); color: var(--ink); font-weight: 600; }
+.pager a[aria-current="page"] { background: var(--green); border-color: var(--green); color: var(--white); font-weight: 600; }
 
 .unread { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; }
 .read { width: 8px; height: 8px; flex: none; }

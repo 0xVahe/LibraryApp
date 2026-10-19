@@ -180,23 +180,9 @@ Razor Pages live in the API host (UI guide in the team docs): the shared shell i
 - **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
 - **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
 
-### Staff members (S2-07)
+Staff pages (MEM-01, MEM-07): `/staff` provides search, department/status filters and pagination; `/staff/{id}` shows the profile and deactivation form. Both routes require a Librarian or Library Administrator.
 
-`/staff` and `/staff/{id}` are available to Librarians and Library Administrators. Search uses the existing paged Staff service, with name/employee ID, department and status filters in the query string. Pagination keeps those filters. Profile pages show the Staff details and a deactivation form with a required reason. When books are outstanding, the form lists their real titles and barcodes and leaves the account unchanged. A successful deactivation redirects to the updated profile with a green alert.
-
-The page invokes Group 3's `StaffBorrowingSummary` View Component with `staffMemberId` when it is registered. Until that component is available, the slot shows that borrowing details are unavailable. The Staff pages do not implement Borrowing actions.
-
-To view and test the UI locally:
-
-1. Start Docker Desktop, then run `docker compose up -d sqlserver smtp4dev` from the repository root. Use the existing `.env` described in [Run it](#run-it).
-2. Run `dotnet watch --project src/LibraryApp.Api run --launch-profile http`. Keep this terminal open. Save a Razor file and refresh the browser to see changes.
-3. Open `http://localhost:5055/login?returnUrl=/staff`. Sign in as `aram.sargsyan@ameriabank.am` (Librarian) or `lilit.grigoryan@ameriabank.am` (Administrator), using the current seed password `Library2026`. An existing database keeps its original account passwords.
-4. Search for `Anna`, combine department/status filters, clear the filters, and use the page links. Open a member's name or the View button to inspect the profile.
-5. Open Anna Petrosyan and try deactivation with a reason: the seeded outstanding books must be listed in a red alert. Submit an empty reason to check the field error. To test successful deactivation, enrol a synthetic test member through the existing Enrol page, then deactivate that member.
-6. In a private browser window, sign in as `anna.petrosyan@ameriabank.am` and open `/staff`: access must be forbidden. Test the list, profile and error states at a 390 px viewport width as well.
-7. Stop the API with `Ctrl+C`, then run `docker compose stop`.
-
-Automated page tests: `dotnet test tests/LibraryApp.Api.IntegrationTests --filter "FullyQualifiedName~StaffMemberPageTests|FullyQualifiedName~StaffBorrowingSlotTests"`. They use their own migrated databases; configure the test SQL connection as described in [Tests](#tests).
+The profile invokes Group 3's `StaffBorrowingSummary` View Component with `staffMemberId` when available; otherwise it displays an unavailable message. Borrowing actions remain owned by Group 3.
 
 ## Test accounts
 
