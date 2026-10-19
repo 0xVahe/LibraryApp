@@ -126,7 +126,7 @@ public class CatalogSeedDataTests
 
     [Fact]
     public void Categories_keep_their_existing_fixed_mapping() => AssertMapping(
-        CatalogSeedData.Categories, "0001", """
+        CatalogSeedData.Categories.Select(x => (x.Id, x.Name)).ToList(), "0001", """
             Banking & Finance
             Risk, Compliance & AML
             IT & Software Engineering
@@ -135,7 +135,30 @@ public class CatalogSeedDataTests
             Soft Skills & Communication
             Customer Experience
             General Reading
+            Investing & Markets
+            Banking & Financial History
+            Software Craftsmanship
+            Software Architecture & Design
+            Armenian Literature
+            Popular Non-fiction
             """, Category.NameMaxLength);
+
+    [Fact]
+    public void Subcategories_keep_their_top_level_parents_and_hold_seeded_books()
+    {
+        // Two levels at most (CAT-03): categories 1 to 8 are top-level, and a parent is listed before its subcategories.
+        var expectedParents = new Dictionary<int, int> { [9] = 1, [10] = 1, [11] = 3, [12] = 3, [13] = 8, [14] = 8 };
+
+        for (var number = 1; number <= CatalogSeedData.Categories.Count; number++)
+        {
+            Guid? expectedParent = expectedParents.TryGetValue(number, out var parent) ? CatalogSeedIds.Category(parent) : null;
+            Assert.Equal(expectedParent, CatalogSeedData.Categories[number - 1].ParentId);
+        }
+
+        Assert.All(expectedParents.Keys, subcategory =>
+            Assert.Contains(CatalogSeedData.Books, book => book.CategoryNumber == subcategory));
+        Assert.All(CatalogSeedData.Books, book => Assert.InRange(book.CategoryNumber, 1, CatalogSeedData.Categories.Count));
+    }
 
     [Fact]
     public void Book_ids_keep_their_fixed_scheme()
@@ -191,8 +214,9 @@ public class CatalogSeedDataTests
     [Fact]
     public void Reference_ids_are_unique_across_all_seed_sets()
     {
-        var ids = CatalogSeedData.Categories.Concat(CatalogSeedData.Authors)
-            .Concat(CatalogSeedData.Publishers).Select(x => x.Id).ToArray();
+        var ids = CatalogSeedData.Categories.Select(x => x.Id)
+            .Concat(CatalogSeedData.Authors.Select(x => x.Id))
+            .Concat(CatalogSeedData.Publishers.Select(x => x.Id)).ToArray();
 
         Assert.Equal(ids.Length, ids.Distinct().Count());
         Assert.DoesNotContain(Guid.Empty, ids);
