@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Jobs;
 using LibraryApp.Infrastructure.Jobs.Borrowing;
@@ -51,6 +52,82 @@ public class BorrowingDailyJobDatabaseTests(BorrowingDailyJobHost factory) : ICl
         var schedule = factory.Services.GetRequiredService<IOptions<JobsOptions>>().Value.Schedules[BorrowingDailyJob.Name];
         Assert.True(schedule.Enabled);
         Assert.False(schedule.WorkingDaysOnly);
+    }
+
+    [Fact]
+    public async Task Expired_pickup_transfers_its_copy_to_the_next_waiter_once()
+    {
+        DateTime now = factory.Services.GetRequiredService<IClock>().UtcNow;
+        Guid bookId = CatalogSeedIds.Book(1);
+        Guid copyId = CatalogSeedIds.Copy(1, 1);
+
+        Reservation expired = Reservation.Create(
+            Guid.NewGuid(),
+            bookId,
+            Members.AnnaPetrosyan,
+            now.AddDays(-10),
+            queuePosition: 1);
+        expired.MarkReady(copyId, now.AddTicks(-1));
+
+        Reservation waiting = Reservation.Create(
+            Guid.NewGuid(),
+            bookId,
+            Members.DavitHakobyan,
+            now.AddDays(-9),
+            queuePosition: 1);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            var copy = await db.BookCopies.SingleAsync(c => c.Id == copyId);
+            copy.ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.AddRange(expired, waiting);
+            await db.SaveChangesAsync();
+        }
+
+        int readyEventsBefore;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            readyEventsBefore = (await db.OutboxMessages.AsNoTracking()
+                .Select(message => message.Type)
+                .ToListAsync())
+                .Count(type => type.EndsWith("ReservationReady", StringComparison.Ordinal));
+        }
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var job = scope.ServiceProvider.GetRequiredService<BorrowingDailyJob>();
+            var run = new DailyJobRun(
+                BorrowingDailyJob.Name,
+                DateOnly.FromDateTime(now),
+                now);
+
+            await job.RunAsync(run, CancellationToken.None);
+            await job.RunAsync(run, CancellationToken.None);
+        }
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            var savedExpired = await db.Reservations.AsNoTracking()
+                .SingleAsync(r => r.Id == expired.Id);
+            var savedWaiting = await db.Reservations.AsNoTracking()
+                .SingleAsync(r => r.Id == waiting.Id);
+            var savedCopy = await db.BookCopies.AsNoTracking()
+                .SingleAsync(c => c.Id == copyId);
+            int readyEventsAfter = (await db.OutboxMessages.AsNoTracking()
+                .Select(message => message.Type)
+                .ToListAsync())
+                .Count(type => type.EndsWith("ReservationReady", StringComparison.Ordinal));
+
+            Assert.Equal(ReservationStatus.Expired, savedExpired.Status);
+            Assert.Equal(copyId, savedExpired.CopyId);
+            Assert.Equal(ReservationStatus.ReadyForPickup, savedWaiting.Status);
+            Assert.Equal(copyId, savedWaiting.CopyId);
+            Assert.Equal(BookCopyStatus.Reserved, savedCopy.Status);
+            Assert.Equal(readyEventsBefore + 1, readyEventsAfter);
+        }
     }
 
     [Fact]

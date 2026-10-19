@@ -44,4 +44,26 @@ public sealed class BorrowingDailyJobQuery(LibraryDbContext db)
             .OrderBy(staffMemberId => staffMemberId)
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
+        DateTime nowUtc,
+        CancellationToken ct = default)
+    {
+        if (nowUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException(
+                "The pickup expiry time must be UTC.",
+                nameof(nowUtc));
+        }
+
+        return await db.Reservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.Status == ReservationStatus.ReadyForPickup
+                && reservation.ReadyUntilUtc < nowUtc)
+            .OrderBy(reservation => reservation.ReadyUntilUtc)
+            .ThenBy(reservation => reservation.Id)
+            .Select(reservation => reservation.Id)
+            .ToListAsync(ct);
+    }
 }

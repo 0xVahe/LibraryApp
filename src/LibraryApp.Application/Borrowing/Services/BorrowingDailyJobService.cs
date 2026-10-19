@@ -4,6 +4,7 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 
@@ -22,8 +23,81 @@ public sealed class BorrowingDailyJobService(
     IApplicationLock locks,
     IEventBus events,
     IClock clock,
-    IIdGenerator ids) : IBorrowingDailyJobService
+    IIdGenerator ids,
+    IReservationRepository reservations,
+    ReservationQueueService reservationQueue) : IBorrowingDailyJobService
 {
+    public Task<bool> ExpirePickupAsync(
+        Guid reservationId,
+        CancellationToken ct = default)
+    {
+        return unitOfWork.ExecuteInTransactionAsync(
+            async token =>
+            {
+                // Read only to identify the book lock.
+                Reservation? initial = await reservations.FindAsync(
+                    reservationId,
+                    token);
+
+                if (initial is null
+                    || initial.Status != ReservationStatus.ReadyForPickup)
+                {
+                    return false;
+                }
+
+                await locks.AcquireAsync(
+                    BorrowingLocks.Book(initial.BookId),
+                    token);
+
+                // Reload after acquiring the lock. Another job run or pickup may
+                // have completed while this reservation waited for the lock.
+                Reservation? reservation = await reservations.GetForUpdateAsync(
+                    reservationId,
+                    token);
+
+                if (reservation is null
+                    || reservation.Status != ReservationStatus.ReadyForPickup)
+                {
+                    return false;
+                }
+
+                DateTime nowUtc = clock.UtcNow;
+                if (reservation.ReadyUntilUtc is not { } readyUntilUtc
+                    || nowUtc <= readyUntilUtc)
+                {
+                    return false;
+                }
+
+                Guid copyId = reservation.CopyId
+                    ?? throw new InvalidOperationException(
+                        "A ReadyForPickup reservation must have a copy.");
+
+                reservation.Expire(nowUtc);
+
+                // Free the unique ReadyForPickup/CopyId slot before offering
+                // the same physical copy to the next reservation.
+                await reservations.FlushAsync(token);
+
+                bool offered = await reservationQueue
+                    .TryOfferCopyUnderBookLockAsync(
+                        copyId,
+                        reservation.BookId,
+                        BookCopyStatus.Reserved,
+                        token);
+
+                if (!offered)
+                {
+                    await catalog.SetCopyStatusAsync(
+                        copyId,
+                        BookCopyStatus.Available,
+                        token);
+                }
+
+                return true;
+            },
+            ct);
+    }
+
     public Task<bool> MarkLoanOverdueAsync(
         Guid loanId,
         CancellationToken ct = default)

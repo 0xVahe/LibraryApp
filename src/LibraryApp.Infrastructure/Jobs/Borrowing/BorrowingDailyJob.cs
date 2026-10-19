@@ -10,7 +10,7 @@ namespace LibraryApp.Infrastructure.Jobs.Borrowing;
 
 /// <summary>
 /// Daily Borrowing maintenance:
-/// marks overdue loans, expires penalties, and recalculates staff standing.
+/// marks overdue loans, expires held reservations and penalties, and recalculates staff standing.
 /// Scheduling and run tracking belong to the shared daily-job runner.
 /// </summary>
 public sealed class BorrowingDailyJob(
@@ -43,6 +43,7 @@ public sealed class BorrowingDailyJob(
         };
 
         IReadOnlyList<Guid> loanIds;
+        IReadOnlyList<Guid> reservationIds;
         IReadOnlyList<Guid> staffIds;
 
         // Candidate selection gets its own short-lived scope.
@@ -56,6 +57,10 @@ public sealed class BorrowingDailyJob(
                 cutoffUtc,
                 ct);
 
+            reservationIds = await query.GetReadyReservationIdsPastDeadlineAsync(
+                selectionTimeUtc,
+                ct);
+
             staffIds = await query.GetStaffIdsWithActivePenaltiesAsync(
                 ct);
         }
@@ -63,12 +68,15 @@ public sealed class BorrowingDailyJob(
         logger.LogInformation(
             "Borrowing maintenance for {LocalDate}: "
             + "{LoanCandidates} loan candidates and "
+            + "{PickupCandidates} pickup candidates and "
             + "{StaffCandidates} staff candidates",
             run.LocalDate,
             loanIds.Count,
+            reservationIds.Count,
             staffIds.Count);
 
         int overdueLoans = 0;
+        int expiredPickups = 0;
         int expiredPenalties = 0;
         int changedStatuses = 0;
         int failures = 0;
@@ -150,10 +158,47 @@ public sealed class BorrowingDailyJob(
             }
         }
 
+        foreach (Guid reservationId in reservationIds)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+
+                var service = scope.ServiceProvider
+                    .GetRequiredService<IBorrowingDailyJobService>();
+
+                bool changed = await service.ExpirePickupAsync(
+                    reservationId,
+                    ct);
+
+                if (changed)
+                {
+                    expiredPickups++;
+                }
+            }
+            catch (OperationCanceledException)
+                when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failures++;
+
+                logger.LogError(
+                    ex,
+                    "Borrowing maintenance failed for reservation {ReservationId}",
+                    reservationId);
+            }
+        }
+
         ct.ThrowIfCancellationRequested();
 
         string summary =
             $"Overdue loans: {overdueLoans}; "
+            + $"expired pickups: {expiredPickups}; "
             + $"expired penalties: {expiredPenalties}; "
             + $"changed statuses: {changedStatuses}; "
             + $"failures: {failures}.";

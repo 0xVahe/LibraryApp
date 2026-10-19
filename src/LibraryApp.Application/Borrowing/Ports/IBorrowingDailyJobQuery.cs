@@ -14,6 +14,11 @@ public interface IBorrowingDailyJobQuery
         DateTime cutoffUtc,
         CancellationToken ct = default);
 
+    /// <summary>Finds ReadyForPickup reservations whose pickup deadline is strictly before now.</summary>
+    Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
+        DateTime nowUtc,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Finds staff members with at least one Active penalty record: the only ones
     /// whose points can expire or whose suspension can end.

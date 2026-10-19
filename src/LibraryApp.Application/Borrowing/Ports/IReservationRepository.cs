@@ -36,4 +36,7 @@ public interface IReservationRepository
 
     /// <summary>The reservation with this id, read only; null when there is none.</summary>
     Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default);
+
+    /// <summary>Loads a tracked reservation for modification within the caller's transaction.</summary>
+    Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default);
 }

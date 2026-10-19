@@ -280,6 +280,7 @@ public sealed class BorrowingDailyJobTests
 
         public int LoanQueryCalls { get; set; }
         public int StaffQueryCalls { get; set; }
+        public int ReservationQueryCalls { get; set; }
 
         public Action? AfterLoan { get; set; }
     }
@@ -309,6 +310,15 @@ public sealed class BorrowingDailyJobTests
 
             return Task.FromResult<IReadOnlyList<Guid>>(
                 state.StaffIds.ToArray());
+        }
+
+        public Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
+            DateTime nowUtc,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            state.ReservationQueryCalls++;
+            return Task.FromResult<IReadOnlyList<Guid>>([]);
         }
     }
 
@@ -365,6 +375,14 @@ public sealed class BorrowingDailyJobTests
                     : new PenaltyRecalculationResult(0, 0, false);
 
             return Task.FromResult(result);
+        }
+
+        public Task<bool> ExpirePickupAsync(
+            Guid reservationId,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(false);
         }
 
         public void Dispose()

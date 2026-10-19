@@ -1,6 +1,8 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Borrowing.Options;
+using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Application.Tests.Borrowing.Fakes;
 using LibraryApp.Domain.Borrowing;
@@ -24,6 +26,7 @@ public sealed class BorrowingDailyJobServiceTests
     private readonly InMemoryCatalogService _catalog = new();
     private readonly FakeEventBus _events = new();
     private readonly FakeApplicationLock _locks = new();
+    private readonly ReservationRepositoryFake _reservations = new();
     private readonly FixedYerevanClock _clock = new(DueUtc);
 
     private readonly FakeUnitOfWork _unitOfWork;
@@ -51,7 +54,91 @@ public sealed class BorrowingDailyJobServiceTests
             _locks,
             _events,
             _clock,
-            new FakeIdGenerator());
+            new FakeIdGenerator(),
+            _reservations,
+            new ReservationQueueService(
+                _reservations,
+                _catalog,
+                _locks,
+                _events,
+                new WeekdayCalendar(),
+                _clock,
+                new FakeIdGenerator(),
+                options));
+    }
+
+    [Fact]
+    public async Task Pickup_deadline_equal_to_now_is_not_expired()
+    {
+        Reservation reservation = SeedReadyReservation(DueUtc);
+        _clock.UtcNow = DueUtc;
+
+        bool changed = await Service().ExpirePickupAsync(reservation.Id);
+
+        Assert.False(changed);
+        Assert.Equal(ReservationStatus.ReadyForPickup, reservation.Status);
+        Assert.Empty(_events.Published.OfType<ReservationReady>());
+        Assert.Equal(0, _catalog.SetStatusCalls);
+    }
+
+    [Fact]
+    public async Task An_expired_pickup_is_offered_to_the_next_waiter_only_once()
+    {
+        Reservation expired = SeedReadyReservation(DueUtc.AddMinutes(-1));
+        Reservation next = SeedWaitingReservation(1);
+        _clock.UtcNow = DueUtc;
+
+        BorrowingDailyJobService service = Service();
+
+        Assert.True(await service.ExpirePickupAsync(expired.Id));
+        Assert.False(await service.ExpirePickupAsync(expired.Id));
+
+        Assert.Equal(ReservationStatus.Expired, expired.Status);
+        Assert.Equal(_copyId, expired.CopyId);
+        Assert.Equal(ReservationStatus.ReadyForPickup, next.Status);
+        Assert.Equal(_copyId, next.CopyId);
+        Assert.Equal(BookCopyStatus.Reserved, _catalog.Snapshot()[_copyId].Status);
+        Assert.Single(_events.Published.OfType<ReservationReady>());
+        Assert.Equal(1, _reservations.FlushCount);
+    }
+
+    [Fact]
+    public async Task An_expired_pickup_makes_the_copy_available_when_queue_is_empty()
+    {
+        Reservation expired = SeedReadyReservation(DueUtc.AddMinutes(-1));
+        _clock.UtcNow = DueUtc;
+
+        bool changed = await Service().ExpirePickupAsync(expired.Id);
+
+        Assert.True(changed);
+        Assert.Equal(ReservationStatus.Expired, expired.Status);
+        Assert.Equal(BookCopyStatus.Available, _catalog.Snapshot()[_copyId].Status);
+        Assert.Empty(_events.Published.OfType<ReservationReady>());
+    }
+
+    private Reservation SeedReadyReservation(DateTime readyUntilUtc)
+    {
+        _catalog.Seed(new BookCopyDto(
+            _copyId,
+            _bookId,
+            "DAILY-001",
+            BookCopyStatus.Reserved,
+            BookCopyCondition.Good,
+            "A-1"));
+
+        Reservation reservation = Reservation.Create(
+            Guid.NewGuid(), _bookId, Guid.NewGuid(), DueUtc.AddDays(-10), 1);
+        reservation.MarkReady(_copyId, readyUntilUtc);
+        _reservations.All.Add(reservation);
+        return reservation;
+    }
+
+    private Reservation SeedWaitingReservation(int position)
+    {
+        Reservation reservation = Reservation.Create(
+            Guid.NewGuid(), _bookId, Guid.NewGuid(), DueUtc.AddDays(-5), position);
+        _reservations.All.Add(reservation);
+        return reservation;
     }
 
     private Loan SeedLoan(
@@ -303,5 +390,55 @@ public sealed class BorrowingDailyJobServiceTests
             CancellationToken ct = default) =>
             throw new NotSupportedException(
                 "Loan processing must not recalculate staff penalties.");
+    }
+
+    private sealed class ReservationRepositoryFake : IReservationRepository
+    {
+        public List<Reservation> All { get; } = [];
+        public int FlushCount { get; private set; }
+
+        public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(
+            Guid bookId,
+            CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Reservation>>(
+                All.Where(r => r.BookId == bookId && r.Status == ReservationStatus.Waiting)
+                    .OrderBy(r => r.QueuePosition)
+                    .ThenBy(r => r.CreatedAtUtc)
+                    .ThenBy(r => r.Id)
+                    .ToArray());
+
+        public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
+            Task.FromResult(All.SingleOrDefault(r => r.Id == reservationId));
+
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) =>
+            Task.FromResult(All.SingleOrDefault(r => r.Id == reservationId));
+
+        public Task FlushAsync(CancellationToken ct = default)
+        {
+            FlushCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task AddAsync(Reservation reservation, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    private sealed class WeekdayCalendar : IWorkingDayCalendar
+    {
+        public bool IsWorkingDay(DateOnly date) => date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday);
+        public DateOnly AddWorkingDays(DateOnly start, int workingDays)
+        {
+            DateOnly date = start;
+            while (workingDays > 0)
+            {
+                date = date.AddDays(1);
+                if (IsWorkingDay(date)) workingDays--;
+            }
+            return date;
+        }
+        public int CountWorkingDays(DateOnly fromExclusive, DateOnly toInclusive) => throw new NotSupportedException();
     }
 }
