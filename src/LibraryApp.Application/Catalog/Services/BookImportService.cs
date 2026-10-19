@@ -11,7 +11,8 @@ namespace LibraryApp.Application.Catalog.Services;
 /// CAT-09: books from a CSV file, all or nothing, like the staff import (MEM-09). Every row is checked with the
 /// rules of a single book (<see cref="CreateBookRequestValidator"/>); category, publisher and author names must
 /// match exactly one existing item (nothing is created silently); ISBNs must be unique in the file and in the
-/// catalog (BR-CAT-1); the language must be one of <see cref="CatalogLanguages"/>.
+/// catalog (BR-CAT-1); the language must be one of <see cref="CatalogLanguages"/>. The optional cover path is
+/// checked by the same validator as on the book form.
 /// </summary>
 public sealed class BookImportService(
     IBookCsvParser parser,
@@ -126,7 +127,8 @@ public sealed class BookImportService(
                 string.IsNullOrWhiteSpace(row.Description) ? null : row.Description.Trim(),
                 categoryId ?? Guid.NewGuid(),
                 string.IsNullOrWhiteSpace(row.Publisher) ? null : publisherId ?? Guid.NewGuid(),
-                authorIds.Count > 0 ? authorIds : [Guid.NewGuid()]);
+                authorIds.Count > 0 ? authorIds : [Guid.NewGuid()],
+                string.IsNullOrWhiteSpace(row.CoverImagePath) ? null : row.CoverImagePath.Trim());
 
             var validation = await validator.ValidateAsync(request, ct);
             foreach (var failure in validation.Errors)

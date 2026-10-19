@@ -140,8 +140,16 @@ public class BookImportEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         var swagger = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
 
         var body = swagger.GetProperty("paths").GetProperty(Route).GetProperty("post").GetProperty("requestBody");
-        var schema = body.GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
+        var multipart = body.GetProperty("content").GetProperty("multipart/form-data");
+        var schema = multipart.GetProperty("schema");
         var file = schema.GetProperty("properties").GetProperty("file");
         Assert.Equal("binary", file.GetProperty("format").GetString());
+
+        var description = swagger.GetProperty("paths").GetProperty(Route).GetProperty("post")
+            .GetProperty("description").GetString();
+        Assert.NotNull(description);
+        Assert.Contains("Title,Isbn,PublicationYear,Language,Category,Authors,Publisher,Description,CoverImagePath", description);
+        Assert.Contains("Example Imported Book", description);
+        Assert.Contains("/samples/book-import.csv", description);
     }
 }
