@@ -1,0 +1,45 @@
+@model IReadOnlyList<LibraryApp.Application.Staff.Dto.StaffImportError>
+@{
+    var fileInvalid = Model.Any(error => error.Field == "File");
+}
+<div class="stack">
+    <section class="card" aria-labelledby="import-title">
+        <div class="card-head"><h2 id="import-title">Import from CSV</h2></div>
+        <p class="small">Use UTF-8 CSV with department and category names. Up to 200 data rows, 1 MB.</p>
+        <p class="hint">All rows are imported together. If any row is invalid, nothing is imported.</p>
+        <form class="form mt-24" method="post" asp-page="./Import" enctype="multipart/form-data" novalidate>
+            <div class="drop">
+                <label for="csv-file">Choose a CSV file</label>
+                <input id="csv-file" name="CsvFile" type="file" accept=".csv,text/csv"
+                       aria-invalid="@(fileInvalid ? "true" : null)" aria-describedby="csv-hint">
+                <span class="hint" id="csv-hint">EmployeeId, FirstName, LastName, CorporateEmail, Department, Position, LineManagerEmail, Category; Role is optional.</span>
+            </div>
+            <button class="btn btn-primary" type="submit">Import</button>
+            <a class="link-btn small" asp-page="./Import" asp-page-handler="Template">Download the template</a>
+        </form>
+    </section>
+    @if (Model.Count > 0)
+    {
+        <section class="card flush" aria-labelledby="import-errors-title">
+            <div class="card-head">
+                <div>
+                    <h2 id="import-errors-title">Import errors</h2>
+                    <p class="small">Nothing was imported. Correct these errors and choose the file again.</p>
+                </div>
+            </div>
+            <table class="table">
+                <thead><tr><th scope="col">Row</th><th scope="col">Field</th><th scope="col">Error</th></tr></thead>
+                <tbody>
+                @foreach (var error in Model)
+                {
+                    <tr>
+                        <td data-label="Row">@error.RowNumber</td>
+                        <td data-label="Field">@error.Field</td>
+                        <td data-label="Error">@error.Message</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </section>
+    }
+</div>
