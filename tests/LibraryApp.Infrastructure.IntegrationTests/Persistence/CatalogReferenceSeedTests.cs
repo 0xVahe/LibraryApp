@@ -158,7 +158,7 @@ public class CatalogReferenceSeedTests
     private static async Task WithDatabaseAsync(Func<LibraryDbContext, Task> test)
     {
         var options = new DbContextOptionsBuilder<LibraryDbContext>();
-        options.UseLibrarySqlServer(TestDatabase.NewConnectionString());
+        options.UseLibrarySqlServer(TestDatabase.NewDatabase());
         await using var db = new LibraryDbContext(options.Options);
         try
         {
