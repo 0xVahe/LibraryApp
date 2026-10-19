@@ -19,10 +19,7 @@ public class DepartmentEndpointTests(ApiHostFactory factory) : IClassFixture<Api
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "test.admin@ameriabank.am",
-                    Guid.NewGuid(),
-                    StaffMemberStatus.Active,
-                    [role]));
+                factory.Account(role));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
 

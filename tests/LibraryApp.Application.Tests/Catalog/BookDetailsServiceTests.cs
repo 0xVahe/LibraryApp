@@ -82,6 +82,17 @@ public sealed class BookDetailsServiceTests
         Assert.Null(details.CoverImageUrl);
     }
 
+    [Fact]
+    public async Task The_stored_cover_path_comes_with_the_cover_url_so_the_Edit_form_can_keep_it()
+    {
+        var service = Service(Book(total: 1, available: 1) with { CoverImageUrl = "library-covers/01.png" }, null);
+
+        var details = await service.GetBookDetailsAsync(BookId);
+
+        Assert.Equal("library-covers/01.png", details.CoverImagePath);
+        Assert.EndsWith("/library-covers/01.png", details.CoverImageUrl);
+    }
+
     private static BookDto Book(int total, int available) => new(
         BookId, "Clean Code", "9781000000153", 2008, "en", "Writing readable code.",
         CategoryId, "IT & Software Engineering", PublisherId, "Prentice Hall",

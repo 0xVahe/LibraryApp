@@ -30,7 +30,7 @@ public class ReservationEndpointTests(ApiHostWithoutBorrowingSeed factory) : ICl
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "reader@ameriabank.am", staffMemberId ?? Guid.NewGuid(), StaffMemberStatus.Active, [role])).Token;
+                factory.Account(role) with { StaffMemberId = staffMemberId ?? Guid.NewGuid() }).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;

@@ -220,4 +220,47 @@ public class StaffMemberServiceTests
         Assert.Empty(names);
         Assert.Equal(0, _repository.GetNamesCalls);
     }
+    
+    // ---- FindAsync (Loan desk search) ----
+
+    [Fact]
+    public async Task Find_by_employee_id_returns_the_member()
+    {
+        var anna = _repository.Add();
+
+        var found = await _service.FindAsync($"  {anna.EmployeeId.ToLowerInvariant()} ");
+
+        Assert.Equal(new StaffMemberLookup(anna.Id, anna.EmployeeId, "Anna Petrosyan", anna.CorporateEmail, StaffMemberStatus.Active), found);
+    }
+
+    [Fact]
+    public async Task Find_by_email_ignores_case()
+    {
+        var anna = _repository.Add();
+
+        var found = await _service.FindAsync(anna.CorporateEmail.ToUpperInvariant());
+
+        Assert.Equal(anna.Id, found?.Id);
+    }
+
+    [Fact]
+    public async Task Find_returns_a_Deactivated_member_with_the_status()
+    {
+        var member = _repository.Add(StaffMemberStatus.Deactivated);
+
+        var found = await _service.FindAsync(member.EmployeeId);
+
+        Assert.Equal(StaffMemberStatus.Deactivated, found?.Status);
+    }
+
+    [Theory]
+    [InlineData("EMP-9999")]
+    [InlineData("nobody@ameriabank.am")]
+    [InlineData("   ")]
+    public async Task Find_returns_null_for_an_unknown_or_empty_value(string value)
+    {
+        _repository.Add();
+
+        Assert.Null(await _service.FindAsync(value));
+    }
 }

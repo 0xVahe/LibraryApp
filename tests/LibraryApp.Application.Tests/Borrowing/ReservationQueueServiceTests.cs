@@ -147,6 +147,7 @@ public sealed class ReservationQueueServiceTests
 
     private sealed class WaitingQueueFake(List<string> log) : IReservationRepository
     {
+        public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
         public List<Reservation> Waiting { get; } = new();
 
         public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default)
@@ -154,6 +155,9 @@ public sealed class ReservationQueueServiceTests
             log.Add("read:waiting");
             return Task.FromResult<IReadOnlyList<Reservation>>(Waiting.Where(r => r.BookId == bookId).ToList());
         }
+
+        public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
 
         public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();

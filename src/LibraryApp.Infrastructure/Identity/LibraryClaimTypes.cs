@@ -4,6 +4,7 @@ namespace LibraryApp.Infrastructure.Identity;
 public static class LibraryClaimTypes
 {
     public const string Role = "role";
+    public const string SecurityStamp = "security_stamp";
     public const string PasswordChangeRequired = "password_change_required";
 
     /// <summary>
