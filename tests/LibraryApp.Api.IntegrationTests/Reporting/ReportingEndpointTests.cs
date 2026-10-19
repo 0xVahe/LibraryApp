@@ -186,12 +186,7 @@ public sealed class ReportingEndpointTests(ApiHostFactory factory)
 
         var token = factory.Services
             .GetRequiredService<IAccessTokenIssuer>()
-            .Issue(new LoginAccount(
-                Guid.NewGuid(),
-                "reporting-tests@example.com",
-                Guid.NewGuid(),
-                StaffMemberStatus.Active,
-                [role]))
+            .Issue(factory.Account(role))
             .Token;
 
         client.DefaultRequestHeaders.Authorization =

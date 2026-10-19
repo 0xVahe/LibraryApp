@@ -73,6 +73,7 @@ public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
                     .Join(db.Authors, link => link.AuthorId, author => author.Id, (_, author) => author.FullName)
                     .OrderBy(name => name)
                     .ToList(),
+                book.CategoryId,
                 db.Categories.Where(category => category.Id == book.CategoryId).Select(category => category.Name).First(),
                 book.Language,
                 db.BookCopies.Count(copy => copy.BookId == book.Id && copy.Status == BookCopyStatus.Available),

@@ -21,7 +21,7 @@ public class MyLibraryEndpointTests(ApiHostFactory factory) : IClassFixture<ApiH
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "demo@ameriabank.am", staffMemberId, StaffMemberStatus.Active, [role]));
+                factory.Account(role) with { StaffMemberId = staffMemberId });
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
         return client;
@@ -170,7 +170,7 @@ public class MyLibraryEndpointTests(ApiHostFactory factory) : IClassFixture<ApiH
     }
 
     [Fact]
-    public async Task Token_without_a_staff_profile_gets_404_staff_not_found()
+    public async Task Token_without_a_staff_member_claim_gets_404_staff_not_found()
     {
         await AssertNotFound(await Client(StaffRoles.StaffMember, null).GetAsync(Route));
     }

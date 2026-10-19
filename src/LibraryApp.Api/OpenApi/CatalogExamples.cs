@@ -18,6 +18,8 @@ public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchema
             if (schema.Properties.TryGetValue("coverImageUrl", out var coverImageUrl)
                 && coverUrls.Build(CatalogSeedIds.CoverImagePath(1)) is { } coverUrl)
                 coverImageUrl.Example = new OpenApiString(coverUrl);
+            if (schema.Properties.TryGetValue("coverImagePath", out var coverImagePath))
+                coverImagePath.Example = new OpenApiString(CatalogSeedIds.CoverImagePath(1));
         }
 
         OpenApiObject? example = context.Type switch

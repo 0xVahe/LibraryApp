@@ -25,7 +25,7 @@ public class JwtTokenIssuerTests
 
     private static readonly LoginAccount Account = new(
         Guid.NewGuid(), "anna.petrosyan@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active,
-        [StaffRoles.Librarian, StaffRoles.LibraryAdministrator]);
+        [StaffRoles.Librarian, StaffRoles.LibraryAdministrator], "test-stamp");
 
     private static JwtTokenIssuer Issuer() => new(Options.Create(Settings), new FixedClock(Now));
 
@@ -44,6 +44,7 @@ public class JwtTokenIssuerTests
 
         Assert.Equal(Account.UserId.ToString(), token.Subject);
         Assert.Equal(Account.Email, token.GetClaim(JwtRegisteredClaimNames.Email).Value);
+        Assert.Equal(Account.SecurityStamp, token.GetClaim(LibraryClaimTypes.SecurityStamp).Value);
         Assert.Equal(Account.StaffMemberId.ToString(), token.GetClaim(LibraryClaimTypes.StaffMemberId).Value);
         Assert.Equal(Account.Roles, token.Claims.Where(c => c.Type == LibraryClaimTypes.Role).Select(c => c.Value));
         Assert.Equal(Settings.Issuer, token.Issuer);
@@ -57,6 +58,12 @@ public class JwtTokenIssuerTests
 
         Assert.Equal(Now.AddMinutes(60), issued.ExpiresAtUtc);
         Assert.Equal(Now.AddMinutes(60), new JsonWebToken(issued.Token).ValidTo);
+    }
+
+    [Fact]
+    public void An_account_without_a_security_stamp_cannot_issue_a_token()
+    {
+        Assert.Throws<ArgumentException>(() => Issuer().Issue(Account with { SecurityStamp = "" }));
     }
 
     [Fact]

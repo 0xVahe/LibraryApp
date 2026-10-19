@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
 /// <summary>Real routing, JWT, validation and error handling; only persistence is replaced.</summary>
-public sealed class PublisherHostFactory : WebApplicationFactory<Program>
+public sealed class PublisherHostFactory : ApiHostFactory
 {
     internal void AddBookReference(Guid publisherId, bool deleted)
     {
@@ -29,10 +29,8 @@ public sealed class PublisherHostFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        base.ConfigureWebHost(builder);
         builder.UseEnvironment("Development");
-        builder.UseSetting("ConnectionStrings:LibraryDb", "Server=localhost;Database=UnusedPublisherTests;Integrated Security=true;TrustServerCertificate=true");
-        builder.UseSetting("Database:MigrateOnStartup", "false");
-        builder.UseSetting("Seed:Enabled", "false");
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
         builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
@@ -40,20 +38,17 @@ public sealed class PublisherHostFactory : WebApplicationFactory<Program>
         {
             services.AddSingleton<PublisherTestStore>();
             services.Replace(ServiceDescriptor.Singleton<IPublisherRepository>(sp => sp.GetRequiredService<PublisherTestStore>()));
-            services.Replace(ServiceDescriptor.Singleton<IUnitOfWork>(sp => sp.GetRequiredService<PublisherTestStore>()));
             services.Replace(ServiceDescriptor.Singleton<IIdGenerator>(sp => sp.GetRequiredService<PublisherTestStore>()));
             services.Replace(ServiceDescriptor.Singleton<IApplicationLock>(sp => sp.GetRequiredService<PublisherTestStore>()));
         });
     }
 
-    private sealed class PublisherTestStore : IPublisherRepository, IUnitOfWork, IIdGenerator, IApplicationLock
+    private sealed class PublisherTestStore : IPublisherRepository, IIdGenerator, IApplicationLock
     {
         private readonly List<Publisher> _publishers = [];
         public List<Book> Books { get; } = [];
         public Guid NewId() => Guid.NewGuid();
         public Task AcquireAsync(string resource, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
-        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
         public Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct) =>
             Task.FromResult<IReadOnlyList<PublisherDto>>(_publishers.Select(x => new PublisherDto(x.Id, x.Name)).ToArray());
         public Task<Publisher?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(_publishers.SingleOrDefault(x => x.Id == id));
@@ -90,8 +85,7 @@ public abstract class PublisherEndpointChecks<TFactory>(TFactory factory) where 
         if (role is not null)
         {
             var token = Factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "demo@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active,
-                    role.Length == 0 ? [] : [role])).Token;
+                Factory.Account(role.Length == 0 ? [] : [role])).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;

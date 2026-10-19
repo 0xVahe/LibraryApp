@@ -20,6 +20,7 @@ public sealed class NotificationEnumValuesTests
     [InlineData(NotificationType.AccessSuspended, 8)]
     [InlineData(NotificationType.DueDateCalendarItem, 9)]
     [InlineData(NotificationType.ReturnReceipt, 10)]
+    [InlineData(NotificationType.PasswordChanged, 11)]
     public void NotificationType_HasTheAgreedNumber(NotificationType type, int number)
     {
         Assert.Equal(number, (int)type);

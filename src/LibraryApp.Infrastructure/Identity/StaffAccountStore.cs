@@ -45,7 +45,8 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
         user.Email = email;
         user.UserName = email;
         user.EmailConfirmed = false;
-        // Both values and their normalized versions are persisted by one Identity update.
+        user.SecurityStamp = Guid.NewGuid().ToString();
+        // The email, normalized fields and stamp are persisted together in the caller's transaction.
         Ensure(await users.UpdateAsync(user));
     }
 
