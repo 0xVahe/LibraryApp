@@ -34,7 +34,7 @@ public class StaffManagementServiceTests
         Assert.Equal(dto.Id, enrolled.StaffMemberId);
         Assert.NotEqual(Guid.Empty, enrolled.EventId);
         Assert.Equal(_fake.UtcNow, enrolled.OccurredAtUtc);
-        Assert.Single(_fake.Accounts);
+        Assert.True(Assert.Single(_fake.Accounts).Value.RequirePasswordChange);
         Assert.False(_fake.InTransaction);
     }
 
@@ -235,7 +235,7 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public Guid DepartmentId { get; } = Guid.NewGuid();
     public Guid CategoryId { get; } = Guid.NewGuid();
     public Dictionary<Guid, StaffMember> Members { get; } = [];
-    public Dictionary<Guid, (string Email, string Role)> Accounts { get; } = [];
+    public Dictionary<Guid, (string Email, string Role, bool RequirePasswordChange)> Accounts { get; } = [];
     public List<IDomainEvent> Events { get; } = [];
     public bool InTransaction { get; private set; }
     public int TransactionCalls { get; private set; }
@@ -319,14 +319,14 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     {
         Assert.True(InTransaction);
         if (FailCreate) throw new DomainException(StaffErrors.AccountWriteFailed);
-        Accounts.Add(userId, (email, role));
+        Accounts.Add(userId, (email, role, requirePasswordChange));
         return Task.CompletedTask;
     }
 
     public Task UpdateEmailAsync(Guid userId, string email, CancellationToken ct)
     {
         Assert.True(InTransaction);
-        Accounts[userId] = (email, Accounts[userId].Role);
+        Accounts[userId] = (email, Accounts[userId].Role, Accounts[userId].RequirePasswordChange);
         return Task.CompletedTask;
     }
 

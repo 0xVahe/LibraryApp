@@ -43,6 +43,7 @@ public sealed class TokenRevocationFactory : ApiHostFactory
 /// <summary>Real login, bearer middleware, Identity and SQL Server; no account-validation bypass (MEM-02, NFR-02).</summary>
 public class TokenRevocationEndpointTests(TokenRevocationFactory factory) : IClassFixture<TokenRevocationFactory>
 {
+    private const string TemporaryPassword = "InitialPass8";
     private const string Password = "DemoPass1";
     private const string Probe = "/api/test-authorization/default";
     private const string ChangedPassword = "ChangedPass9";
@@ -74,9 +75,16 @@ public class TokenRevocationEndpointTests(TokenRevocationFactory factory) : ICla
         using var response = await administrator.PostAsJsonAsync("/api/staff-members",
             new EnrolStaffMemberRequest($"TOKEN-{unique}", "Demo", "Employee", $"token.{unique}@ameriabank.am",
                 StaffSeedIds.Departments.InformationTechnology, "Engineer", null,
-                StaffSeedIds.Categories.Employee, Password));
+                StaffSeedIds.Categories.Employee, TemporaryPassword));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<StaffMemberDto>())!;
+        var member = (await response.Content.ReadFromJsonAsync<StaffMemberDto>())!;
+
+        // Enrolled accounts must complete the first-login password change before accessing other endpoints.
+        using var client = Client((await Login(member.CorporateEmail, TemporaryPassword)).AccessToken);
+        using var passwordChange = await client.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(TemporaryPassword, Password));
+        Assert.Equal(HttpStatusCode.NoContent, passwordChange.StatusCode);
+        return member;
     }
 
     private static UpdateStaffMemberRequest Update(StaffMemberDto member, string email) =>

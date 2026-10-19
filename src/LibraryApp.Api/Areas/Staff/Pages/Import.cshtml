@@ -1,0 +1,38 @@
+@page "/staff/import"
+@model ImportModel
+@{
+    ViewData["Title"] = "Import staff members";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Import staff members", "Enrol staff from a synthetic HR CSV file.",
+             Actions: [new PageAction("Enrol one person", "/staff/new")],
+             Crumbs: [new PageAction("Staff members", "/staff")]))' />
+<div class="stack-lg">
+    <div asp-validation-summary="All" class="error-text" role="alert"></div>
+    @if (Model.Imported.Count > 0)
+    {
+        <section class="card flush" aria-labelledby="import-result-title">
+            <div class="card-head">
+                <div>
+                    <h2 id="import-result-title">Imported staff</h2>
+                    <p class="small">Save the temporary passwords now. They appear once; each employee must change theirs at first sign-in.</p>
+                </div>
+            </div>
+            <table class="table">
+                <thead><tr><th scope="col">Employee ID</th><th scope="col">Name</th><th scope="col">Temporary password</th><th scope="col">Profile</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.Imported)
+                {
+                    <tr>
+                        <td data-label="Employee ID">@item.Member.EmployeeId</td>
+                        <td data-label="Name">@item.Member.FirstName @item.Member.LastName</td>
+                        <td data-label="Temporary password">@item.TemporaryPassword</td>
+                        <td data-label="Profile"><a class="btn btn-secondary btn-sm" href="/staff/@item.Member.Id">View staff member</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </section>
+    }
+    <partial name="_StaffCsvImport" model="Model.Errors" />
+</div>
