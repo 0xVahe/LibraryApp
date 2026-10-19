@@ -2,6 +2,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Domain.Catalog;
 
+/// <summary>A publisher of books; optional on a book.</summary>
 public sealed class Publisher : Entity
 {
     public const int NameMaxLength = 200;

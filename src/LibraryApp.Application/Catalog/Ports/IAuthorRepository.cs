@@ -3,6 +3,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Authors and book-author links for <see cref="Services.AuthorService"/> and the book services.</summary>
 public interface IAuthorRepository
 {
     Task<IReadOnlyList<AuthorDto>> ListAsync(CancellationToken ct);

@@ -56,12 +56,23 @@
             <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.CategoryId == category.Id ? "true" : null)">@category.Name</a>
         }
     </nav>
-    <p class="catalog-count">Showing @firstResult–@lastResult of @Model.Result.TotalCount</p>
+    <p class="catalog-count">@(Model.Result.Items.Count > 0
+        ? $"Showing {firstResult}–{lastResult} of {Model.Result.TotalCount}"
+        : $"{Model.Result.TotalCount} {(Model.Result.TotalCount == 1 ? "book" : "books")} in total")</p>
 </div>
 
 @if (Model.Result.Items.Count == 0)
 {
-    <section class="card" aria-live="polite"><p>No books match your filters.</p></section>
+    <section class="card" aria-live="polite">
+        @if (Model.Result.TotalCount > 0)
+        {
+            <p>This page is empty. <a href="@Model.FirstPageHref">Go to the first page</a>.</p>
+        }
+        else
+        {
+            <p>No books match your filters.</p>
+        }
+    </section>
 }
 else
 {

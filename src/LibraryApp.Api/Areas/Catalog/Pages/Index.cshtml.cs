@@ -54,6 +54,9 @@ public sealed class IndexModel(
                 new PageRequest(pageNumber, PageSize)), ct);
     }
 
+    /// <summary>Page 1 with the same filters, for a page number past the last page.</summary>
+    public string FirstPageHref => CategoryHref(CategoryId);
+
     public string CategoryHref(Guid? categoryId)
     {
         var values = new List<KeyValuePair<string, string?>>();

@@ -75,7 +75,7 @@
                     @foreach (var other in Model.MoreBooks)
                     {
                         <li>
-                            <partial name="_BookCover" model="@(new BookCoverModel(other.Title, null, other.CoverImageUrl, book.CategoryId, Mini: true))" />
+                            <partial name="_BookCover" model="@(new BookCoverModel(other.Title, null, other.CoverImageUrl, other.CategoryId, Mini: true))" />
                             <div class="grow">
                                 <a class="title" href="/catalog/books/@other.Id">@other.Title</a>
                                 <div class="small muted">@string.Join(", ", other.Authors)</div>

@@ -72,6 +72,11 @@ public sealed class BookCopyService(
         return unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             BookCopy copy = await GetCopyOfBookAsync(bookId, copyId, token);
+
+            // Lost and Withdrawn are final: the copy has left the collection, so its shelf and condition stay as they were.
+            if (copy.Status is BookCopyStatus.Lost or BookCopyStatus.Withdrawn)
+                throw new DomainException(CatalogErrors.CopyRetired);
+
             copy.UpdateDetails(request.Condition, request.ShelfLocation);
             return ToDto(copy);
         }, ct);

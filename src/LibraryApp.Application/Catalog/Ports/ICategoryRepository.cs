@@ -3,6 +3,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Categories (CAT-03); lists are read without tracking.</summary>
 public interface ICategoryRepository
 {
     Task<IReadOnlyList<CategoryDto>> ListAsync(CancellationToken ct);
