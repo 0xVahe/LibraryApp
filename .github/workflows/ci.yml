@@ -18,63 +18,39 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
+# Every check is its own job and the jobs run in parallel; each builds only the projects it needs
+# (.github/actions/dotnet-build). The integration tests are split into shards (matrix), each with its own SQL Server;
+# migrations checks the migration order (.github/scripts/check_migrations.py); smoke-test starts the API and checks it
+# from outside (.github/scripts/smoke-test.sh). The docker compose system is checked by compose.yml.
+# The last job, result, waits for all of them, writes the summary and fails when any check failed: it is the one
+# check to require in branch protection. A draft pull request runs no checks until it is marked ready for review.
 jobs:
-  build-and-test:
+  secret-scan:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-      - run: dotnet restore LibraryApp.sln
-      - run: dotnet build LibraryApp.sln --configuration Release --no-restore
-      - name: Unit tests with coverage
-        run: |
-          dotnet test tests/LibraryApp.Domain.Tests --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" --results-directory ./coverage
-          dotnet test tests/LibraryApp.Application.Tests --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" --results-directory ./coverage
-      - name: Coverage gate - Application at least 50% (NFR-09)
-        if: ${{ vars.COVERAGE_GATE == 'true' }}
-        run: |
-          python3 - <<'PY'
-          import glob, sys, xml.etree.ElementTree as ET
-          covered = total = 0
-          for path in glob.glob('coverage/**/coverage.cobertura.xml', recursive=True):
-              for package in ET.parse(path).getroot().iter('package'):
-                  if package.get('name') == 'LibraryApp.Application':
-                      for line in package.iter('line'):
-                          total += 1
-                          covered += 1 if int(line.get('hits')) > 0 else 0
-          rate = 100.0 * covered / total if total else 0.0
-          print(f'Application line coverage: {rate:.1f}% ({covered}/{total})')
-          sys.exit(0 if rate >= 50.0 else 1)
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage
-          path: coverage
-          if-no-files-found: ignore
+          fetch-depth: 0   # gitleaks reads the commits of the pull request
+      - name: gitleaks (NFR-04)
+        env:
+          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
 
   model-sync:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write   # the needs-migration label
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet-build
         with:
-          dotnet-version: 8.0.x
+          projects: src/LibraryApp.Infrastructure
+          tools: "true"
       - name: No pending model changes
         id: model
         run: |
@@ -100,68 +76,277 @@ jobs:
             exit 1
           fi
 
-          dotnet tool restore
-          dotnet build src/LibraryApp.Infrastructure --configuration Debug
-          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure --no-build; then
+          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure --configuration Release --no-build; then
             echo "pending=true" >> "$GITHUB_OUTPUT"
             echo "::error::The model changed but there is no migration. The pull request is labelled needs-migration; the Integration Owner adds the migration as the last commit. Do not add migration files yourself."
             exit 1
           fi
           echo "pending=false" >> "$GITHUB_OUTPUT"
-
       - name: Label needs-migration
-        if: always() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true'
+        if: ${{ failure() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels" -f "labels[]=needs-migration"
       - name: Remove needs-migration
-        if: github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration')
+        if: ${{ github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels/needs-migration"
 
+  unit-tests:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      coverage: ${{ steps.gate.outputs.coverage }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
+        with:
+          projects: tests/LibraryApp.Domain.Tests tests/LibraryApp.Application.Tests
+      - name: Unit tests with coverage
+        id: unit
+        run: |
+          dotnet test tests/LibraryApp.Domain.Tests --configuration Release --no-build \
+            --collect:"XPlat Code Coverage" --results-directory ./coverage
+          dotnet test tests/LibraryApp.Application.Tests --configuration Release --no-build \
+            --collect:"XPlat Code Coverage" --results-directory ./coverage
+      # Repository variables (Settings > Secrets and variables > Actions > Variables):
+      #   COVERAGE_GATE             true or false; not set = true. false still prints the coverage, with a warning.
+      #   APPLICATION_MIN_COVERAGE  minimum line coverage of LibraryApp.Application in percent; not set = 50 (NFR-09).
+      - name: Coverage gate - Application line coverage (NFR-09)
+        id: gate
+        env:
+          GATE: ${{ vars.COVERAGE_GATE || 'true' }}
+          MIN_COVERAGE: ${{ vars.APPLICATION_MIN_COVERAGE || '50' }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, xml.etree.ElementTree as ET
+
+          def result(text):
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+                  out.write(f'coverage={text}\n')
+
+          gate = os.environ['GATE'].strip().lower()
+          if gate not in ('true', 'false'):
+              result('invalid COVERAGE_GATE')
+              sys.exit(f"::error::Repository variable COVERAGE_GATE must be true or false, not '{os.environ['GATE']}'.")
+          try:
+              minimum = float(os.environ['MIN_COVERAGE'])
+          except ValueError:
+              minimum = -1.0
+          if not 0 <= minimum <= 100:
+              result('invalid APPLICATION_MIN_COVERAGE')
+              sys.exit(f"::error::Repository variable APPLICATION_MIN_COVERAGE must be a number from 0 to 100, not '{os.environ['MIN_COVERAGE']}'.")
+
+          # A line counts once even when several test projects report it: covered if any report hits it.
+          lines = {}
+          for path in glob.glob('coverage/**/coverage.cobertura.xml', recursive=True):
+              for package in ET.parse(path).getroot().iter('package'):
+                  if package.get('name') != 'LibraryApp.Application':
+                      continue
+                  for cls in package.iter('class'):
+                      for line in cls.iter('line'):
+                          key = (cls.get('filename'), line.get('number'))
+                          lines[key] = lines.get(key, False) or int(line.get('hits')) > 0
+          total, covered = len(lines), sum(lines.values())
+          rate = 100.0 * covered / total if total else 0.0
+          line = f'{rate:.1f}% ({covered}/{total} lines), minimum {minimum:g}%, gate {gate}'
+          print(f'::notice title=Application line coverage (NFR-09)::{line}')
+          result(line if total else 'no coverage report')
+          if total == 0:
+              sys.exit('::error::No coverage report for LibraryApp.Application was found.')
+          if rate >= minimum:
+              sys.exit(0)
+          if gate == 'false':
+              print(f'::warning::Application line coverage {rate:.1f}% is below {minimum:g}% (NFR-09); not enforced because COVERAGE_GATE is false.')
+              sys.exit(0)
+          sys.exit(f'::error::Application line coverage {rate:.1f}% is below the minimum {minimum:g}% (NFR-09).')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
   integration-tests:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    name: integration-tests (${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: CiOnly_Throwaway_Passw0rd
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CiOnly_Throwaway_Passw0rd -C -Q 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-          --health-start-period 20s
+    strategy:
+      fail-fast: false   # every shard reports its own result
+      matrix:
+        # Every migration is applied to an empty SQL Server database in each shard, so the whole chain is proven from
+        # scratch. "API - platform, UI, reporting and the rest" takes every API test outside the named shards, so a new test
+        # folder is never left out; a folder that grows large gets its own shard here.
+        include:
+          - shard: Infrastructure
+            project: tests/LibraryApp.Infrastructure.IntegrationTests
+            filter: ""
+          - shard: API - Borrowing
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Borrowing.
+          - shard: API - Catalog
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Catalog.
+          - shard: API - Staff
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Staff.
+          - shard: API - platform, UI, reporting and the rest
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Borrowing.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Catalog.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Staff.
     env:
+      SA_PASSWORD: CiOnly_Throwaway_Passw0rd   # a throw-away container that lives for this job only
       LIBRARYAPP_TEST_DB: Server=localhost,1433;Database=LibraryApp_CiTests;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
     steps:
+      # Started in the background, so the image pull and the server start overlap with the SDK setup and the build;
+      # a service container would make the job wait for it before the first step.
+      - name: Start SQL Server
+        run: |
+          nohup docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" -p 1433:1433 \
+            -d mcr.microsoft.com/mssql/server:2022-latest > /tmp/sqlserver-start.log 2>&1 &
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet-build
         with:
-          dotnet-version: 8.0.x
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-      - run: dotnet restore LibraryApp.sln
-      - run: dotnet test tests/LibraryApp.Infrastructure.IntegrationTests --configuration Release --no-restore
-      - run: dotnet test tests/LibraryApp.Api.IntegrationTests --configuration Release --no-restore
+          projects: ${{ matrix.project }}
+      - name: Wait for SQL Server
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -Q 'SELECT 1' > /dev/null 2>&1; then
+              echo "SQL Server is ready after $attempt checks"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sqlserver-start.log
+          docker logs sqlserver 2>&1 | tail -50 || true
+          echo "::error::SQL Server did not start within 2 minutes."
+          exit 1
+      - name: Tests
+        env:
+          FILTER: ${{ matrix.filter }}
+          PROJECT: ${{ matrix.project }}
+        run: |
+          args=()
+          if [ -n "$FILTER" ]; then args=(--filter "$FILTER"); fi
+          dotnet test "$PROJECT" --configuration Release --no-build "${args[@]}"
 
-  secret-scan:
+  migrations:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - name: gitleaks
+          # HEAD^1 is the base branch: for a pull request HEAD is the merge commit, for a push the previous tip.
+          fetch-depth: 2
+      - name: New migrations are the newest; merged migrations are unchanged
+        run: python3 .github/scripts/check_migrations.py HEAD^1 HEAD
+
+  # The API as it starts in Development (migrations, seed, Swagger), from the Release build and checked from outside.
+  # The same checks against the docker compose system run in compose.yml.
+  smoke-test:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SA_PASSWORD: CiOnly_Throwaway_Passw0rd   # a throw-away container that lives for this job only
+    steps:
+      - name: Start SQL Server
+        run: |
+          nohup docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" -p 1433:1433 \
+            -d mcr.microsoft.com/mssql/server:2022-latest > /tmp/sqlserver-start.log 2>&1 &
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
+        with:
+          projects: src/LibraryApp.Api
+      - name: Wait for SQL Server
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -Q 'SELECT 1' > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sqlserver-start.log
+          echo "::error::SQL Server did not start within 2 minutes."
+          exit 1
+      - name: Start the API (Development)
         env:
-          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:8080
+          UseHttpsRedirection: "false"
+          ConnectionStrings__LibraryDb: Server=localhost,1433;Database=LibraryApp;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
+          Database__MigrateOnStartup: "true"
+          Seed__Enabled: "true"
+        run: |
+          export Jwt__SigningKey="$(openssl rand -base64 32)"
+          echo "::add-mask::$Jwt__SigningKey"
+          nohup dotnet run --project src/LibraryApp.Api --configuration Release --no-build --no-launch-profile \
+            > /tmp/api.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl -sf http://localhost:8080/health/ready > /dev/null; then
+              echo "The API is ready after $attempt checks"
+              exit 0
+            fi
+            sleep 1
+          done
+          tail -100 /tmp/api.log
+          echo "::error::The API did not become ready within 90 seconds."
+          exit 1
+      - name: Smoke test
+        run: bash .github/scripts/smoke-test.sh http://localhost:8080 sqlserver "$SA_PASSWORD"
+      - name: API log
+        if: failure()
+        run: tail -200 /tmp/api.log
+
+  result:
+    needs: [secret-scan, model-sync, migrations, unit-tests, integration-tests, smoke-test]
+    if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Summary
+        env:
+          SECRETS: ${{ needs.secret-scan.result }}
+          MODEL: ${{ needs.model-sync.result }}
+          MIGRATIONS: ${{ needs.migrations.result }}
+          SMOKE: ${{ needs.smoke-test.result }}
+          UNIT: ${{ needs.unit-tests.result }}
+          INTEGRATION: ${{ needs.integration-tests.result }}
+          COVERAGE: ${{ needs.unit-tests.outputs.coverage }}
+        run: |
+          mark() {
+            case "$1" in
+              success) echo "✅ passed" ;;
+              failure) echo "❌ failed" ;;
+              cancelled) echo "⏹ cancelled" ;;
+              *) echo "⏭ not run" ;;
+            esac
+          }
+          {
+            echo "### Checks"
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| secret-scan (NFR-04) | $(mark "$SECRETS") |"
+            echo "| model-sync | $(mark "$MODEL") |"
+            echo "| migration order | $(mark "$MIGRATIONS") |"
+            echo "| unit tests and coverage gate (NFR-09) | $(mark "$UNIT") |"
+            echo "| integration tests (all shards; the failed shard is marked in the job list) | $(mark "$INTEGRATION") |"
+            echo "| smoke test of the API in Development | $(mark "$SMOKE") |"
+            echo
+            echo "**Application line coverage:** ${COVERAGE:-not measured}"
+            if [ "$MODEL" = "failure" ]; then
+              echo
+              echo "**model-sync failed:** the model changed without a migration, or the model check could not run. When a migration is missing, the pull request is labelled needs-migration and the Integration Owner adds the migration."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          for outcome in "$SECRETS" "$MODEL" "$MIGRATIONS" "$UNIT" "$INTEGRATION" "$SMOKE"; do
+            if [ "$outcome" != "success" ]; then
+              echo "::error::At least one check did not pass; see the table above."
+              exit 1
+            fi
+          done
