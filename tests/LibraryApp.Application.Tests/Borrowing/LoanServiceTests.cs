@@ -12,6 +12,7 @@ using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
@@ -31,6 +32,7 @@ public sealed class LoanServiceTests
     private readonly FakeEventBus _events = new();
     private readonly FakeApplicationLock _locks;
     private readonly FakeUnitOfWork _unitOfWork;
+    private readonly BorrowingOptions _settings = BorrowingTestSettings.Defaults();
     private readonly LoanService _service;
 
     public LoanServiceTests()
@@ -41,7 +43,8 @@ public sealed class LoanServiceTests
         var clock = new TestClock(_now);
         var queue = new ReservationQueueService(_reservations, _catalog, _locks, _events, new TestCalendar(), clock, _ids,
             BorrowingTestSettings.Create());
-        _service = new LoanService(_staff, _catalog, _loans, _reservations, queue, _unitOfWork, _locks, _events, clock, _ids);
+        _service = new LoanService(_staff, _catalog, _loans, _reservations, queue, _unitOfWork, _locks, _events, clock, _ids,
+            Options.Create(_settings));
     }
 
     [Fact]
@@ -254,6 +257,54 @@ public sealed class LoanServiceTests
         Assert.Equal(BookCopyStatus.Available, (await _catalog.GetCopyByBarcodeAsync(heldBarcode))!.Status);
     }
 
+    [Fact]
+    public async Task IssueAsync_cancels_the_members_waiting_reservation_for_the_book_and_moves_the_queue_up()
+    {
+        Guid bookId = Guid.NewGuid();
+        SeedCopy(BookCopyStatus.Available, bookId);
+        Reservation own = Reservation.Create(Guid.NewGuid(), bookId, _staffId, _now.AddDays(-2), 1);
+        _reservations.Seed(own);
+        Reservation behind = _reservations.Wait(bookId, _now.AddDays(-1), 2);
+
+        await _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode));
+
+        Assert.Equal(ReservationStatus.Cancelled, own.Status);
+        Assert.Equal((ReservationStatus.Waiting, 1), (behind.Status, behind.QueuePosition));
+    }
+
+    [Fact]
+    public async Task IssueAsync_keeps_a_ready_reservation_and_its_held_copy_when_any_copy_does_not_fulfil()
+    {
+        _settings.Reservations.AnyCopyFulfils = false;
+        Guid bookId = Guid.NewGuid();
+        SeedCopy(BookCopyStatus.Available, bookId);
+        Guid heldCopyId = Guid.NewGuid();
+        const string heldBarcode = "BK-HELD";
+        _catalog.Seed(new BookCopyDto(heldCopyId, bookId, heldBarcode, BookCopyStatus.Reserved, BookCopyCondition.Good, "A-2"));
+        Reservation held = Ready(bookId, _staffId, heldCopyId);
+        _reservations.Seed(held);
+
+        await _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode));
+
+        Assert.Equal(ReservationStatus.ReadyForPickup, held.Status);
+        Assert.Equal(BookCopyStatus.Reserved, (await _catalog.GetCopyByBarcodeAsync(heldBarcode))!.Status);
+        Assert.Equal(BookCopyStatus.OnLoan, (await _catalog.GetCopyByBarcodeAsync(Barcode))!.Status);
+    }
+
+    [Fact]
+    public async Task IssueAsync_keeps_a_waiting_reservation_when_any_copy_does_not_fulfil()
+    {
+        _settings.Reservations.AnyCopyFulfils = false;
+        Guid bookId = Guid.NewGuid();
+        SeedCopy(BookCopyStatus.Available, bookId);
+        Reservation own = Reservation.Create(Guid.NewGuid(), bookId, _staffId, _now.AddDays(-2), 1);
+        _reservations.Seed(own);
+
+        await _service.IssueAsync(new IssueLoanRequest(_staffId, Barcode));
+
+        Assert.Equal((ReservationStatus.Waiting, 1), (own.Status, own.QueuePosition));
+    }
+
     private void SeedCopy(BookCopyStatus status, Guid? bookId = null) =>
         _catalog.Seed(new BookCopyDto(_copyId, bookId ?? Guid.NewGuid(), Barcode, status, BookCopyCondition.Good, "A-1"));
 
@@ -288,8 +339,9 @@ public sealed class LoanServiceTests
                 .OrderBy(r => r.QueuePosition).ThenBy(r => r.CreatedAtUtc).ToArray());
         public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) =>
             Task.FromResult(_items.SingleOrDefault(r => r.CopyId == copyId && r.Status == ReservationStatus.ReadyForPickup));
-        public Task<Reservation?> FindReadyForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) =>
-            Task.FromResult(_items.SingleOrDefault(r => r.StaffMemberId == staffMemberId && r.BookId == bookId && r.Status == ReservationStatus.ReadyForPickup));
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) =>
+            Task.FromResult(_items.SingleOrDefault(r => r.StaffMemberId == staffMemberId && r.BookId == bookId
+                && r.Status is ReservationStatus.Waiting or ReservationStatus.ReadyForPickup));
         public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();

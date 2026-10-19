@@ -4,12 +4,14 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
 using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Borrowing.Services;
 
@@ -27,7 +29,8 @@ public sealed class LoanService(
     IApplicationLock locks,
     IEventBus events,
     IClock clock,
-    IIdGenerator idGenerator)
+    IIdGenerator idGenerator,
+    IOptions<BorrowingOptions> options)
     : ILoanService
 {
     /// <inheritdoc />
@@ -86,23 +89,10 @@ public sealed class LoanService(
             else if (copy.Status != BookCopyStatus.Available)
                 throw new DomainException(BorrowingErrors.CopyNotAvailable);
 
-            // BQ-BA-08: issuing any copy fulfills this member's ready reservation for the same book. Its held copy
-            // is then offered to the next waiting member, or released to Available when the queue is empty.
-            if (heldReservation is null && copy.Status == BookCopyStatus.Available)
-            {
-                heldReservation = await reservations.FindReadyForStaffAndBookAsync(request.StaffMemberId, copy.BookId, token);
-                if (heldReservation is not null)
-                {
-                    Guid heldCopyId = heldReservation.CopyId
-                        ?? throw new DomainException(BorrowingErrors.CopyNotAvailable);
-                    heldReservation.Fulfil();
-
-                    bool reassigned = await reservationQueue.TryOfferCopyUnderBookLockAsync(
-                        heldCopyId, copy.BookId, BookCopyStatus.Reserved, token);
-                    if (!reassigned)
-                        await catalog.SetCopyStatusAsync(heldCopyId, BookCopyStatus.Available, token);
-                }
-            }
+            // BQ-BA-08 (setting Borrowing:Reservations:AnyCopyFulfils): issuing any copy of the book closes this
+            // member's active reservation for it, so no copy is held later for someone who already has the book.
+            if (heldReservation is null && copy.Status == BookCopyStatus.Available && options.Value.Reservations.AnyCopyFulfils)
+                await CloseReservationForIssuedBookAsync(request.StaffMemberId, copy.BookId, token);
 
             // 6. Create and stage the loan.
             DateTime now = clock.UtcNow;
@@ -133,6 +123,33 @@ public sealed class LoanService(
         }, ct);
 
         return ToDto(loan);
+    }
+
+    /// <summary>
+    /// A ready reservation is fulfilled and its held copy goes to the next waiting member, or becomes Available when
+    /// nobody waits. A waiting one is cancelled (Fulfil needs a held copy) and the members behind it move up.
+    /// Runs under the staff and book locks, inside the issue transaction.
+    /// </summary>
+    private async Task CloseReservationForIssuedBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct)
+    {
+        Reservation? active = await reservations.FindActiveForStaffAndBookAsync(staffMemberId, bookId, ct);
+        if (active is { Status: ReservationStatus.ReadyForPickup, CopyId: Guid heldCopyId })
+        {
+            active.Fulfil();
+            bool reassigned = await reservationQueue.TryOfferCopyUnderBookLockAsync(
+                heldCopyId, bookId, BookCopyStatus.Reserved, ct);
+            if (!reassigned)
+                await catalog.SetCopyStatusAsync(heldCopyId, BookCopyStatus.Available, ct);
+        }
+        else if (active is { Status: ReservationStatus.Waiting })
+        {
+            active.Cancel();
+            // The query still returns the cancelled row (not saved yet), as the tracked entity with its new status.
+            IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(bookId, ct);
+            int position = 1;
+            foreach (Reservation next in waiting.Where(r => r.Status == ReservationStatus.Waiting))
+                next.SetQueuePosition(position++);
+        }
     }
 
     /// <inheritdoc />

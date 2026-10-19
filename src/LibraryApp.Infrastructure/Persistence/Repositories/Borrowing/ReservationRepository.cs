@@ -42,11 +42,12 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
                            && reservation.Status == ReservationStatus.ReadyForPickup,
             ct);
 
-    public Task<Reservation?> FindReadyForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) =>
+    public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) =>
         db.Reservations.SingleOrDefaultAsync(
             reservation => reservation.StaffMemberId == staffMemberId
                            && reservation.BookId == bookId
-                           && reservation.Status == ReservationStatus.ReadyForPickup,
+                           && (reservation.Status == ReservationStatus.Waiting
+                               || reservation.Status == ReservationStatus.ReadyForPickup),
             ct);
 
     public async Task AddAsync(Reservation reservation, CancellationToken ct = default)

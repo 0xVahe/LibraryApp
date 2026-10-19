@@ -21,8 +21,9 @@ public sealed class LoansController(
     /// <summary>Issues a copy, found by its barcode, to a staff member (BOR-01, BOR-02).</summary>
     /// <remarks>
     /// The due date is the issue date plus the loan days of the staff member's category. A Reserved copy can be issued
-    /// only to the staff member whose ReadyForPickup reservation holds it. Issuing an Available copy also fulfills
-    /// that member's ReadyForPickup reservation for the same book and offers its held copy to the next member.
+    /// only to the staff member whose ReadyForPickup reservation holds it. Issuing an Available copy also closes that
+    /// member's active reservation for the same book (setting Borrowing:Reservations:AnyCopyFulfils, BQ-BA-08): a ready
+    /// one is fulfilled and its held copy offered to the next member, a waiting one is cancelled.
     /// Refused with 422 when the staff member may not borrow, the loan limit is reached ("Loan limit reached (3/3)")
     /// or the copy is unavailable to them; 404 when no copy has the barcode.
     /// </remarks>

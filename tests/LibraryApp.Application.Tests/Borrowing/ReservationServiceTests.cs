@@ -411,7 +411,7 @@ public sealed class ReservationServiceTests
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => Task.FromResult(WaitingCount);
         public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<Reservation?> FindReadyForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default)
         {
             _pending.Add(reservation);

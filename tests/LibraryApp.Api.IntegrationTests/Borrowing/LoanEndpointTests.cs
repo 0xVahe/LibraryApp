@@ -130,6 +130,89 @@ public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixt
         Assert.Equal(BookCopyStatus.OnLoan, await CopyStatus(book, 1));
     }
 
+    /// <summary>Copy 1 of the book is held for <paramref name="holder"/> (ReadyForPickup); the others wait in this order.</summary>
+    private async Task<Guid> HoldCopyAsync(int book, Guid holder, params Guid[] waiting)
+    {
+        var ready = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(book), holder, DateTime.UtcNow.AddHours(-2), 1);
+        ready.MarkReady(CatalogSeedIds.Copy(book, 1), DateTime.UtcNow.AddDays(3));
+        await Db(async db =>
+        {
+            db.BookCopies.Single(copy => copy.Id == CatalogSeedIds.Copy(book, 1)).ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.Add(ready);
+            int position = 1;
+            foreach (Guid member in waiting)
+                db.Reservations.Add(Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(book), member, DateTime.UtcNow.AddHours(-1), position++));
+            return await db.SaveChangesAsync();
+        });
+        return ready.Id;
+    }
+
+    [Fact]
+    public async Task Issuing_another_copy_to_the_holder_hands_the_held_copy_to_the_next_member()
+    {
+        // BQ-BA-08: any copy of the book fulfils the holder's reservation; the held copy goes to the next in the queue.
+        Guid readyId = await HoldCopyAsync(13, Members.NarekSimonyan, Members.EvaHovsepyan);
+
+        using var client = Client();
+        using var response = await Issue(client, Members.NarekSimonyan, CatalogSeedIds.CopyBarcode(13, 2));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var reservations = await Db(db => db.Reservations.AsNoTracking().Where(r => r.BookId == CatalogSeedIds.Book(13)).ToListAsync());
+        Assert.Equal(ReservationStatus.Fulfilled, reservations.Single(r => r.Id == readyId).Status);
+        Reservation next = reservations.Single(r => r.StaffMemberId == Members.EvaHovsepyan);
+        Assert.Equal(ReservationStatus.ReadyForPickup, next.Status);
+        Assert.Equal(CatalogSeedIds.Copy(13, 1), next.CopyId);
+        Assert.Equal(BookCopyStatus.Reserved, await CopyStatus(13, 1));
+        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatus(13, 2));
+        Assert.True(await Db(db => db.OutboxMessages.AnyAsync(m => m.Type.Contains(nameof(ReservationReady)) && m.Payload.Contains(next.Id.ToString()))));
+    }
+
+    [Fact]
+    public async Task Issuing_another_copy_to_the_holder_releases_the_held_copy_when_nobody_waits()
+    {
+        Guid readyId = await HoldCopyAsync(14, Members.TigranMelikyan);
+
+        using var client = Client();
+        using var response = await Issue(client, Members.TigranMelikyan, CatalogSeedIds.CopyBarcode(14, 2));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Equal(ReservationStatus.Fulfilled, await Db(db => db.Reservations.Where(r => r.Id == readyId).Select(r => r.Status).SingleAsync()));
+        Assert.Equal(BookCopyStatus.Available, await CopyStatus(14, 1));
+    }
+
+    [Fact]
+    public async Task Issuing_a_copy_to_a_waiting_member_cancels_their_reservation_and_moves_the_queue_up()
+    {
+        var own = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(1), Members.EvaHovsepyan, DateTime.UtcNow.AddHours(-2), 1);
+        var behind = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(1), Members.ManeGevorgyan, DateTime.UtcNow.AddHours(-1), 2);
+        await Db(async db =>
+        {
+            db.Reservations.AddRange(own, behind);
+            return await db.SaveChangesAsync();
+        });
+
+        using var client = Client();
+        using var response = await Issue(client, Members.EvaHovsepyan, CatalogSeedIds.CopyBarcode(1, 1));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var stored = await Db(db => db.Reservations.AsNoTracking().Where(r => r.Id == own.Id || r.Id == behind.Id).ToListAsync());
+        Assert.Equal(ReservationStatus.Cancelled, stored.Single(r => r.Id == own.Id).Status);
+        Assert.Equal((ReservationStatus.Waiting, 1), (stored.Single(r => r.Id == behind.Id).Status, stored.Single(r => r.Id == behind.Id).QueuePosition));
+    }
+
+    [Fact]
+    public async Task A_held_copy_is_refused_to_another_member_and_stays_held()
+    {
+        Guid readyId = await HoldCopyAsync(7, Members.ManeGevorgyan);
+
+        using var client = Client();
+        await AssertProblem(await Issue(client, Members.EvaHovsepyan, CatalogSeedIds.CopyBarcode(7, 1)),
+            HttpStatusCode.UnprocessableEntity, "borrowing.copy_not_available");
+
+        Assert.Equal(ReservationStatus.ReadyForPickup, await Db(db => db.Reservations.Where(r => r.Id == readyId).Select(r => r.Status).SingleAsync()));
+        Assert.Equal(BookCopyStatus.Reserved, await CopyStatus(7, 1));
+    }
+
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
