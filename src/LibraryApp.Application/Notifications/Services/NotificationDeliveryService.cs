@@ -1,8 +1,10 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Notifications;
+using LibraryApp.Application.Notifications.Options;
 using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Domain.Notifications;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Notifications.Services;
 
@@ -11,20 +13,24 @@ public sealed class NotificationDeliveryService(
     INotificationDeliveryStore store,
     IOutlookNotificationSender sender,
     IClock clock,
+    IOptions<NotificationsOptions> options,
     ILogger<NotificationDeliveryService> logger) : INotificationDeliveryService
 {
-    public async Task<int> DeliverPendingAsync(int batchSize, CancellationToken ct = default)
+    public async Task<int> DeliverPendingAsync(CancellationToken ct = default)
     {
-        var pending = await store.GetPendingAsync(batchSize, ct);
+        DeliveryOptions settings = options.Value.Delivery;
+        DateTime now = clock.UtcNow;
+        var claimed = await store.ClaimPendingAsync(now, now + settings.Lease, settings.BatchSize, ct);
 
-        foreach (var notification in pending)
+        foreach (var notification in claimed)
         {
             await DeliverAsync(notification, ct);
-            // One save per email: a sent email is never sent again because a later one failed.
+            // One save per email, so a later failure does not undo it. If this save fails, the email goes out again
+            // when the lease ends.
             await store.SaveAsync(ct);
         }
 
-        return pending.Count;
+        return claimed.Count;
     }
 
     private async Task DeliverAsync(Notification notification, CancellationToken ct)

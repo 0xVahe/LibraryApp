@@ -7,21 +7,77 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Notifications;
 
-public sealed class DeliveryDatabase : IAsyncLifetime
+/// <summary>Each test gets its own database: claiming changes the rows.</summary>
+public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
 {
     private static readonly DateTime Now = new(2026, 10, 18, 9, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime LeaseUntil = Now.AddMinutes(15);
     private static readonly Guid StaffId = Guid.NewGuid();
 
-    public Guid Older { get; } = Guid.NewGuid();
-    public Guid Newer { get; } = Guid.NewGuid();
+    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly Guid _older = Guid.NewGuid();
+    private readonly Guid _newer = Guid.NewGuid();
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
-
-    public LibraryDbContext NewContext()
+    [Fact]
+    public async Task Claims_pending_outlook_only_oldest_first()
     {
-        var options = new DbContextOptionsBuilder<LibraryDbContext>();
-        options.UseLibrarySqlServer(ConnectionString);
-        return new LibraryDbContext(options.Options);
+        await using var db = NewContext();
+
+        var claimed = await new NotificationDeliveryStore(db).ClaimPendingAsync(Now, LeaseUntil, 20);
+
+        Assert.Equal(new[] { _older, _newer }, claimed.Select(n => n.Id));
+        Assert.All(claimed, n => Assert.Equal(LeaseUntil, n.NextAttemptAtUtc));
+    }
+
+    [Fact]
+    public async Task Claims_at_most_max()
+    {
+        await using var db = NewContext();
+
+        var claimed = await new NotificationDeliveryStore(db).ClaimPendingAsync(Now, LeaseUntil, 1);
+
+        Assert.Equal(_older, Assert.Single(claimed).Id);
+    }
+
+    [Fact]
+    public async Task Claimed_email_is_not_claimed_again_until_the_lease_ends()
+    {
+        await using (var first = NewContext())
+            await new NotificationDeliveryStore(first).ClaimPendingAsync(Now, LeaseUntil, 20);
+
+        await using var db = NewContext();
+        var store = new NotificationDeliveryStore(db);
+
+        Assert.Empty(await store.ClaimPendingAsync(Now.AddMinutes(1), Now.AddMinutes(16), 20));
+        Assert.Equal(2, (await store.ClaimPendingAsync(LeaseUntil, LeaseUntil.AddMinutes(15), 20)).Count);
+    }
+
+    [Fact]
+    public async Task Two_instances_never_claim_the_same_email()
+    {
+        await using var first = NewContext();
+        await using var second = NewContext();
+
+        // The first claim stays uncommitted, as if that instance were still in the middle of it. The retrying
+        // execution strategy allows an own transaction only inside ExecuteAsync.
+        IReadOnlyList<Notification> firstClaim = [];
+        IReadOnlyList<Notification> secondClaim = [];
+        await first.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await first.Database.BeginTransactionAsync();
+            firstClaim = await new NotificationDeliveryStore(first).ClaimPendingAsync(Now, LeaseUntil, 1);
+            secondClaim = await new NotificationDeliveryStore(second).ClaimPendingAsync(Now, LeaseUntil, 20);
+            await transaction.CommitAsync();
+        });
+
+        // Rows the first instance is still reading are skipped, not waited for: the second instance may get fewer
+        // rows, never the same one. Whatever it skipped is claimed by the next round.
+        await using var third = NewContext();
+        var nextRound = await new NotificationDeliveryStore(third).ClaimPendingAsync(Now, LeaseUntil, 20);
+
+        Assert.Equal(_older, Assert.Single(firstClaim).Id);
+        Assert.DoesNotContain(secondClaim, n => n.Id == _older);
+        Assert.Equal(new[] { _newer }, secondClaim.Concat(nextRound).Select(n => n.Id));
     }
 
     public async Task InitializeAsync()
@@ -51,8 +107,8 @@ public sealed class DeliveryDatabase : IAsyncLifetime
         failed.MarkFailed("Mail server is down.", null);
 
         db.Notifications.AddRange(
-            New(Newer, NotificationChannel.Outlook, Now.AddHours(-1)),
-            New(Older, NotificationChannel.Outlook, Now.AddHours(-2)),
+            New(_newer, NotificationChannel.Outlook, Now.AddHours(-1)),
+            New(_older, NotificationChannel.Outlook, Now.AddHours(-2)),
             New(Guid.NewGuid(), NotificationChannel.InApp, Now.AddHours(-3)),
             sent,
             failed);
@@ -66,31 +122,15 @@ public sealed class DeliveryDatabase : IAsyncLifetime
         await db.Database.EnsureDeletedAsync();
     }
 
+    private LibraryDbContext NewContext()
+    {
+        var options = new DbContextOptionsBuilder<LibraryDbContext>();
+        options.UseLibrarySqlServer(_connectionString);
+        return new LibraryDbContext(options.Options);
+    }
+
     private static Notification New(Guid id, NotificationChannel channel, DateTime createdAtUtc) =>
         Notification.Create(
             id, StaffId, NotificationType.LoanConfirmation, channel, "eng-001@example.com", null,
             "Subject", "<p>Body</p>", createdAtUtc, DateOnly.FromDateTime(createdAtUtc));
-}
-
-public sealed class NotificationDeliveryStoreTests(DeliveryDatabase database) : IClassFixture<DeliveryDatabase>
-{
-    [Fact]
-    public async Task Returns_pending_outlook_only_oldest_first()
-    {
-        await using var db = database.NewContext();
-
-        var pending = await new NotificationDeliveryStore(db).GetPendingAsync(20);
-
-        Assert.Equal(new[] { database.Older, database.Newer }, pending.Select(n => n.Id));
-    }
-
-    [Fact]
-    public async Task Returns_at_most_max()
-    {
-        await using var db = database.NewContext();
-
-        var pending = await new NotificationDeliveryStore(db).GetPendingAsync(1);
-
-        Assert.Equal(database.Older, Assert.Single(pending).Id);
-    }
 }

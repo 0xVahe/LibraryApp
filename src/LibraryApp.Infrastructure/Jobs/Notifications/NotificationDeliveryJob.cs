@@ -60,6 +60,6 @@ public sealed class NotificationDeliveryJob(
     {
         await using var scope = scopes.CreateAsyncScope();
         var delivery = scope.ServiceProvider.GetRequiredService<INotificationDeliveryService>();
-        return await delivery.DeliverPendingAsync(options.Value.Delivery.BatchSize, ct);
+        return await delivery.DeliverPendingAsync(ct);
     }
 }

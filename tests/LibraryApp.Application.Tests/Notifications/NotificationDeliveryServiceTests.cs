@@ -1,9 +1,11 @@
 using LibraryApp.Application.Abstractions.Notifications;
+using LibraryApp.Application.Notifications.Options;
 using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Notifications;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Notifications;
 
@@ -17,7 +19,7 @@ public sealed class NotificationDeliveryServiceTests
         var store = new FakeStore(NewNotification("anna@ameriabank.am", "manager@ameriabank.am"));
         var sender = new FakeSender();
 
-        var tried = await Service(store, sender).DeliverPendingAsync(20);
+        var tried = await Service(store, sender).DeliverPendingAsync();
 
         var message = Assert.Single(sender.Sent);
         Assert.Equal("anna@ameriabank.am", message.To);
@@ -35,7 +37,7 @@ public sealed class NotificationDeliveryServiceTests
         var store = new FakeStore(NewNotification());
         var sender = new FakeSender { FailFor = "anna@ameriabank.am" };
 
-        await Service(store, sender).DeliverPendingAsync(20);
+        await Service(store, sender).DeliverPendingAsync();
 
         var notification = store.Notifications[0];
         Assert.Equal(NotificationStatus.Failed, notification.Status);
@@ -50,7 +52,7 @@ public sealed class NotificationDeliveryServiceTests
         var store = new FakeStore(NewNotification("anna@ameriabank.am"), NewNotification("gor@ameriabank.am"));
         var sender = new FakeSender { FailFor = "anna@ameriabank.am" };
 
-        var tried = await Service(store, sender).DeliverPendingAsync(20);
+        var tried = await Service(store, sender).DeliverPendingAsync();
 
         Assert.Equal(2, tried);
         Assert.Equal(NotificationStatus.Failed, store.Notifications[0].Status);
@@ -59,13 +61,15 @@ public sealed class NotificationDeliveryServiceTests
     }
 
     [Fact]
-    public async Task Asks_the_store_for_one_batch()
+    public async Task Claims_one_batch_with_the_lease()
     {
         var store = new FakeStore();
 
-        var tried = await Service(store, new FakeSender()).DeliverPendingAsync(5);
+        var tried = await Service(store, new FakeSender()).DeliverPendingAsync();
 
-        Assert.Equal(5, store.RequestedMax);
+        Assert.Equal(20, store.RequestedMax);
+        Assert.Equal(Now, store.RequestedNow);
+        Assert.Equal(Now.AddMinutes(15), store.RequestedLeaseUntil);
         Assert.Equal(0, tried);
     }
 
@@ -75,14 +79,24 @@ public sealed class NotificationDeliveryServiceTests
         var store = new FakeStore(NewNotification());
         var sender = new FakeSender { Cancel = true };
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(store, sender).DeliverPendingAsync(20));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(store, sender).DeliverPendingAsync());
 
         Assert.Equal(NotificationStatus.Pending, store.Notifications[0].Status);
         Assert.Equal(0, store.Saves);
     }
 
     private static NotificationDeliveryService Service(FakeStore store, FakeSender sender) =>
-        new(store, sender, new TestClock(Now), NullLogger<NotificationDeliveryService>.Instance);
+        new(store, sender, new TestClock(Now), Settings, NullLogger<NotificationDeliveryService>.Instance);
+
+    private static readonly IOptions<NotificationsOptions> Settings = Microsoft.Extensions.Options.Options.Create(new NotificationsOptions
+    {
+        Delivery = new DeliveryOptions
+        {
+            PollInterval = TimeSpan.FromSeconds(5),
+            BatchSize = 20,
+            Lease = TimeSpan.FromMinutes(15),
+        },
+    });
 
     private static Notification NewNotification(string to = "anna@ameriabank.am", string? cc = null) =>
         Notification.Create(
@@ -93,11 +107,16 @@ public sealed class NotificationDeliveryServiceTests
     {
         public List<Notification> Notifications { get; } = [.. notifications];
         public int RequestedMax { get; private set; }
+        public DateTime RequestedNow { get; private set; }
+        public DateTime RequestedLeaseUntil { get; private set; }
         public int Saves { get; private set; }
 
-        public Task<IReadOnlyList<Notification>> GetPendingAsync(int max, CancellationToken ct = default)
+        public Task<IReadOnlyList<Notification>> ClaimPendingAsync(
+            DateTime nowUtc, DateTime leaseUntilUtc, int max, CancellationToken ct = default)
         {
             RequestedMax = max;
+            RequestedNow = nowUtc;
+            RequestedLeaseUntil = leaseUntilUtc;
             return Task.FromResult<IReadOnlyList<Notification>>(Notifications.Take(max).ToList());
         }
 
