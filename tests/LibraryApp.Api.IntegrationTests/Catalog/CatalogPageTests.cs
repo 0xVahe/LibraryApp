@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using LibraryApp.Api.Areas.Catalog;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
@@ -98,7 +99,10 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
 
         var html = await client.GetStringAsync("/catalog?search=The+Intelligent+Investor");
 
-        Assert.Contains("class=\"cover c1 has-image\"", html);
+        // The colour follows the category, as on the Book page.
+        var categoryId = CatalogSeedIds.Category(CatalogSeedData.Books.Single(book => book.Number == 1).CategoryNumber);
+        var cover = new BookCoverModel("The Intelligent Investor", null, "cover", categoryId);
+        Assert.Contains($"class=\"{cover.CssClass}\"", html);
         Assert.Contains("class=\"cover-img\"", html);
         Assert.Contains("src=\"https://res.cloudinary.com/hil9ktuv/image/upload/library-covers/01.png\"", html);
         Assert.Contains("alt=\"\"", html);
@@ -110,10 +114,11 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
     public async Task A_book_without_a_cover_renders_only_the_text_cover()
     {
         var title = "Catalog page no-cover " + Guid.NewGuid().ToString("N")[..8];
+        var categoryId = Guid.NewGuid();
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
-            var category = new Category(Guid.NewGuid(), title + " category");
+            var category = new Category(categoryId, title + " category");
             var author = new Author(Guid.NewGuid(), title + " author");
             var book = new Book(Guid.NewGuid(), title, "9791000000015", 2024, "en", null, category.Id, null);
             db.AddRange(category, author, book, new BookAuthor(book.Id, author.Id));
@@ -125,6 +130,6 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
 
         Assert.Contains(title, html);
         Assert.DoesNotContain("class=\"cover-img\"", html);
-        Assert.Contains("class=\"cover c1", html);
+        Assert.Contains($"class=\"{new BookCoverModel(title, null, null, categoryId).CssClass}\"", html);
     }
 }
