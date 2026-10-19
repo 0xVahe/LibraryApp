@@ -401,6 +401,7 @@ public sealed class ReservationServiceTests
 
     private sealed class ReservationRepositoryFake : IReservationRepository
     {
+        public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
         private readonly List<Reservation> _pending = new();
         public List<Reservation> Saved { get; } = new();
         public int ActiveCount { get; set; }
@@ -410,6 +411,8 @@ public sealed class ReservationServiceTests
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => Task.FromResult(HasActiveForBook);
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => Task.FromResult(WaitingCount);
         public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default)
         {
             _pending.Add(reservation);
