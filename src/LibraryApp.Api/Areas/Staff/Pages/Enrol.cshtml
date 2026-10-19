@@ -1,0 +1,13 @@
+@page "/staff/new"
+@model EnrolModel
+@{
+    ViewData["Title"] = "Enrol a staff member";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Enrol a staff member",
+             "Add one person with the form, or many at once from a CSV file.",
+             Crumbs: [new PageAction("Staff members", "/staff")]))' />
+<div class="grid grid-side">
+    <partial name="_EnrolStaffForm" model="Model" />
+    <partial name="_StaffCsvImport" model="@(Array.Empty<LibraryApp.Application.Staff.Dto.StaffImportError>())" />
+</div>

@@ -1,0 +1,21 @@
+@model EditModel
+<section class="card" aria-labelledby="edit-title">
+    <div class="card-head">
+        <div>
+            <h2 id="edit-title">Staff details</h2>
+            <p class="small muted">Employee ID and role stay unchanged.</p>
+        </div>
+    </div>
+    <dl class="dl">
+        <dt>Employee ID</dt><dd>@Model.Member.EmployeeId</dd>
+        <dt>Role</dt><dd>@Model.Member.Role</dd>
+    </dl>
+    <form class="form form-2 mt-24" method="post" asp-page="./Edit" asp-route-id="@Model.Member.Id" novalidate>
+        <div asp-validation-summary="ModelOnly" class="error-text field-wide" role="alert"></div>
+        <partial name="_StaffProfileFields" model="@(new StaffProfileFieldsModel(Model.Input, Model))" />
+        <div class="form-actions field-wide">
+            <button class="btn btn-primary" type="submit">Save changes</button>
+            <a class="btn btn-secondary" href="/staff/@Model.Member.Id">Cancel</a>
+        </div>
+    </form>
+</section>

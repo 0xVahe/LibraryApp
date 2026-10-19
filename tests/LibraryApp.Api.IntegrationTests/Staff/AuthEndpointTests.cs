@@ -127,10 +127,22 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         Assert.Equal(HttpStatusCode.OK, initialLogin.StatusCode);
         var login = await initialLogin.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(login);
-        Assert.False(login.PasswordChangeRequired);
+        Assert.True(login.PasswordChangeRequired);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = await users.FindByEmailAsync(member.CorporateEmail);
+            Assert.NotNull(user);
+            Assert.Contains(await users.GetClaimsAsync(user), claim =>
+                claim.Type == LibraryClaimTypes.PasswordChangeRequired && claim.Value == bool.TrueString);
+        }
 
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+        using var blocked = await client.GetAsync("/api/staff-members/me");
+        await AssertLoginError(blocked, HttpStatusCode.Forbidden, "staff.password_change_required");
+
         using var change = await client.PostAsJsonAsync("/api/auth/change-password",
             new ChangePasswordRequest(Password, "ChangedPass9"));
         Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
@@ -143,6 +155,21 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         var updatedLogin = await newPasswordLogin.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(updatedLogin);
         Assert.False(updatedLogin.PasswordChangeRequired);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+            var user = await users.FindByEmailAsync(member.CorporateEmail);
+            Assert.NotNull(user);
+            Assert.DoesNotContain(await users.GetClaimsAsync(user), claim =>
+                claim.Type == LibraryClaimTypes.PasswordChangeRequired);
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", updatedLogin.AccessToken);
+        using var allowed = await client.GetAsync("/api/staff-members/me");
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        // Changing the password does not give a StaffMember library-staff permissions.
+        using var forbidden = await client.GetAsync("/api/staff-members");
+        await AssertLoginError(forbidden, HttpStatusCode.Forbidden, "forbidden");
     }
 
     [Fact]
