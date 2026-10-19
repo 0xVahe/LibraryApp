@@ -17,7 +17,7 @@ namespace LibraryApp.Infrastructure.Persistence.Auditing;
 /// <see cref="AuditLog"/> row, saved by the same SaveChanges and therefore in the same transaction as the change: a
 /// rolled-back change leaves no audit row. Recording here, not in the services, means no module can forget it (SD-18).
 /// <para>
-/// A soft delete of a book (BR-CAT-3) is recorded as Deleted. The authors of a book (CAT-02) are links, not an entity:
+/// A soft delete of a book (BR-CAT-3) and the deactivation of a staff member (MEM-01) are recorded as Deleted. The authors of a book (CAT-02) are links, not an entity:
 /// adding or removing one records the book as Updated, once per book and save. The user is the "sub" claim of the
 /// request's access token; jobs, event handlers, the seed and anonymous requests (login) have none and are recorded as
 /// system (UserId null).
@@ -87,6 +87,8 @@ public sealed class AuditSaveChangesInterceptor(IHttpContextAccessor http, ICloc
         EntityState.Added => AuditActions.Created,
         EntityState.Modified when entry.Entity is Book { IsDeleted: true }
                                   && entry.Property(nameof(Book.IsDeleted)).IsModified => AuditActions.Deleted,
+        EntityState.Modified when entry.Entity is StaffMember { Status: StaffMemberStatus.Deactivated }
+                                  && entry.Property(nameof(StaffMember.Status)).IsModified => AuditActions.Deleted,
         EntityState.Modified => AuditActions.Updated,
         _ => AuditActions.Deleted,
     };

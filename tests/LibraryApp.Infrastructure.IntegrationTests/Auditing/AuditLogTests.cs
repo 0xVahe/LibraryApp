@@ -2,6 +2,8 @@ using System.Security.Claims;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Domain.Auditing;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
@@ -154,6 +156,40 @@ public class AuditLogTests(AuditFixture fixture) : IClassFixture<AuditFixture>
         List<AuditLog> rows = await fixture.RowsAsync(bookId);
         Assert.Equal([AuditActions.Created, AuditActions.Updated], rows.Select(r => r.Action));
         Assert.All(rows, row => Assert.Equal(("Book", userId), (row.EntityName, row.UserId)));
+    }
+
+    [Fact]
+    public async Task Enrolling_and_deactivating_a_staff_member_records_the_deactivation_as_deleted()
+    {
+        var userId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+
+        await fixture.InTransactionAsync(userId, db =>
+        {
+            var accountId = Guid.NewGuid();
+            string email = $"audit.{memberId:N}@ameriabank.am";
+            var department = new Department(Guid.NewGuid(), $"Audit {memberId:N}");
+            var category = new StaffCategory(Guid.NewGuid(), $"Audit {memberId:N}", 3, 14, 1);
+            db.Users.Add(new AppUser { Id = accountId, UserName = email, Email = email });
+            db.Departments.Add(department);
+            db.StaffCategories.Add(category);
+            db.StaffMembers.Add(new StaffMember(memberId, accountId, $"EMP-{memberId:N}", "Audit", "Member", email,
+                department.Id, "Analyst", null, category.Id, AuditFixture.Now));
+            return Task.CompletedTask;
+        });
+        await fixture.InTransactionAsync(userId, async db =>
+            (await db.StaffMembers.SingleAsync(m => m.Id == memberId)).ChangeStatus(StaffMemberStatus.Restricted));
+        await fixture.InTransactionAsync(userId, async db =>
+            (await db.StaffMembers.SingleAsync(m => m.Id == memberId)).Deactivate());
+
+        // Deactivation (MEM-01) is how a staff member is removed: the delete action NFR-14 names; other status changes are updates.
+        List<AuditLog> rows = await fixture.RowsAsync(memberId);
+        Assert.Equal([AuditActions.Created, AuditActions.Updated, AuditActions.Deleted], rows.Select(r => r.Action));
+        Assert.All(rows, row =>
+        {
+            Assert.Equal("StaffMember", row.EntityName);
+            Assert.Equal(userId, row.UserId);
+        });
     }
 
     [Fact]
