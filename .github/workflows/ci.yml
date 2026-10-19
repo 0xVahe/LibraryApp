@@ -19,64 +19,68 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
+  # One job runs every check: Actions bills each job separately, rounded up to a whole minute, and each job would
+  # repeat checkout, SDK setup, restore and build. A check step runs even when an earlier check failed (!cancelled()),
+  # so one red run still reports every problem; the step name says which check failed.
   build-and-test:
+    # A draft is not reviewed yet: its checks run when it is marked ready for review (ready_for_review above).
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write   # the needs-migration label
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: CiOnly_Throwaway_Passw0rd
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CiOnly_Throwaway_Passw0rd -C -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+    env:
+      LIBRARYAPP_TEST_DB: Server=localhost,1433;Database=LibraryApp_CiTests;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the secret scan reads the commits of the pull request
+
+      - name: secret-scan - gitleaks (NFR-04)
+        env:
+          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
+
       - uses: actions/setup-dotnet@v4
+        if: ${{ !cancelled() }}
         with:
           dotnet-version: 8.0.x
       - uses: actions/cache@v4
+        if: ${{ !cancelled() }}
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
           restore-keys: |
             nuget-${{ runner.os }}-
-      - run: dotnet restore LibraryApp.sln
-      - run: dotnet build LibraryApp.sln --configuration Release --no-restore
-      - name: Unit tests with coverage
+      - name: Restore
+        id: restore
+        if: ${{ !cancelled() }}
         run: |
-          dotnet test tests/LibraryApp.Domain.Tests --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" --results-directory ./coverage
-          dotnet test tests/LibraryApp.Application.Tests --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" --results-directory ./coverage
-      - name: Coverage gate - Application at least 50% (NFR-09)
-        if: ${{ vars.COVERAGE_GATE == 'true' }}
-        run: |
-          python3 - <<'PY'
-          import glob, sys, xml.etree.ElementTree as ET
-          covered = total = 0
-          for path in glob.glob('coverage/**/coverage.cobertura.xml', recursive=True):
-              for package in ET.parse(path).getroot().iter('package'):
-                  if package.get('name') == 'LibraryApp.Application':
-                      for line in package.iter('line'):
-                          total += 1
-                          covered += 1 if int(line.get('hits')) > 0 else 0
-          rate = 100.0 * covered / total if total else 0.0
-          print(f'Application line coverage: {rate:.1f}% ({covered}/{total})')
-          sys.exit(0 if rate >= 50.0 else 1)
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage
-          path: coverage
-          if-no-files-found: ignore
+          dotnet restore LibraryApp.sln
+          dotnet tool restore
+      - name: Build
+        id: build
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
+        run: dotnet build LibraryApp.sln --configuration Release --no-restore
 
-  model-sync:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-      - name: No pending model changes
+      - name: model-sync - no pending model changes
         id: model
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           set -eu
           # -z reads each file as one record, so a declaration split over several lines is still found.
@@ -100,68 +104,86 @@ jobs:
             exit 1
           fi
 
-          dotnet tool restore
-          dotnet build src/LibraryApp.Infrastructure --configuration Debug
-          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure --no-build; then
+          if ! dotnet ef migrations has-pending-model-changes --project src/LibraryApp.Infrastructure --configuration Release --no-build; then
             echo "pending=true" >> "$GITHUB_OUTPUT"
             echo "::error::The model changed but there is no migration. The pull request is labelled needs-migration; the Integration Owner adds the migration as the last commit. Do not add migration files yourself."
             exit 1
           fi
           echo "pending=false" >> "$GITHUB_OUTPUT"
-
       - name: Label needs-migration
-        if: always() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true'
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels" -f "labels[]=needs-migration"
       - name: Remove needs-migration
-        if: github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration')
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels/needs-migration"
 
-  integration-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
+      - name: Unit tests with coverage
+        id: unit
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          dotnet test tests/LibraryApp.Domain.Tests --configuration Release --no-build \
+            --collect:"XPlat Code Coverage" --results-directory ./coverage
+          dotnet test tests/LibraryApp.Application.Tests --configuration Release --no-build \
+            --collect:"XPlat Code Coverage" --results-directory ./coverage
+      # Repository variables (Settings > Secrets and variables > Actions > Variables):
+      #   COVERAGE_GATE             true or false; not set = true. false still prints the coverage, with a warning.
+      #   APPLICATION_MIN_COVERAGE  minimum line coverage of LibraryApp.Application in percent; not set = 50 (NFR-09).
+      - name: Coverage gate - Application line coverage (NFR-09)
+        if: ${{ !cancelled() && steps.unit.outcome == 'success' }}
         env:
-          ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: CiOnly_Throwaway_Passw0rd
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CiOnly_Throwaway_Passw0rd -C -Q 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-          --health-start-period 20s
-    env:
-      LIBRARYAPP_TEST_DB: Server=localhost,1433;Database=LibraryApp_CiTests;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-      - run: dotnet restore LibraryApp.sln
-      - run: dotnet test tests/LibraryApp.Infrastructure.IntegrationTests --configuration Release --no-restore
-      - run: dotnet test tests/LibraryApp.Api.IntegrationTests --configuration Release --no-restore
+          GATE: ${{ vars.COVERAGE_GATE || 'true' }}
+          MIN_COVERAGE: ${{ vars.APPLICATION_MIN_COVERAGE || '50' }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, xml.etree.ElementTree as ET
+          gate = os.environ['GATE'].strip().lower()
+          if gate not in ('true', 'false'):
+              sys.exit(f"::error::Repository variable COVERAGE_GATE must be true or false, not '{os.environ['GATE']}'.")
+          try:
+              minimum = float(os.environ['MIN_COVERAGE'])
+          except ValueError:
+              minimum = -1.0
+          if not 0 <= minimum <= 100:
+              sys.exit(f"::error::Repository variable APPLICATION_MIN_COVERAGE must be a number from 0 to 100, not '{os.environ['MIN_COVERAGE']}'.")
 
-  secret-scan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
+          # A line counts once even when several test projects report it: covered if any report hits it.
+          lines = {}
+          for path in glob.glob('coverage/**/coverage.cobertura.xml', recursive=True):
+              for package in ET.parse(path).getroot().iter('package'):
+                  if package.get('name') != 'LibraryApp.Application':
+                      continue
+                  for cls in package.iter('class'):
+                      for line in cls.iter('line'):
+                          key = (cls.get('filename'), line.get('number'))
+                          lines[key] = lines.get(key, False) or int(line.get('hits')) > 0
+          total, covered = len(lines), sum(lines.values())
+          rate = 100.0 * covered / total if total else 0.0
+          print(f'Application line coverage: {rate:.1f}% ({covered}/{total} lines), minimum {minimum:g}%, gate {gate}')
+          if total == 0:
+              sys.exit('::error::No coverage report for LibraryApp.Application was found.')
+          if rate >= minimum:
+              sys.exit(0)
+          if gate == 'false':
+              print(f'::warning::Application line coverage {rate:.1f}% is below {minimum:g}% (NFR-09); not enforced because COVERAGE_GATE is false.')
+              sys.exit(0)
+          sys.exit(f'::error::Application line coverage {rate:.1f}% is below the minimum {minimum:g}% (NFR-09).')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          fetch-depth: 0
-      - name: gitleaks
-        env:
-          LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
+      # integration-tests: every migration is applied to an empty SQL Server database, so the whole chain is proven
+      # from scratch.
+      - name: integration-tests - Infrastructure
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/LibraryApp.Infrastructure.IntegrationTests --configuration Release --no-build
+      - name: integration-tests - API
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: dotnet test tests/LibraryApp.Api.IntegrationTests --configuration Release --no-build
