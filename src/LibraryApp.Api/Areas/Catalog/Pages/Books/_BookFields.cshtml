@@ -49,6 +49,13 @@
     <span id="category-error" class="error-text" asp-validation-for="Input.CategoryId"></span>
 </div>
 <div class="field field-wide">
+    <label asp-for="Input.CoverImagePath">Cover image path (optional)</label>
+    <input asp-for="Input.CoverImagePath" maxlength="@LibraryApp.Domain.Catalog.Book.CoverImagePathMaxLength" placeholder="library-covers/01.png"
+           aria-invalid="@Model.AriaInvalid("CoverImagePath")" aria-describedby="cover-hint cover-error" />
+    <span id="cover-hint" class="hint">A file in the library's cover storage: letters, digits, - _ /, ending in .png, .jpg or .webp. Leave empty for no cover.</span>
+    <span id="cover-error" class="error-text" asp-validation-for="Input.CoverImagePath"></span>
+</div>
+<div class="field field-wide">
     <label asp-for="Input.Description">Description</label>
     <textarea asp-for="Input.Description" rows="4"></textarea>
 </div>
