@@ -33,7 +33,7 @@ public class ReservationQueueEndpointTests(ApiHostWithoutBorrowingSeed factory) 
     {
         var client = factory.CreateClient();
         var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(Guid.NewGuid(), "librarian@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian])).Token;
+            factory.Account(StaffRoles.Librarian)).Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }

@@ -20,4 +20,8 @@ public sealed class JwtOptions
 
     [Range(1, 1440)]
     public int AccessTokenMinutes { get; set; } = 60;
+
+    /// <summary>Maximum delay before an account change invalidates a previously accepted token.</summary>
+    [Range(1, 30)]
+    public int SecurityStampCacheSeconds { get; set; }
 }

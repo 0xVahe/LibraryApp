@@ -70,8 +70,7 @@ public class BorrowingReadServiceTests(ApiHostWithoutBorrowingSeed factory) : IC
         await SeedLoansAsync(Members.GorMkrtchyan, 16, 17, 18);
         using var client = factory.CreateClient();
         var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(Guid.NewGuid(), "admin@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active,
-                [StaffRoles.LibraryAdministrator])).Token;
+            factory.Account(StaffRoles.LibraryAdministrator)).Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await client.PostAsJsonAsync($"/api/staff-members/{Members.GorMkrtchyan}/deactivate",

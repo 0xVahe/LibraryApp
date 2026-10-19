@@ -17,6 +17,7 @@ public class JwtRegistrationTests
     {
         ["Jwt:Issuer"] = "LibraryApp",
         ["Jwt:Audience"] = "LibraryApp.Api",
+        ["Jwt:SecurityStampCacheSeconds"] = "30",
         ["Jwt:SigningKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
     };
 
@@ -36,7 +37,7 @@ public class JwtRegistrationTests
     {
         using var services = Services(ValidSettings);
         var token = services.GetRequiredService<IAccessTokenIssuer>().Issue(new LoginAccount(
-            Guid.NewGuid(), "anna@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian]));
+            Guid.NewGuid(), "anna@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian], "test-stamp"));
         var bearer = services.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>().Get(JwtBearerDefaults.AuthenticationScheme);
 
         var result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Token, bearer.TokenValidationParameters);
@@ -54,6 +55,22 @@ public class JwtRegistrationTests
             ["Jwt:Issuer"] = "LibraryApp",
             ["Jwt:Audience"] = "LibraryApp.Api"
         });
+
+        Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<JwtOptions>>().Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0")]
+    [InlineData("31")]
+    public void Missing_or_invalid_cache_duration_fails_options_validation(string? seconds)
+    {
+        var settings = new Dictionary<string, string?>(ValidSettings);
+        if (seconds is null)
+            settings.Remove("Jwt:SecurityStampCacheSeconds");
+        else
+            settings["Jwt:SecurityStampCacheSeconds"] = seconds;
+        using var services = Services(settings);
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<JwtOptions>>().Value);
     }

@@ -16,7 +16,7 @@ internal sealed class FakeUserAccountStore : IUserAccountStore
         StaffMemberStatus? status = StaffMemberStatus.Active,
         string role = StaffRoles.StaffMember)
     {
-        var account = new LoginAccount(Guid.NewGuid(), email, status is null ? null : Guid.NewGuid(), status, [role]);
+        var account = new LoginAccount(Guid.NewGuid(), email, status is null ? null : Guid.NewGuid(), status, [role], "test-stamp");
         _accounts[email] = account;
         return account;
     }

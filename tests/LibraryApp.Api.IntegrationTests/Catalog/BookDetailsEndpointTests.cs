@@ -24,7 +24,7 @@ public class BookDetailsEndpointTests(ApiHostFactory factory) : IClassFixture<Ap
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "demo@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [role])).Token;
+                factory.Account(role)).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;

@@ -572,12 +572,7 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
 
         if (role is not null)
         {
-            var account = new LoginAccount(
-                Guid.NewGuid(),
-                "return-test@ameriabank.am",
-                Guid.NewGuid(),
-                StaffMemberStatus.Active,
-                [role]);
+            var account = _host.Account(role);
 
             // The business clock of the host is fixed (Now); the token must be valid at the real time the test
             // runs, otherwise the API answers 401 on every day except the fixed one.

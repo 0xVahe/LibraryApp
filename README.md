@@ -46,6 +46,19 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Access tokens (`Jwt`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `AccessTokenMinutes` | 60 | Lifetime of an access token | MEM-02 |
+| `SecurityStampCacheSeconds` | 30 | Account-state cache duration, from 1 to 30 seconds; required at startup | MEM-02, NFR-02, S1-03-ADD-02 |
+
+JWTs carry the account's `security_stamp`. Bearer authentication checks it against the current account and rejects a missing account, missing Staff profile, a mismatched stamp or Deactivated status with the standard 401 problem response. Restricted and Suspended members can still sign in to view their standing.
+
+Role membership changes through `UserManager` rotate the stamp in the same Identity save through `StaffUserStore`. Email changes save the new stamp with the updated email in the Staff transaction; deactivation and password changes also rotate it.
+
+Account state is cached per user and token stamp, with absolute expiration on each application instance. Email, password, role changes and deactivation invalidate previously issued tokens within the configured cache duration; requests do not extend it. A new login uses its new stamp immediately. Deactivated members cannot sign in. Tokens issued before this stamp check was added require a new login. Browser cookies continue to use `Ui:SecurityStampValidationInterval` (see [Browser UI](#browser-ui)).
+
 ### Borrowing (`Borrowing`)
 
 | Key | Value | Meaning | Requirement |
