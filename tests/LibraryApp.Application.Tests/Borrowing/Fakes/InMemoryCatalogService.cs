@@ -56,6 +56,7 @@ public sealed class InMemoryCatalogService : ICatalogService
         {
             (BookCopyStatus.Available, BookCopyStatus.OnLoan or BookCopyStatus.Reserved) => true,
             (BookCopyStatus.Reserved, BookCopyStatus.OnLoan or BookCopyStatus.Available) => true,
+            (BookCopyStatus.OnLoan, BookCopyStatus.Lost) => true,
             _ => false,
         };
         if (!allowed)
