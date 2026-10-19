@@ -52,4 +52,10 @@ public sealed class FakeStaffMemberService : IStaffMemberService
         CancellationToken ct = default)
         => throw new NotSupportedException(
             "Issuing a loan should not read staff names.");
+    
+    public Task<StaffMemberLookup?> FindAsync(
+        string employeeIdOrEmail, 
+        CancellationToken ct = default) 
+        => throw new NotSupportedException(
+            "Issuing a loan should not find staff members.");
 }
