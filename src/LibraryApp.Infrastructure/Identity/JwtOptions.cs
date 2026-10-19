@@ -23,5 +23,5 @@ public sealed class JwtOptions
 
     /// <summary>Maximum delay before an account change invalidates a previously accepted token.</summary>
     [Range(1, 30)]
-    public int SecurityStampCacheSeconds { get; set; }
+    public int SecurityStampCacheSeconds { get; set; } = 30;
 }

@@ -84,6 +84,13 @@ public sealed class ReservationOptions
 
     /// <summary>Whether a Suspended employee may place new reservations (BQ-BA-11); a Deactivated one never may.</summary>
     public bool SuspendedMayReserve { get; set; }
+
+    /// <summary>
+    /// Whether issuing any copy of a book to an employee closes their active reservation for it (BQ-BA-08): a ready one
+    /// is fulfilled and its held copy goes to the next in the queue (or becomes Available), a waiting one is cancelled
+    /// and the queue moves up. False: only collecting the held copy fulfils a reservation.
+    /// </summary>
+    public bool AnyCopyFulfils { get; set; } = true;
 }
 /// <summary>
 /// Section Borrowing:Loans.

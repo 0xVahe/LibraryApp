@@ -59,17 +59,25 @@ public class JwtRegistrationTests
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<JwtOptions>>().Value);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("0")]
-    [InlineData("31")]
-    public void Missing_or_invalid_cache_duration_fails_options_validation(string? seconds)
+    [Fact]
+    public void Missing_cache_duration_uses_the_thirty_second_default()
     {
         var settings = new Dictionary<string, string?>(ValidSettings);
-        if (seconds is null)
-            settings.Remove("Jwt:SecurityStampCacheSeconds");
-        else
-            settings["Jwt:SecurityStampCacheSeconds"] = seconds;
+        settings.Remove("Jwt:SecurityStampCacheSeconds");
+        using var services = Services(settings);
+
+        Assert.Equal(30, services.GetRequiredService<IOptions<JwtOptions>>().Value.SecurityStampCacheSeconds);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("31")]
+    public void Invalid_cache_duration_fails_options_validation(string seconds)
+    {
+        var settings = new Dictionary<string, string?>(ValidSettings)
+        {
+            ["Jwt:SecurityStampCacheSeconds"] = seconds
+        };
         using var services = Services(settings);
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<JwtOptions>>().Value);

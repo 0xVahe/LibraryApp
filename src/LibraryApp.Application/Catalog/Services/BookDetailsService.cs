@@ -43,6 +43,8 @@ public sealed class BookDetailsService(
             book.AvailableCopies,
             Availability: $"{book.AvailableCopies} of {book.TotalCopies} available",
             nextExpectedReturnDate,
-            coverUrls.Build(book.CoverImageUrl));
+            coverUrls.Build(book.CoverImageUrl),
+            // The details query returns the stored path in CoverImageUrl; the public URL is built from it above.
+            CoverImagePath: book.CoverImageUrl);
     }
 }

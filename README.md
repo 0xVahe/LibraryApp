@@ -51,7 +51,7 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | Key | Value | Meaning | Requirement |
 |---|---|---|---|
 | `AccessTokenMinutes` | 60 | Lifetime of an access token | MEM-02 |
-| `SecurityStampCacheSeconds` | 30 | Account-state cache duration, from 1 to 30 seconds; required at startup | MEM-02, NFR-02, S1-03-ADD-02 |
+| `SecurityStampCacheSeconds` | 30 | Account-state cache duration, from 1 to 30 seconds; defaults to 30 when omitted, validated at startup | MEM-02, NFR-02, S1-03-ADD-02 |
 
 JWTs carry the account's `security_stamp`. Bearer authentication checks it against the current account and rejects a missing account, missing Staff profile, a mismatched stamp or Deactivated status with the standard 401 problem response. Restricted and Suspended members can still sign in to view their standing.
 
@@ -78,6 +78,7 @@ Account state is cached per user and token stamp, with absolute expiration on ea
 | `Reservations:PickupCountsReleaseDay` | false | The day the copy is held counts as the first pickup day | BOR-07 |
 | `Reservations:RestrictedMayReserve` | false | A Restricted employee may place reservations | BR-MEM-3 |
 | `Reservations:SuspendedMayReserve` | false | A Suspended employee may place reservations | BR-BOR-6 |
+| `Reservations:AnyCopyFulfils` | true | Issuing any copy of a book closes the employee's active reservation for it: a ready one is fulfilled and its held copy goes to the next in the queue, a waiting one is cancelled. false: only collecting the held copy fulfils | BOR-07 (BQ-BA-08) |
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 

@@ -1,4 +1,5 @@
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Notifications;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Persistence;
@@ -126,5 +127,24 @@ public class NotificationTemplateSeedDataTests
     {
         Assert.Equal(new Guid("40000000-0000-0000-0001-000000000001"), NotificationTemplateSeedData.IdOf(NotificationType.Welcome));
         Assert.Equal(new Guid("40000000-0000-0000-0001-000000000010"), NotificationTemplateSeedData.IdOf(NotificationType.ReturnReceipt));
+    }
+
+    [Fact]
+    public void Password_changed_template_has_the_next_constant_id()
+    {
+        Assert.Equal(new Guid("40000000-0000-0000-0001-000000000011"), NotificationTemplateSeedData.IdOf(NotificationType.PasswordChanged));
+    }
+
+    [Fact]
+    public void Password_changed_template_uses_only_the_employee_name_and_carries_no_credential_or_link()
+    {
+        var template = NotificationTemplateSeedData.Templates.Single(x => x.Type == NotificationType.PasswordChanged);
+        var text = template.Subject + template.Body;
+
+        Assert.Equal([NotificationPlaceholders.EmployeeName], NotificationPlaceholders.Find(text));
+        Assert.DoesNotContain("http", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<a ", text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("administrator", template.Body, StringComparison.OrdinalIgnoreCase);
     }
 }
