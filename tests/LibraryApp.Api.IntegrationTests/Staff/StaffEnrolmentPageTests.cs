@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
@@ -329,6 +331,139 @@ public class StaffEnrolmentPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.Equal(CsvHeader, await response.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Manual_enrolment_redirects_the_employee_until_the_initial_password_is_changed()
+    {
+        var request = Request();
+        using var librarian = await ClientAsync();
+        Assert.Equal(HttpStatusCode.Redirect, (await PostFormAsync(librarian, NewPage, Fields(request))).StatusCode);
+
+        using var employee = await UiTestClient.SignedInAsync(factory, request.CorporateEmail, request.Password);
+        var blocked = await employee.GetAsync("/catalog");
+        Assert.Equal(HttpStatusCode.Redirect, blocked.StatusCode);
+        Assert.Equal("/change-password", blocked.Headers.Location!.OriginalString);
+
+        // The password-change page is a separate UI task; use the existing API to change it.
+        using var api = factory.CreateClient();
+        var login = await api.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest(request.CorporateEmail, request.Password));
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var account = (await login.Content.ReadFromJsonAsync<LoginResponse>())!;
+        Assert.True(account.PasswordChangeRequired);
+        api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", account.AccessToken);
+        var change = await api.PostAsJsonAsync("/api/auth/change-password",
+            new ChangePasswordRequest(request.Password, "ChangedPass9"));
+        Assert.Equal(HttpStatusCode.NoContent, change.StatusCode);
+
+        using var signedInAgain = await UiTestClient.SignedInAsync(factory, request.CorporateEmail, "ChangedPass9");
+        Assert.Equal(HttpStatusCode.OK, (await signedInAgain.GetAsync("/catalog")).StatusCode);
+        await AssertForbiddenAsync(signedInAgain, await signedInAgain.GetAsync(NewPage));
+    }
+
+    [Fact]
+    public async Task A_deactivated_member_shows_a_notice_and_profile_navigation_instead_of_editable_fields()
+    {
+        using var client = await ClientAsync();
+        var member = await MemberAsync(StaffSeedIds.StaffMembers.HaykManukyan);
+        var response = await client.GetAsync($"/staff/{member.Id}/edit");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("This staff member is deactivated. Their profile cannot be edited.", html);
+        Assert.Contains("alert-amber", html);
+        Assert.Contains($"href=\"/staff/{member.Id}\"", html);
+        Assert.DoesNotContain("name=\"Input.", html);
+        Assert.DoesNotContain("Save changes", html);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Direct_and_stale_edit_posts_cannot_change_a_deactivated_profile_or_unlock_its_account(
+        bool staleForm)
+    {
+        var member = await CreateMemberAsync();
+        var path = $"/staff/{member.Id}/edit";
+        using var client = await ClientAsync();
+        var token = await AntiforgeryAsync(client, staleForm ? path : NewPage);
+        using (var scope = factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<IStaffDeactivationService>()
+                .DeactivateAsync(member.Id, new("Left the bank"));
+        }
+
+        var before = await MemberAsync(member.Id);
+        var accountBefore = await AccountStateAsync(member.CorporateEmail);
+        Assert.True(accountBefore.LockoutEnabled);
+        Assert.Equal(DateTimeOffset.MaxValue, accountBefore.LockoutEnd);
+        var fields = EditFields(member);
+        fields["Input.FirstName"] = "Tampered";
+        fields["Input.CorporateEmail"] = $"tampered.{Guid.NewGuid():N}@ameriabank.am";
+        fields["Input.DepartmentId"] = StaffSeedIds.Departments.Finance.ToString();
+        fields["Input.StaffCategoryId"] = StaffSeedIds.Categories.ManagerSenior.ToString();
+        fields["Input.Role"] = StaffRoles.LibraryAdministrator;
+        fields["Input.Status"] = nameof(StaffMemberStatus.Active);
+        fields["__RequestVerificationToken"] = token;
+
+        var response = await client.PostAsync(path, new FormUrlEncodedContent(fields));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("This staff member is deactivated. Their profile cannot be edited.", html);
+        Assert.DoesNotContain("name=\"Input.", html);
+        Assert.Equal(before, await MemberAsync(member.Id));
+        Assert.Equal(accountBefore, await AccountStateAsync(member.CorporateEmail));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Both_forms_keep_all_common_fields_labels_lookups_values_and_validation(bool edit)
+    {
+        var member = await CreateMemberAsync();
+        var path = edit ? $"/staff/{member.Id}/edit" : NewPage;
+        var fields = edit ? EditFields(member) : Fields(Request());
+        fields["Input.FirstName"] = "Preserved name";
+        fields["Input.LastName"] = "";
+        fields["Input.CorporateEmail"] = "invalid-email";
+        fields["Input.Position"] = "Senior engineer";
+        fields["Input.LineManagerEmail"] = "invalid-manager";
+        fields["Input.DepartmentId"] = StaffSeedIds.Departments.Finance.ToString();
+        fields["Input.StaffCategoryId"] = StaffSeedIds.Categories.ManagerSenior.ToString();
+        using var client = await ClientAsync();
+
+        var response = await PostFormAsync(client, path, fields);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        foreach (var field in new[]
+                 {
+                     "FirstName", "LastName", "CorporateEmail", "DepartmentId", "Position", "LineManagerEmail",
+                     "StaffCategoryId"
+                 })
+        {
+            var control = Regex.Match(html, "<(?:input|select)\\b[^>]*\\bname=\"Input\\." + field + "\"[^>]*>");
+            Assert.True(control.Success, $"Input.{field} was not rendered.");
+            Assert.Single(Regex.Matches(html, "<(?:input|select)\\b[^>]*\\bname=\"Input\\." + field + "\"[^>]*>"));
+            Assert.Contains($"<label for=\"Input_{field}\">", html);
+            Assert.Contains($"data-valmsg-for=\"Input.{field}\"", html);
+            var errorId = Regex.Match(control.Value, "aria-describedby=\"([^\"]+)\"").Groups[1].Value;
+            Assert.NotEmpty(errorId);
+            Assert.Contains($"id=\"{errorId}\"", html);
+        }
+
+        foreach (var field in new[] { "FirstName", "LastName", "CorporateEmail", "Position", "LineManagerEmail" })
+            Assert.Contains($"value=\"{fields[$"Input.{field}"]}\"", InputTag(html, $"Input.{field}"));
+        foreach (var field in new[] { "LastName", "CorporateEmail", "LineManagerEmail" })
+            Assert.Contains("aria-invalid=\"true\"", InputTag(html, $"Input.{field}"));
+        foreach (var field in new[] { "DepartmentId", "StaffCategoryId" })
+            Assert.Matches(
+                "<option\\b(?=[^>]*selected=\"selected\")(?=[^>]*value=\"" + fields[$"Input.{field}"] + "\")[^>]*>",
+                html);
+        Assert.Contains("form form-2", html);
+        Assert.Equal(member, await MemberAsync(member.Id));
+    }
+
     private static async Task AssertForbiddenAsync(
         HttpClient client,
         HttpResponseMessage response)
@@ -404,6 +539,15 @@ public class StaffEnrolmentPageTests(ApiHostFactory factory) : IClassFixture<Api
         using var scope = factory.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().StaffMembers.AsNoTracking()
             .AnyAsync(member => member.EmployeeId == employeeId);
+    }
+
+    private async Task<(string? Email, bool LockoutEnabled, DateTimeOffset? LockoutEnd, string? SecurityStamp)>
+        AccountStateAsync(string email)
+    {
+        using var scope = factory.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Users.AsNoTracking()
+            .SingleAsync(user => user.Email == email);
+        return (user.Email, user.LockoutEnabled, user.LockoutEnd, user.SecurityStamp);
     }
 
     private static async Task<string> AntiforgeryAsync(HttpClient client, string path)

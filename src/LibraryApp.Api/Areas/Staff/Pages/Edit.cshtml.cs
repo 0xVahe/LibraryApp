@@ -3,6 +3,7 @@ using LibraryApp.Api.Ui.Shared;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +19,8 @@ public sealed class EditModel(
     public UpdateStaffMemberRequest Input { get; set; } = new("", "", "", Guid.Empty, "", null, Guid.Empty);
 
     public StaffMemberDto Member { get; private set; } = null!;
+
+    public bool IsDeactivated => Member.Status == nameof(StaffMemberStatus.Deactivated);
 
     public async Task OnGetAsync(Guid id, CancellationToken ct)
     {

@@ -12,58 +12,7 @@
     </dl>
     <form class="form form-2 mt-24" method="post" asp-page="./Edit" asp-route-id="@Model.Member.Id" novalidate>
         <div asp-validation-summary="ModelOnly" class="error-text field-wide" role="alert"></div>
-        <div class="field">
-            <label asp-for="Input.FirstName">First name</label>
-            <input asp-for="Input.FirstName" type="text" maxlength="100" autocomplete="given-name"
-                   aria-invalid="@Model.Invalid("FirstName")" aria-describedby="firstname-error">
-            <span asp-validation-for="Input.FirstName" class="error-text" id="firstname-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.LastName">Last name</label>
-            <input asp-for="Input.LastName" type="text" maxlength="100" autocomplete="family-name"
-                   aria-invalid="@Model.Invalid("LastName")" aria-describedby="lastname-error">
-            <span asp-validation-for="Input.LastName" class="error-text" id="lastname-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.CorporateEmail">Corporate email</label>
-            <input asp-for="Input.CorporateEmail" type="email" maxlength="256" autocomplete="off"
-                   aria-invalid="@Model.Invalid("CorporateEmail")" aria-describedby="corporateemail-error">
-            <span asp-validation-for="Input.CorporateEmail" class="error-text" id="corporateemail-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.DepartmentId">Department</label>
-            <select asp-for="Input.DepartmentId" aria-invalid="@Model.Invalid("DepartmentId")" aria-describedby="department-error">
-                <option value="">Choose a department</option>
-                @foreach (var item in Model.Departments)
-                {
-                    <option value="@item.Id">@item.Name</option>
-                }
-            </select>
-            <span asp-validation-for="Input.DepartmentId" class="error-text" id="department-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.Position">Position</label>
-            <input asp-for="Input.Position" type="text" maxlength="200" autocomplete="organization-title"
-                   aria-invalid="@Model.Invalid("Position")" aria-describedby="position-error">
-            <span asp-validation-for="Input.Position" class="error-text" id="position-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.LineManagerEmail">Line manager email (optional)</label>
-            <input asp-for="Input.LineManagerEmail" type="email" maxlength="256" autocomplete="off"
-                   aria-invalid="@Model.Invalid("LineManagerEmail")" aria-describedby="linemanageremail-error">
-            <span asp-validation-for="Input.LineManagerEmail" class="error-text" id="linemanageremail-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.StaffCategoryId">Category</label>
-            <select asp-for="Input.StaffCategoryId" aria-invalid="@Model.Invalid("StaffCategoryId")" aria-describedby="category-error">
-                <option value="">Choose a category</option>
-                @foreach (var item in Model.Categories)
-                {
-                    <option value="@item.Id">@item.Name · @item.MaxLoans books, @item.LoanDays days</option>
-                }
-            </select>
-            <span asp-validation-for="Input.StaffCategoryId" class="error-text" id="category-error"></span>
-        </div>
+        <partial name="_StaffProfileFields" model="@(new StaffProfileFieldsModel(Model.Input, Model))" />
         <div class="form-actions field-wide">
             <button class="btn btn-primary" type="submit">Save changes</button>
             <a class="btn btn-secondary" href="/staff/@Model.Member.Id">Cancel</a>

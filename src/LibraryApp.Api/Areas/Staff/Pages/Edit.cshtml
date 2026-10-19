@@ -8,4 +8,15 @@
              $"{Model.Member.FirstName} {Model.Member.LastName}",
              Actions: [new PageAction("View staff member", $"/staff/{Model.Member.Id}")],
              Crumbs: [new PageAction("Staff members", "/staff")]))' />
-<partial name="_EditStaffForm" model="Model" />
+@if (Model.IsDeactivated)
+{
+    <section class="card" aria-labelledby="locked-title">
+        <div class="card-head"><h2 id="locked-title">Profile locked</h2></div>
+        <p class="alert alert-amber">This staff member is deactivated. Their profile cannot be edited.</p>
+        <a class="btn btn-secondary" href="/staff/@Model.Member.Id">Back to staff member</a>
+    </section>
+}
+else
+{
+    <partial name="_EditStaffForm" model="Model" />
+}

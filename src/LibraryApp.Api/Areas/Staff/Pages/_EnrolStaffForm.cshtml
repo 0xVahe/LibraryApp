@@ -1,3 +1,4 @@
+@using LibraryApp.Domain.Staff
 @model EnrolModel
 <section class="card" aria-labelledby="enrol-title">
     <div class="card-head"><h2 id="enrol-title">One person</h2></div>
@@ -9,80 +10,32 @@
                    aria-invalid="@Model.Invalid("EmployeeId")" aria-describedby="employee-error">
             <span asp-validation-for="Input.EmployeeId" class="error-text" id="employee-error"></span>
         </div>
-        <div class="field">
-            <label asp-for="Input.FirstName">First name</label>
-            <input asp-for="Input.FirstName" type="text" maxlength="100" autocomplete="given-name"
-                   aria-invalid="@Model.Invalid("FirstName")" aria-describedby="firstname-error">
-            <span asp-validation-for="Input.FirstName" class="error-text" id="firstname-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.LastName">Last name</label>
-            <input asp-for="Input.LastName" type="text" maxlength="100" autocomplete="family-name"
-                   aria-invalid="@Model.Invalid("LastName")" aria-describedby="lastname-error">
-            <span asp-validation-for="Input.LastName" class="error-text" id="lastname-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.CorporateEmail">Corporate email</label>
-            <input asp-for="Input.CorporateEmail" type="email" maxlength="256" autocomplete="off"
-                   aria-invalid="@Model.Invalid("CorporateEmail")" aria-describedby="corporateemail-error">
-            <span asp-validation-for="Input.CorporateEmail" class="error-text" id="corporateemail-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.DepartmentId">Department</label>
-            <select asp-for="Input.DepartmentId" aria-invalid="@Model.Invalid("DepartmentId")" aria-describedby="department-error">
-                <option value="">Choose a department</option>
-                @foreach (var item in Model.Departments)
-                {
-                    <option value="@item.Id">@item.Name</option>
-                }
-            </select>
-            <span asp-validation-for="Input.DepartmentId" class="error-text" id="department-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.Position">Position</label>
-            <input asp-for="Input.Position" type="text" maxlength="200" autocomplete="organization-title"
-                   aria-invalid="@Model.Invalid("Position")" aria-describedby="position-error">
-            <span asp-validation-for="Input.Position" class="error-text" id="position-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.LineManagerEmail">Line manager email (optional)</label>
-            <input asp-for="Input.LineManagerEmail" type="email" maxlength="256" autocomplete="off"
-                   aria-invalid="@Model.Invalid("LineManagerEmail")" aria-describedby="linemanageremail-error">
-            <span asp-validation-for="Input.LineManagerEmail" class="error-text" id="linemanageremail-error"></span>
-        </div>
-        <div class="field">
-            <label asp-for="Input.StaffCategoryId">Category</label>
-            <select asp-for="Input.StaffCategoryId" aria-invalid="@Model.Invalid("StaffCategoryId")" aria-describedby="category-error">
-                <option value="">Choose a category</option>
-                @foreach (var item in Model.Categories)
-                {
-                    <option value="@item.Id">@item.Name · @item.MaxLoans books, @item.LoanDays days</option>
-                }
-            </select>
-            <span asp-validation-for="Input.StaffCategoryId" class="error-text" id="category-error"></span>
-        </div>
+        <partial name="_StaffProfileFields"
+                 model="@(new StaffProfileFieldsModel(new(Model.Input.FirstName, Model.Input.LastName,
+                     Model.Input.CorporateEmail, Model.Input.DepartmentId, Model.Input.Position,
+                     Model.Input.LineManagerEmail, Model.Input.StaffCategoryId), Model))" />
         @if (Model.CanAssignRoles)
         {
             <div class="field">
                 <label asp-for="Input.Role">Role</label>
                 <select asp-for="Input.Role" aria-invalid="@Model.Invalid("Role")" aria-describedby="role-error">
-                    <option value="StaffMember">Staff member</option>
-                    <option value="Librarian">Librarian</option>
-                    <option value="LibraryAdministrator">Library administrator</option>
+                    <option value="@StaffRoles.StaffMember">Staff member</option>
+                    <option value="@StaffRoles.Librarian">Librarian</option>
+                    <option value="@StaffRoles.LibraryAdministrator">Library administrator</option>
                 </select>
                 <span asp-validation-for="Input.Role" class="error-text" id="role-error"></span>
             </div>
         }
         else
         {
-            <input type="hidden" name="Input.Role" value="StaffMember">
+            <input type="hidden" name="Input.Role" value="@StaffRoles.StaffMember">
             <p class="hint field-wide">New accounts have the Staff member role. Only an administrator can assign other roles.</p>
         }
         <div class="field">
             <label asp-for="Input.Password">Initial password</label>
             <input asp-for="Input.Password" type="text" readonly autocomplete="off"
                    aria-invalid="@Model.Invalid("Password")" aria-describedby="password-hint password-error">
-            <span class="hint" id="password-hint">Generated. Save this password before enrolling the employee.</span>
+            <span class="hint" id="password-hint">Generated. Save this password before enrolling the employee. They must change it at first sign-in.</span>
             <span asp-validation-for="Input.Password" class="error-text" id="password-error"></span>
         </div>
         <div class="form-actions field-wide">
