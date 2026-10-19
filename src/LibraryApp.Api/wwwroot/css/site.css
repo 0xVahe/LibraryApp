@@ -89,7 +89,6 @@ strong { color: var(--ink); font-weight: 600; }
   z-index: 10;
 }
 .topbar-inner {
-  max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
   min-height: 72px;
@@ -109,18 +108,12 @@ strong { color: var(--ink); font-weight: 600; }
   color: var(--ink);
   white-space: nowrap;
 }
-.logo-mark {
+.logo-img {
   width: 32px; height: 32px;
-  border-radius: 8px;
-  background: var(--green);
-  color: var(--white);
-  display: grid;
-  place-items: center;
-  font-size: 16px;
 }
 .logo span.light { font-weight: 400; color: var(--text); }
 
-.nav { display: flex; gap: 4px; flex: 1; }
+.nav { margin: 0 auto; display: flex; gap: 4px; }
 .nav a {
   display: flex;
   align-items: center;
@@ -199,7 +192,9 @@ strong { color: var(--ink); font-weight: 600; }
   border-radius: var(--radius-sm);
   color: var(--ink);
   text-decoration: none;
+  transition: background 0.2s var(--ease);
 }
+.menu nav a:hover { background: var(--surface); }
 .menu nav a[aria-current="page"] { background: var(--green-soft); font-weight: 600; }
 
 /* ---------- Layout ---------- */
@@ -356,6 +351,7 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, a:focus-visible, 
 }
 input[aria-invalid="true"] { border-color: var(--red); }
 input[readonly] { background: var(--surface); color: var(--text); }
+input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) brightness(0); }
 .check { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 400; font-size: 16px; color: var(--text); }
 .check input { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--green-text); }
 .search { position: relative; flex: 1; min-width: 200px; }
@@ -383,6 +379,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .table td { padding: 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .table tr:last-child td { border-bottom: 0; }
 .table td.actions { text-align: right; white-space: nowrap; }
+.table td.nowrap { white-space: nowrap; }
 .table th:first-child, .table td:first-child { padding-left: 24px; }
 .table th:last-child, .table td:last-child { padding-right: 24px; }
 .table a.row-link { color: var(--ink); font-weight: 600; text-decoration: none; }
@@ -390,7 +387,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
 .card.flush { padding: 0; overflow-x: auto; }
 .card.flush .card-head { padding: 24px 24px 0; }
 .card-head .btn { flex: none; white-space: nowrap; }
-.card-filters { padding: 16px 24px 0; }
+.card-filters { padding: 16px 24px; }
 
 /* ---------- Lists ---------- */
 .list { list-style: none; margin: 0; padding: 0; }
@@ -426,6 +423,8 @@ input[readonly] { background: var(--surface); color: var(--text); }
   background: #2d4a22;
 }
 .cover .small { font-family: var(--font-text); font-weight: 400; opacity: 0.9; }
+.cover.has-image { position: relative; overflow: hidden; }
+.cover-img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block; }
 .cover.c2 { background: #1d4f91; }
 .cover.c3 { background: #6b2d5c; }
 .cover.c4 { background: #7a4a12; }
@@ -465,6 +464,11 @@ input[readonly] { background: var(--surface); color: var(--text); }
   font-size: 14px;
 }
 .chip[aria-current="true"] { background: var(--ink); border-color: var(--ink); color: var(--white); }
+.catalog-category-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.catalog-count { margin: 0; color: var(--muted); white-space: nowrap; }
+.catalog-filters { grid-template-columns: minmax(0, 1fr) minmax(160px, .5fr) auto auto; align-items: end; }
+.catalog-available { margin-bottom: 2px; }
+.catalog-submit { white-space: nowrap; }
 
 .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 24px; overflow-x: auto; }
 .tabs a {
@@ -513,7 +517,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
   min-height: 100vh;
 }
 .auth-brand {
-  background: var(--dark);
+  background: linear-gradient(color-mix(in srgb, var(--green) 20%, transparent), color-mix(in srgb, var(--dark) 55%, transparent)),
+  url("../img/lib-background.jpg") center / cover,
+  var(--dark);
   color: #d4d4d4;
   padding: 48px;
   display: flex;
@@ -575,10 +581,14 @@ input[readonly] { background: var(--surface); color: var(--text); }
   .topbar-inner { gap: 16px; }
 }
 
-@media (max-width: 1024px) {
-  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* The Administrator nav (7 items) needs about 1080 px next to the logo, user chip and Sign out; below 1120 px the menu takes over. */
+@media (max-width: 1120px) {
   .nav, .user { display: none; }
   .menu { display: block; }
+}
+
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid-2, .grid-3, .grid-side { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -597,7 +607,11 @@ input[readonly] { background: var(--surface); color: var(--text); }
   .logo { font-size: 16px; }
   .card { padding: 16px; }
   .card.flush .card-head { padding: 16px 16px 0; }
-  .card-filters { padding: 16px 16px 0; }
+  .card-filters { padding: 16px; }
+  .catalog-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .catalog-available, .catalog-submit { margin-top: 4px; }
+  .catalog-category-row { align-items: flex-start; flex-direction: column; }
+  .catalog-count { white-space: normal; }
   .card-head { flex-wrap: wrap; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-2 { grid-template-columns: minmax(0, 1fr); }
@@ -633,7 +647,9 @@ input[readonly] { background: var(--surface); color: var(--text); }
 /* ---------- Shell (Integration Owner): pieces the static demo did not need ---------- */
 /* Sign-out is a POST form; its button looks like the links around it. */
 .signout { margin: 0; }
-@media (max-width: 1024px) { .signout { display: none; } }   /* the mobile menu has its own sign-out, like .user */
+.signout .btn { border-color: transparent; white-space: nowrap; }
+.signout .btn:hover { background: var(--green-soft); }
+@media (max-width: 1120px) { .signout { display: none; } }   /* the mobile menu has its own sign-out, like .user */
 .menu nav form { margin: 0; }
 .menu nav form button {
   width: 100%;
@@ -647,6 +663,7 @@ input[readonly] { background: var(--surface); color: var(--text); }
   color: var(--ink);
   font: inherit;
   cursor: pointer;
+  transition: background 0.2s var(--ease);
 }
 .menu nav form button:hover { background: var(--surface); }
 .error-page h1 { margin-top: 8px; }

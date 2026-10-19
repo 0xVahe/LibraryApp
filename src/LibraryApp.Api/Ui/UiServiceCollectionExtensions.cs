@@ -1,6 +1,7 @@
 using LibraryApp.Api.Ui.Auth;
 using LibraryApp.Api.Ui.Forms;
 using Microsoft.Extensions.Options;
+using LibraryApp.Application.Catalog.Options;
 
 namespace LibraryApp.Api.Ui;
 
@@ -56,6 +57,9 @@ public static class UiServiceCollectionExtensions
     /// </summary>
     public static WebApplication UseUi(this WebApplication app)
     {
+        var coverBaseUrl = app.Services.GetRequiredService<IOptions<CatalogCoversOptions>>().Value.BaseUrl;
+        var coverSource = string.IsNullOrEmpty(coverBaseUrl) ? "'self' data:" : $"'self' data: {coverBaseUrl}";
+
         app.UseStaticFiles();
         app.Use(async (context, next) =>
         {
@@ -64,7 +68,7 @@ public static class UiServiceCollectionExtensions
                 var headers = context.Response.Headers;
                 // Pages use no scripts and no inline styles (design.md); nothing loads from another site.
                 headers.ContentSecurityPolicy =
-                    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
+                    $"default-src 'self'; script-src 'self'; style-src 'self'; img-src {coverSource}; font-src 'self'; " +
                     "form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'";
                 headers.XContentTypeOptions = "nosniff";
                 headers["Referrer-Policy"] = "strict-origin-when-cross-origin";

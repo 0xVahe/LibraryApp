@@ -1,0 +1,95 @@
+@page "/catalog/suggestions/review"
+@model SuggestionReviewModel
+@using LibraryApp.Domain.Catalog
+@{
+    ViewData["Title"] = "Review suggestions";
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Review suggestions", "Books the staff would like the library to buy.", Crumbs: [new("Catalog", "/catalog"), new("Suggest a book", SuggestionsModel.Path)]))" />
+
+@if (Model.FormError is { } formError)
+{
+    <div class="page-alert"><partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "The suggestion was not changed.", formError))" /></div>
+}
+else if (Model.RejectId is not null)
+{
+    <div class="page-alert"><partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "The suggestion was not rejected.", "Check the comment of that suggestion below."))" /></div>
+}
+
+<nav class="chips mb-24" aria-label="Status">
+    <a class="chip" href="@SuggestionReviewModel.FilterHref(null)" aria-current="@(Model.Status is null ? "true" : null)">All</a>
+    @foreach (var status in SuggestionReviewModel.Statuses)
+    {
+        <a class="chip" href="@SuggestionReviewModel.FilterHref(status)" aria-current="@(Model.Status == status ? "true" : null)">@status</a>
+    }
+</nav>
+
+<section class="card flush" aria-labelledby="list-title">
+    <div class="card-head"><h2 id="list-title">Suggestions (@Model.Result.TotalCount)</h2></div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Book</th><th scope="col">Suggested by</th><th scope="col">Reason</th><th scope="col">Status</th><th scope="col">Review</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var suggestion in Model.Result.Items)
+            {
+                var badge = SuggestionStatusBadge.For(suggestion.Status);
+                var created = Model.LocalDate(suggestion.CreatedAtUtc);
+                var failed = Model.RejectId == suggestion.Id;
+                <tr id="suggestion-@suggestion.Id">
+                    <td data-label="Book">
+                        <div>
+                            <div><strong>@suggestion.Title</strong></div>
+                            <div class="small muted">@suggestion.AuthorName@(suggestion.Isbn is { } isbn ? $" · ISBN {isbn}" : "")</div>
+                        </div>
+                    </td>
+                    <td data-label="Suggested by">
+                        <div>
+                            <div>@suggestion.StaffMemberName</div>
+                            <div class="small muted"><time datetime="@created">@created</time></div>
+                        </div>
+                    </td>
+                    <td data-label="Reason">@suggestion.Reason</td>
+                    <td data-label="Status"><span class="@badge.CssClass">@badge.Text</span></td>
+                    <td data-label="Review">
+                        @if (suggestion.Status == BookSuggestionStatus.Pending)
+                        {
+                            <div class="stack">
+                                <form method="post" action="@Model.HandlerHref("Approve")" asp-antiforgery="true">
+                                    <input type="hidden" name="id" value="@suggestion.Id">
+                                    <button class="btn btn-primary btn-sm" type="submit" aria-label="Approve: @suggestion.Title">Approve</button>
+                                </form>
+                                <form method="post" class="form" action="@Model.HandlerHref("Reject")" asp-antiforgery="true">
+                                    <input type="hidden" name="id" value="@suggestion.Id">
+                                    <div class="field">
+                                        <label for="comment-@suggestion.Id">Comment for the staff member</label>
+                                        <textarea id="comment-@suggestion.Id" name="Comment" maxlength="@BookSuggestion.ReviewCommentMaxLength" required
+                                                  aria-invalid="@(failed && Model.CommentError is not null ? "true" : null)" aria-describedby="comment-error-@suggestion.Id">@(failed ? Model.RejectComment : null)</textarea>
+                                        <span id="comment-error-@suggestion.Id" class="error-text">@(failed ? Model.CommentError : null)</span>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm" type="submit" aria-label="Reject: @suggestion.Title">Reject</button>
+                                </form>
+                            </div>
+                        }
+                        else
+                        {
+                            var reviewed = suggestion.ReviewedAtUtc is { } at ? Model.LocalDate(at) : null;
+                            <div>
+                                <div>@(suggestion.ReviewComment ?? "No comment")</div>
+                                @if (reviewed is not null)
+                                {
+                                    <div class="small muted">Reviewed <time datetime="@reviewed">@reviewed</time></div>
+                                }
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Result.Items.Count == 0)
+            {
+                <tr><td colspan="5">No suggestions here.</td></tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+<partial name="_Pager" model="PagerModel.From(Model.Result, Request)" />

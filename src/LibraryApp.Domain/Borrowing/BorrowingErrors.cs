@@ -15,6 +15,10 @@ public static class BorrowingErrors
     public static readonly Error CopyNotFound =
         Error.NotFound("borrowing.copy_not_found", "No copy with this barcode was found.");
 
+    /// <summary>The copy exists but has no open (Active or Overdue) loan: it is on the shelf, held or already returned.</summary>
+    public static readonly Error NoOpenLoanForCopy =
+        Error.NotFound("borrowing.no_open_loan_for_copy", "This copy is not on loan.");
+
     /// <summary>The copy exists but cannot be lent now (on loan, reserved, under repair, lost or withdrawn).</summary>
     public static readonly Error CopyNotAvailable =
         Error.BusinessRule("borrowing.copy_not_available", "This copy is not available for lending.");

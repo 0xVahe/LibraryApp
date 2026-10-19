@@ -148,6 +148,18 @@ public class CatalogSeedDataTests
     }
 
     [Fact]
+    public void Book_cover_paths_keep_their_fixed_scheme()
+    {
+        var paths = CatalogSeedData.Books
+            .Select(book => CatalogSeedIds.CoverImagePath(book.Number))
+            .ToArray();
+
+        Assert.Equal(CatalogSeedData.Books.Count, paths.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal("library-covers/01.png", paths[0]);
+        Assert.Equal("library-covers/57.png", paths[^1]);
+    }
+
+    [Fact]
     public void Copy_ids_and_barcodes_keep_their_fixed_scheme()
     {
         // The loans seed references these values, so they must never change.

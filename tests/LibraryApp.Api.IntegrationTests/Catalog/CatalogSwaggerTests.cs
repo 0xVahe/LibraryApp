@@ -44,6 +44,14 @@ public sealed class CatalogSwaggerTests(ApiHostFactory factory) : IClassFixture<
         Assert.False(string.IsNullOrWhiteSpace(createBookProperties.GetProperty("title").GetProperty("description").GetString()));
         Assert.False(string.IsNullOrWhiteSpace(createBookProperties.GetProperty("isbn").GetProperty("description").GetString()));
 
+        foreach (var schemaName in new[] { "BookDetailsDto", "BookSearchResultDto" })
+        {
+            var cover = schemas.GetProperty(schemaName).GetProperty("properties").GetProperty("coverImageUrl");
+            Assert.False(string.IsNullOrWhiteSpace(cover.GetProperty("example").GetString()),
+                $"Missing cover URL example: {schemaName}");
+            Assert.StartsWith("https://", cover.GetProperty("example").GetString(), StringComparison.Ordinal);
+        }
+
         // Registering CatalogExamples must not replace examples supplied by other schema filters.
         Assert.True(
             schemas.GetProperty("EnrolStaffMemberRequest").GetProperty("example").TryGetProperty("departmentId", out _),

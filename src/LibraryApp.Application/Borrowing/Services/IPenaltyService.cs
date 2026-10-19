@@ -17,8 +17,23 @@ public interface IPenaltyService
         IReadOnlyList<ReturnPenaltyItem> items,
         DateTime nowUtc,
         CancellationToken ct = default);
+    
+    /// <summary>
+    /// Expires due penalty records and recalculates staff standing.
+    /// The caller must hold the staff lock and own the transaction.
+    /// Does not save, commit, or open a transaction.
+    /// </summary>
+    Task<PenaltyRecalculationResult> RecalculateStatusAsync(
+        Guid staffMemberId,
+        DateTime nowUtc,
+        CancellationToken ct = default);
 }
 
 public sealed record PenaltyApplicationResult(
     int PointsApplied,
     int ActivePointsTotal);
+
+public sealed record PenaltyRecalculationResult(
+    int ExpiredRecords,
+    int ActivePointsTotal,
+    bool StatusChanged);
