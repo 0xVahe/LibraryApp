@@ -20,8 +20,8 @@ env:
 
 # Every check is its own job and the jobs run in parallel; each builds only the projects it needs
 # (.github/actions/dotnet-build). The integration tests are split into shards (matrix), each with its own SQL Server;
-# migrations checks the migration order (.github/scripts/check_migrations.py); smoke-test starts the system with
-# docker compose and checks it from outside (.github/scripts/smoke-test.sh).
+# migrations checks the migration order (.github/scripts/check_migrations.py); smoke-test starts the API and checks it
+# from outside (.github/scripts/smoke-test.sh). The docker compose system is checked by compose.yml.
 # The last job, result, waits for all of them, writes the summary and fails when any check failed: it is the one
 # check to require in branch protection. A draft pull request runs no checks until it is marked ready for review.
 jobs:
@@ -179,7 +179,8 @@ jobs:
       fail-fast: false   # every shard reports its own result
       matrix:
         # Every migration is applied to an empty SQL Server database in each shard, so the whole chain is proven from
-        # scratch. "API - other" takes every API test outside the named shards, so a new test folder is never left out.
+        # scratch. "API - platform, UI, reporting and the rest" takes every API test outside the named shards, so a new test
+        # folder is never left out; a folder that grows large gets its own shard here.
         include:
           - shard: Infrastructure
             project: tests/LibraryApp.Infrastructure.IntegrationTests
@@ -193,7 +194,7 @@ jobs:
           - shard: API - Staff
             project: tests/LibraryApp.Api.IntegrationTests
             filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Staff.
-          - shard: API - other
+          - shard: API - platform, UI, reporting and the rest
             project: tests/LibraryApp.Api.IntegrationTests
             filter: FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Borrowing.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Catalog.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Staff.
     env:
@@ -244,43 +245,62 @@ jobs:
       - name: New migrations are the newest; merged migrations are unchanged
         run: python3 .github/scripts/check_migrations.py HEAD^1 HEAD
 
-  # NFR-13: the system as `docker compose up` starts it in Development, checked from outside.
+  # The API as it starts in Development (migrations, seed, Swagger), from the Release build and checked from outside.
+  # The same checks against the docker compose system run in compose.yml.
   smoke-test:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
-      DOCKER_BUILD_SUMMARY: false        # no build report: the result job writes the summary
-      DOCKER_BUILD_RECORD_UPLOAD: false
+      SA_PASSWORD: CiOnly_Throwaway_Passw0rd   # a throw-away container that lives for this job only
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      # The image docker compose would build, with its layers cached between runs.
-      - name: Build the API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: src/LibraryApp.Api/Dockerfile
-          tags: libraryapp-api:latest
-          load: true
-          cache-from: type=gha,scope=api-image
-          cache-to: type=gha,scope=api-image,mode=max
-      - name: Settings for docker compose (.env)
+      - name: Start SQL Server
         run: |
-          # Throw-away values for this job only, generated as .env.sample asks.
-          password="Ci$(openssl rand -hex 12)_9a!"
-          key="$(openssl rand -base64 32)"
-          echo "::add-mask::$password"
-          echo "::add-mask::$key"
-          printf 'MSSQL_SA_PASSWORD=%s\nJWT_SIGNING_KEY=%s\n' "$password" "$key" > .env
-          echo "MSSQL_SA_PASSWORD=$password" >> "$GITHUB_ENV"
-      - name: docker compose up
-        run: docker compose up -d --no-build --wait --wait-timeout 240
+          nohup docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" -p 1433:1433 \
+            -d mcr.microsoft.com/mssql/server:2022-latest > /tmp/sqlserver-start.log 2>&1 &
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
+        with:
+          projects: src/LibraryApp.Api
+      - name: Wait for SQL Server
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -Q 'SELECT 1' > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sqlserver-start.log
+          echo "::error::SQL Server did not start within 2 minutes."
+          exit 1
+      - name: Start the API (Development)
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:8080
+          UseHttpsRedirection: "false"
+          ConnectionStrings__LibraryDb: Server=localhost,1433;Database=LibraryApp;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
+          Database__MigrateOnStartup: "true"
+          Seed__Enabled: "true"
+        run: |
+          export Jwt__SigningKey="$(openssl rand -base64 32)"
+          echo "::add-mask::$Jwt__SigningKey"
+          nohup dotnet run --project src/LibraryApp.Api --configuration Release --no-build --no-launch-profile \
+            > /tmp/api.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl -sf http://localhost:8080/health/ready > /dev/null; then
+              echo "The API is ready after $attempt checks"
+              exit 0
+            fi
+            sleep 1
+          done
+          tail -100 /tmp/api.log
+          echo "::error::The API did not become ready within 90 seconds."
+          exit 1
       - name: Smoke test
-        run: bash .github/scripts/smoke-test.sh http://localhost:8080 libraryapp-sqlserver "$MSSQL_SA_PASSWORD"
-      - name: Container logs
+        run: bash .github/scripts/smoke-test.sh http://localhost:8080 sqlserver "$SA_PASSWORD"
+      - name: API log
         if: failure()
-        run: docker compose logs --no-color --tail 200
+        run: tail -200 /tmp/api.log
 
   result:
     needs: [secret-scan, model-sync, migrations, unit-tests, integration-tests, smoke-test]
@@ -316,7 +336,7 @@ jobs:
             echo "| migration order | $(mark "$MIGRATIONS") |"
             echo "| unit tests and coverage gate (NFR-09) | $(mark "$UNIT") |"
             echo "| integration tests (all shards; the failed shard is marked in the job list) | $(mark "$INTEGRATION") |"
-            echo "| smoke test of docker compose (NFR-13) | $(mark "$SMOKE") |"
+            echo "| smoke test of the API in Development | $(mark "$SMOKE") |"
             echo
             echo "**Application line coverage:** ${COVERAGE:-not measured}"
             if [ "$MODEL" = "failure" ]; then

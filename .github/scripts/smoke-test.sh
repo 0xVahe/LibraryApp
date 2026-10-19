@@ -2,13 +2,14 @@
 # Smoke test of the system started by `docker compose up` in Development (NFR-13): the API answers, Swagger is served,
 # errors are ProblemDetails, the pages work, and the start applied every migration and the seed data.
 #
-# Usage: smoke-test.sh <api base url> <SQL Server container> <sa password>
+# Usage: smoke-test.sh <api base url> <SQL Server container> <sa password> [database, default LibraryApp]
 # Example: smoke-test.sh http://localhost:8080 libraryapp-sqlserver "$MSSQL_SA_PASSWORD"
 set -uo pipefail
 
 BASE="$1"
 SQL_CONTAINER="$2"
 SA_PASSWORD="$3"
+DATABASE="${4:-LibraryApp}"
 MIGRATIONS_DIR="src/LibraryApp.Infrastructure/Persistence/Migrations"
 failures=0
 body=$(mktemp "${RUNNER_TEMP:-.}/smoke.XXXXXX")   # RUNNER_TEMP on GitHub; the current folder elsewhere
@@ -38,7 +39,7 @@ expect() {
 }
 
 sql() {
-  docker exec "$SQL_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d LibraryApp \
+  docker exec "$SQL_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -d "$DATABASE" \
     -h -1 -W -b -Q "SET NOCOUNT ON; $1" | tr -d '[:space:]'
 }
 
