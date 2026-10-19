@@ -538,8 +538,8 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 .auth-form .box { width: 100%; max-width: 400px; }
 
 /* ---------- Error page ---------- */
-.error-page { text-align: center; max-width: 560px; margin: 48px auto; }
-.error-code { font-family: var(--font-head); font-size: 32px; font-weight: 700; color: var(--green-text); }
+.error-page { text-align: center; max-width: 560px; margin: 38px auto; }
+.error-code { font-family: var(--font-head); font-size: 42px; font-weight: 700; color: var(--green-hover); }
 
 /* ---------- Footer ---------- */
 .footer { background: var(--dark); color: #b8b8b8; font-size: 14px; }
@@ -667,7 +667,8 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 }
 .menu nav form button:hover { background: var(--surface); }
 .error-page h1 { margin-top: 8px; }
-.error-page p { margin-top: 16px; }
+.error-page img { width: 200px; }
+.error-page p { margin-top: 16px; white-space: pre-wrap; }
 .error-page .row { justify-content: center; margin-top: 24px; }
 .page-alert { margin-bottom: 24px; }
 .auth-form .box > p.muted { margin: 8px 0 24px; }
