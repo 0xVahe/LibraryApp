@@ -32,7 +32,17 @@
                         <dt>Language</dt>
                         <dd>@Model.LanguageName</dd>
                         <dt>Category</dt>
-                        <dd>@Model.CategoryPath</dd>
+                        <dd>
+                            @for (var index = 0; index < Model.CategoryTrail.Count; index++)
+                            {
+                                var category = Model.CategoryTrail[index];
+                                if (index > 0)
+                                {
+                                    <text> / </text>
+                                }
+                                <a href="/catalog?categoryId=@category.Id">@category.Name</a>
+                            }
+                        </dd>
                     </dl>
                     </div>
                     @if (book.Description is { } description)

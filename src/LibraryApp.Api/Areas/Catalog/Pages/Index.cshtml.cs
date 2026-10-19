@@ -37,6 +37,15 @@ public sealed class IndexModel(
 
     public CategoryTree CategoryTree { get; private set; } = new([]);
 
+    /// <summary>
+    /// The top-level category the filter is in (CAT-03): the selected category itself, or the parent of a selected
+    /// subcategory. Null when no category, or an unknown one, is selected.
+    /// </summary>
+    public CategoryDto? SelectedTopLevel { get; private set; }
+
+    /// <summary>The subcategories of <see cref="SelectedTopLevel"/>, the second row of chips; empty when it has none.</summary>
+    public IReadOnlyList<CategoryDto> Subcategories { get; private set; } = [];
+
     public IReadOnlyList<CatalogLanguage> Languages => CatalogLanguages.All;
 
     public bool CanManageBooks => User.IsInRole(StaffRoles.Librarian)
@@ -45,6 +54,14 @@ public sealed class IndexModel(
     public async Task OnGetAsync(CancellationToken ct)
     {
         CategoryTree = new CategoryTree(await categories.ListAsync(ct));
+        if (CategoryId is Guid selectedId)
+        {
+            SelectedTopLevel = CategoryTree.ParentOf(selectedId)
+                ?? CategoryTree.TopLevel.FirstOrDefault(category => category.Id == selectedId);
+            if (SelectedTopLevel is not null)
+                Subcategories = CategoryTree.ChildrenOf(SelectedTopLevel.Id);
+        }
+
         int pageNumber = int.TryParse(Request.Query[PagerModel.PageParameter], out var requestedPage)
             ? requestedPage
             : 1;
