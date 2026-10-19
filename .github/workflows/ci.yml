@@ -52,6 +52,7 @@ jobs:
           fetch-depth: 0   # the secret scan reads the commits of the pull request
 
       - name: secret-scan - gitleaks (NFR-04)
+        id: secrets
         env:
           LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
         run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
@@ -133,6 +134,7 @@ jobs:
       #   COVERAGE_GATE             true or false; not set = true. false still prints the coverage, with a warning.
       #   APPLICATION_MIN_COVERAGE  minimum line coverage of LibraryApp.Application in percent; not set = 50 (NFR-09).
       - name: Coverage gate - Application line coverage (NFR-09)
+        id: gate
         if: ${{ !cancelled() && steps.unit.outcome == 'success' }}
         env:
           GATE: ${{ vars.COVERAGE_GATE || 'true' }}
@@ -140,14 +142,21 @@ jobs:
         run: |
           python3 - <<'PY'
           import glob, os, sys, xml.etree.ElementTree as ET
+
+          def result(text):
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+                  out.write(f'coverage={text}\n')
+
           gate = os.environ['GATE'].strip().lower()
           if gate not in ('true', 'false'):
+              result('invalid COVERAGE_GATE')
               sys.exit(f"::error::Repository variable COVERAGE_GATE must be true or false, not '{os.environ['GATE']}'.")
           try:
               minimum = float(os.environ['MIN_COVERAGE'])
           except ValueError:
               minimum = -1.0
           if not 0 <= minimum <= 100:
+              result('invalid APPLICATION_MIN_COVERAGE')
               sys.exit(f"::error::Repository variable APPLICATION_MIN_COVERAGE must be a number from 0 to 100, not '{os.environ['MIN_COVERAGE']}'.")
 
           # A line counts once even when several test projects report it: covered if any report hits it.
@@ -162,7 +171,9 @@ jobs:
                           lines[key] = lines.get(key, False) or int(line.get('hits')) > 0
           total, covered = len(lines), sum(lines.values())
           rate = 100.0 * covered / total if total else 0.0
-          print(f'Application line coverage: {rate:.1f}% ({covered}/{total} lines), minimum {minimum:g}%, gate {gate}')
+          line = f'{rate:.1f}% ({covered}/{total} lines), minimum {minimum:g}%, gate {gate}'
+          print(f'::notice title=Application line coverage (NFR-09)::{line}')
+          result(line if total else 'no coverage report')
           if total == 0:
               sys.exit('::error::No coverage report for LibraryApp.Application was found.')
           if rate >= minimum:
@@ -182,8 +193,51 @@ jobs:
       # integration-tests: every migration is applied to an empty SQL Server database, so the whole chain is proven
       # from scratch.
       - name: integration-tests - Infrastructure
+        id: infra
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet test tests/LibraryApp.Infrastructure.IntegrationTests --configuration Release --no-build
       - name: integration-tests - API
+        id: api
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: dotnet test tests/LibraryApp.Api.IntegrationTests --configuration Release --no-build
+
+      # One table on the run's Summary page: which check passed or failed, and the coverage.
+      - name: Summary
+        if: always()
+        env:
+          SECRETS: ${{ steps.secrets.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          MODEL: ${{ steps.model.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          GATE: ${{ steps.gate.outcome }}
+          INFRA: ${{ steps.infra.outcome }}
+          API: ${{ steps.api.outcome }}
+          COVERAGE: ${{ steps.gate.outputs.coverage }}
+        run: |
+          mark() {
+            case "$1" in
+              success) echo "✅ passed" ;;
+              failure) echo "❌ failed" ;;
+              cancelled) echo "⏹ cancelled" ;;
+              *) echo "⏭ not run" ;;
+            esac
+          }
+          {
+            echo "### Checks"
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| secret-scan (NFR-04) | $(mark "$SECRETS") |"
+            echo "| build | $(mark "$BUILD") |"
+            echo "| model-sync | $(mark "$MODEL") |"
+            echo "| unit tests | $(mark "$UNIT") |"
+            echo "| coverage gate (NFR-09) | $(mark "$GATE") |"
+            echo "| integration-tests - Infrastructure | $(mark "$INFRA") |"
+            echo "| integration-tests - API | $(mark "$API") |"
+            echo
+            echo "**Application line coverage:** ${COVERAGE:-not measured}"
+            if [ "$MODEL" = "failure" ]; then
+              echo
+              echo "**model-sync failed:** the model changed without a migration. The pull request is labelled needs-migration; the Integration Owner adds the migration."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
