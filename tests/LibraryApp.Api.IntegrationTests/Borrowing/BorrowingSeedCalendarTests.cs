@@ -16,18 +16,34 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 /// 40 loans with 6 overdue on the seeding day and still 12 days later (REP-02 acceptance), the lending rules, and a penalty
 /// record for every late return ("a return from Overdue always creates a PenaltyRecord"). Each run is only tracked, never
 /// saved, so every day starts from the same Catalog and Staff seed.
+/// <para>
+/// The year is split into four quarters, one test class each: xUnit runs test classes in parallel, each with its own host
+/// and database, so the 365 runs take about a quarter of the time. Together the quarters cover every day of the year
+/// (<see cref="BorrowingSeedCalendarQuartersTests"/>).
+/// </para>
 /// </summary>
-public class BorrowingSeedCalendarTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>
+public abstract class BorrowingSeedCalendarTests(ApiHostWithoutBorrowingSeed factory, int quarter)
 {
     private const int StableDays = 12;
 
+    /// <summary>1-4: the quarter of 2026 this class runs the seed on.</summary>
+    public int Quarter => quarter;
+
+    /// <summary>The days the test runs the seed on: every day of <paramref name="quarter"/> (1-4) of 2026.</summary>
+    public static IEnumerable<DateOnly> DaysOf(int quarter)
+    {
+        var first = new DateOnly(2026, (quarter - 1) * 3 + 1, 1);
+        for (var day = first; day < first.AddMonths(3); day = day.AddDays(1))
+            yield return day;
+    }
+
     [Fact]
-    public async Task Every_day_of_a_year_gives_40_loans_with_6_overdue_for_12_days_and_follows_the_rules()
+    public async Task Every_day_of_the_quarter_gives_40_loans_with_6_overdue_for_12_days_and_follows_the_rules()
     {
         var failures = new List<string>();
         var timeZone = factory.Services.GetRequiredService<IOptions<TimeZoneOptions>>();
 
-        for (var day = new DateOnly(2026, 1, 1); day.Year == 2026; day = day.AddDays(1))
+        foreach (DateOnly day in DaysOf(Quarter))
         {
             // 04:00 Yerevan = 00:00 UTC; the hour moves through the whole day over the year.
             var seededAt = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero).AddHours(day.DayOfYear % 24 - 4);
@@ -100,5 +116,44 @@ public class BorrowingSeedCalendarTests(ApiHostWithoutBorrowingSeed factory) : I
     private sealed class FixedTime(DateTimeOffset utcNow) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => utcNow;
+    }
+}
+
+public class BorrowingSeedCalendarQ1Tests(ApiHostWithoutBorrowingSeed factory)
+    : BorrowingSeedCalendarTests(factory, 1), IClassFixture<ApiHostWithoutBorrowingSeed>;
+
+public class BorrowingSeedCalendarQ2Tests(ApiHostWithoutBorrowingSeed factory)
+    : BorrowingSeedCalendarTests(factory, 2), IClassFixture<ApiHostWithoutBorrowingSeed>;
+
+public class BorrowingSeedCalendarQ3Tests(ApiHostWithoutBorrowingSeed factory)
+    : BorrowingSeedCalendarTests(factory, 3), IClassFixture<ApiHostWithoutBorrowingSeed>;
+
+public class BorrowingSeedCalendarQ4Tests(ApiHostWithoutBorrowingSeed factory)
+    : BorrowingSeedCalendarTests(factory, 4), IClassFixture<ApiHostWithoutBorrowingSeed>;
+
+/// <summary>The four quarter classes together run the seed on every day of 2026, each day once.</summary>
+public class BorrowingSeedCalendarQuartersTests
+{
+    [Fact]
+    public void The_quarters_cover_every_day_of_the_year_once()
+    {
+        List<DateOnly> days = Enumerable.Range(1, 4).SelectMany(BorrowingSeedCalendarTests.DaysOf).ToList();
+
+        Assert.Equal(365, days.Count);
+        Assert.Equal(days.Count, days.Distinct().Count());
+        Assert.Equal(new DateOnly(2026, 1, 1), days.Min());
+        Assert.Equal(new DateOnly(2026, 12, 31), days.Max());
+    }
+
+    [Fact]
+    public void Each_quarter_has_exactly_one_test_class()
+    {
+        // The host is not used to read the quarter, so the classes are created without one.
+        int[] quarters = typeof(BorrowingSeedCalendarTests).Assembly.GetTypes()
+            .Where(t => !t.IsAbstract && t.IsSubclassOf(typeof(BorrowingSeedCalendarTests)))
+            .Select(t => ((BorrowingSeedCalendarTests)Activator.CreateInstance(t, [null])!).Quarter)
+            .Order().ToArray();
+
+        Assert.Equal([1, 2, 3, 4], quarters);
     }
 }

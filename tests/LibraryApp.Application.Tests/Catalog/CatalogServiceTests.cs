@@ -1,8 +1,10 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -16,7 +18,14 @@ public sealed class CatalogServiceTests
 
     public CatalogServiceTests()
     {
-        _service = new CatalogService(_query, _repository, _details);
+        _service = new CatalogService(
+            _query,
+            _repository,
+            _details,
+            new CatalogCoverUrlBuilder(Options.Create(new CatalogCoversOptions
+            {
+                BaseUrl = "https://images.example.test/",
+            })));
     }
 
     // ---------- SetCopyStatusAsync (INT-02) ----------
@@ -137,6 +146,35 @@ public sealed class CatalogServiceTests
         var book = await _service.GetBookAsync(Guid.NewGuid());
 
         Assert.Null(book);
+    }
+
+    [Fact]
+    public async Task A_book_cover_path_is_returned_as_a_full_configured_url()
+    {
+        _details.Book = new BookDto(
+            Guid.NewGuid(), "Covered Book", "9781000000207", 2003, "en", null,
+            Guid.NewGuid(), "IT & Software Engineering", null, null,
+            ["An Author"], TotalCopies: 1, AvailableCopies: 1, IsDeleted: false,
+            CoverImageUrl: "library-covers/01.png");
+
+        var book = await _service.GetBookAsync(_details.Book.Id);
+
+        Assert.NotNull(book);
+        Assert.Equal("https://images.example.test/library-covers/01.png", book.CoverImageUrl);
+    }
+
+    [Fact]
+    public async Task A_book_without_a_cover_returns_a_null_cover_url()
+    {
+        _details.Book = new BookDto(
+            Guid.NewGuid(), "Uncovered Book", "9781000000207", 2003, "en", null,
+            Guid.NewGuid(), "IT & Software Engineering", null, null,
+            ["An Author"], TotalCopies: 1, AvailableCopies: 1, IsDeleted: false);
+
+        var book = await _service.GetBookAsync(_details.Book.Id);
+
+        Assert.NotNull(book);
+        Assert.Null(book.CoverImageUrl);
     }
 
     private static BookCopyDto Dto(string barcode) =>

@@ -1,0 +1,33 @@
+@page "/catalog/books/new"
+@model NewModel
+@{
+    ViewData["Title"] = "New book";
+}
+<partial name="_PageHead" model="@(new PageHeadModel("New book", "Add the book first; its copies come on the next page.", Crumbs: [new("Catalog", "/catalog")]))" />
+
+@if (Model.FormError is { } formError)
+{
+    <partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "The book was not added.", formError))" />
+}
+
+<section class="card" aria-labelledby="details-title">
+    <h2 id="details-title" class="mb-16">Details</h2>
+    <form method="post" class="form form-2">
+        <partial name="_BookFields" model="Model" />
+        <div class="field field-wide">
+            <label asp-for="Input.AuthorIds">Authors</label>
+            <select asp-for="Input.AuthorIds" size="8" aria-invalid="@Model.AriaInvalid("AuthorIds")" aria-describedby="authors-hint authors-error">
+                @foreach (var author in Model.Authors)
+                {
+                    <option value="@author.Id">@author.FullName</option>
+                }
+            </select>
+            <span id="authors-hint" class="hint">Pick one or more (Ctrl or Cmd for several). A new author is added on the <a href="/catalog/authors">Authors</a> page first.</span>
+            <span id="authors-error" class="error-text" asp-validation-for="Input.AuthorIds"></span>
+        </div>
+        <div class="form-actions field-wide">
+            <button class="btn btn-primary" type="submit">Add book</button>
+            <a class="btn btn-secondary" href="/catalog">Cancel</a>
+        </div>
+    </form>
+</section>

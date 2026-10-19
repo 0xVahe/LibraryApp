@@ -3,8 +3,10 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -70,13 +72,28 @@ public sealed class BookDetailsServiceTests
         Assert.Equal(CatalogErrors.BookNotFound, error.Error);
     }
 
+    [Fact]
+    public async Task An_empty_cover_base_url_returns_null_instead_of_the_stored_path()
+    {
+        var service = Service(Book(total: 1, available: 1) with { CoverImageUrl = "library-covers/01.png" }, null, "");
+
+        var details = await service.GetBookDetailsAsync(BookId);
+
+        Assert.Null(details.CoverImageUrl);
+    }
+
     private static BookDto Book(int total, int available) => new(
         BookId, "Clean Code", "9781000000153", 2008, "en", "Writing readable code.",
         CategoryId, "IT & Software Engineering", PublisherId, "Prentice Hall",
         ["Robert C. Martin"], total, available, IsDeleted: false);
 
-    private static BookDetailsService Service(BookDto? book, DateTime? dueDateUtc) =>
-        new(new StubQuery(book), new FakeLoanQuery(dueDateUtc), new YerevanClock());
+    private static BookDetailsService Service(BookDto? book, DateTime? dueDateUtc,
+        string baseUrl = "https://images.example.test/") =>
+        new(new StubQuery(book), new FakeLoanQuery(dueDateUtc), new YerevanClock(),
+            new CatalogCoverUrlBuilder(Options.Create(new CatalogCoversOptions
+            {
+                BaseUrl = baseUrl,
+            })));
 
     /// <summary>Returns the same book (or null) for any id.</summary>
     private sealed class StubQuery(BookDto? book) : IBookDetailsQuery

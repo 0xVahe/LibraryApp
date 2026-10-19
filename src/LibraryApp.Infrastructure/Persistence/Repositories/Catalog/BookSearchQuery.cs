@@ -78,7 +78,8 @@ public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
                 db.BookCopies.Count(copy => copy.BookId == book.Id && copy.Status == BookCopyStatus.Available),
                 db.BookCopies.Count(copy => copy.BookId == book.Id
                     && copy.Status != BookCopyStatus.Lost
-                    && copy.Status != BookCopyStatus.Withdrawn)))
+                    && copy.Status != BookCopyStatus.Withdrawn),
+                book.CoverImagePath))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<BookSearchResultDto>(items, totalCount, paging.Page, paging.PageSize);

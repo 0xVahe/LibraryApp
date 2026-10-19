@@ -1,0 +1,76 @@
+@page "/catalog/suggestions"
+@model SuggestionsModel
+@using LibraryApp.Domain.Catalog
+@{
+    ViewData["Title"] = "Suggest a book";
+    var actions = Model.CanReview ? new[] { new PageAction("Review suggestions", SuggestionReviewModel.Path) } : null;
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Suggest a book", "Tell the library which book to buy next.", actions, Crumbs: [new("Catalog", "/catalog")]))" />
+
+@if (Model.FormError is { } formError)
+{
+    <div class="page-alert"><partial name="_Alert" model="@(new AlertModel(AlertKind.Red, "The suggestion was not sent.", formError))" /></div>
+}
+
+<section class="card mb-24" aria-labelledby="suggest-title">
+    <h2 id="suggest-title" class="mb-16">New suggestion</h2>
+    <form method="post" class="form form-2">
+        <div class="field">
+            <label asp-for="Input.Title">Title</label>
+            <input asp-for="Input.Title" maxlength="@Book.TitleMaxLength" aria-invalid="@Model.AriaInvalid("Title")" aria-describedby="title-error" />
+            <span id="title-error" class="error-text" asp-validation-for="Input.Title"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Input.AuthorName">Author</label>
+            <input asp-for="Input.AuthorName" maxlength="@Author.FullNameMaxLength" aria-invalid="@Model.AriaInvalid("AuthorName")" aria-describedby="author-error" />
+            <span id="author-error" class="error-text" asp-validation-for="Input.AuthorName"></span>
+        </div>
+        <div class="field">
+            <label asp-for="Input.Isbn">ISBN (optional)</label>
+            <input asp-for="Input.Isbn" aria-invalid="@Model.AriaInvalid("Isbn")" aria-describedby="isbn-hint isbn-error" />
+            <span id="isbn-hint" class="hint">ISBN-10 or ISBN-13; hyphens and spaces are fine.</span>
+            <span id="isbn-error" class="error-text" asp-validation-for="Input.Isbn"></span>
+        </div>
+        <div class="field field-wide">
+            <label asp-for="Input.Reason">Why should the library buy it?</label>
+            <textarea asp-for="Input.Reason" maxlength="@BookSuggestion.ReasonMaxLength" aria-invalid="@Model.AriaInvalid("Reason")" aria-describedby="reason-error"></textarea>
+            <span id="reason-error" class="error-text" asp-validation-for="Input.Reason"></span>
+        </div>
+        <div class="form-actions field-wide">
+            <button class="btn btn-primary" type="submit">Send suggestion</button>
+        </div>
+    </form>
+</section>
+
+<section class="card flush" aria-labelledby="mine-title">
+    <div class="card-head"><h2 id="mine-title">My suggestions</h2></div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Book</th><th scope="col">Suggested</th><th scope="col">Status</th><th scope="col">Answer</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var suggestion in Model.Mine.Items)
+            {
+                var badge = SuggestionStatusBadge.For(suggestion.Status);
+                var created = Model.LocalDate(suggestion.CreatedAtUtc);
+                <tr id="suggestion-@suggestion.Id">
+                    <td data-label="Book">
+                        <div>
+                            <div><strong>@suggestion.Title</strong></div>
+                            <div class="small muted">@suggestion.AuthorName@(suggestion.Isbn is { } isbn ? $" · ISBN {isbn}" : "")</div>
+                        </div>
+                    </td>
+                    <td data-label="Suggested"><time datetime="@created">@created</time></td>
+                    <td data-label="Status"><span class="@badge.CssClass">@badge.Text</span></td>
+                    <td data-label="Answer">@(suggestion.ReviewComment ?? (suggestion.Status == BookSuggestionStatus.Pending ? "Not reviewed yet" : "—"))</td>
+                </tr>
+            }
+            @if (Model.Mine.Items.Count == 0)
+            {
+                <tr><td colspan="4">You have not suggested any books yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+<partial name="_Pager" model="PagerModel.From(Model.Mine, Request)" />

@@ -68,6 +68,12 @@ public sealed class FakeLoanRepository : ILoanRepository
         return Task.FromResult(_saved.SingleOrDefault(loan => loan.Id == loanId));
     }
 
+    public Task<Loan?> FindOpenByCopyAsync(Guid copyId, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(_saved.SingleOrDefault(loan => loan.BookCopyId == copyId && loan.IsOpen));
+    }
+
     public void Commit()
     {
         _saved.AddRange(_pending);
