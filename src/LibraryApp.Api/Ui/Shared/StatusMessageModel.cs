@@ -4,7 +4,7 @@ namespace LibraryApp.Api.Ui.Shared;
 public sealed record StatusMessageModel(int Code, string Title, string Text, string? TraceId = null)
 {
     public static StatusMessageModel NotFound() =>
-        new(404, "Page not found", "The page was moved or never existed.\nCheck the address or go back to the start page.");
+        new(404, "Page not found", "The page was moved or never existed. Check the address or go back to the start page.");
 
     public static StatusMessageModel Forbidden() =>
         new(403, "You don’t have access to this page", "Your role does not include this page. Ask the library administrator if you need it.");
