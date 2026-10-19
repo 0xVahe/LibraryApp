@@ -136,6 +136,8 @@ public sealed class LoanService(
         if (active is { Status: ReservationStatus.ReadyForPickup, CopyId: Guid heldCopyId })
         {
             active.Fulfil();
+            // The held copy may now be held for the next member: this reservation leaves ReadyForPickup first.
+            await reservations.FlushAsync(ct);
             bool reassigned = await reservationQueue.TryOfferCopyUnderBookLockAsync(
                 heldCopyId, bookId, BookCopyStatus.Reserved, ct);
             if (!reassigned)

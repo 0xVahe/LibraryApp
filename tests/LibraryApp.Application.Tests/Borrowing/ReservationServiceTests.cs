@@ -401,6 +401,7 @@ public sealed class ReservationServiceTests
 
     private sealed class ReservationRepositoryFake : IReservationRepository
     {
+        public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
         private readonly List<Reservation> _pending = new();
         public List<Reservation> Saved { get; } = new();
         public int ActiveCount { get; set; }

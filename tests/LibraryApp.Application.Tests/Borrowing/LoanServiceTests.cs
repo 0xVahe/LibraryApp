@@ -236,6 +236,7 @@ public sealed class LoanServiceTests
 
         Assert.Equal(ReservationStatus.Fulfilled, fulfilled.Status);
         Assert.Equal((ReservationStatus.ReadyForPickup, heldCopyId), (next.Status, next.CopyId));
+        Assert.Equal(1, _reservations.Flushes);   // the fulfilled reservation is written before the copy is held again
         Assert.Equal(BookCopyStatus.Reserved, (await _catalog.GetCopyByBarcodeAsync(heldBarcode))!.Status);
         Assert.Equal(BookCopyStatus.OnLoan, (await _catalog.GetCopyByBarcodeAsync(Barcode))!.Status);
     }
@@ -327,6 +328,12 @@ public sealed class LoanServiceTests
     private sealed class ReservationRepositoryFake : IReservationRepository
     {
         private readonly List<Reservation> _items = new();
+        public int Flushes { get; private set; }
+        public Task FlushAsync(CancellationToken ct = default)
+        {
+            Flushes++;
+            return Task.CompletedTask;
+        }
         public void Seed(Reservation item) => _items.Add(item);
         public Reservation Wait(Guid bookId, DateTime createdAtUtc, int position)
         {

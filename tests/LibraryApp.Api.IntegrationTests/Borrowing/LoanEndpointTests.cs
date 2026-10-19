@@ -147,24 +147,41 @@ public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixt
         return ready.Id;
     }
 
-    [Fact]
-    public async Task Issuing_another_copy_to_the_holder_hands_the_held_copy_to_the_next_member()
+    /// <summary>
+    /// BQ-BA-08: any copy of the book fulfils the holder's reservation; the held copy goes to the next in the queue. Both
+    /// orders of the two reservation ids: EF writes the two updates in key order, and the database allows one
+    /// ReadyForPickup reservation per copy, so the fulfilled one must be written first whatever the ids are.
+    /// </summary>
+    [Theory]
+    [InlineData(13, true)]
+    [InlineData(18, false)]
+    public async Task Issuing_another_copy_to_the_holder_hands_the_held_copy_to_the_next_member(int book, bool holderIdFirst)
     {
-        // BQ-BA-08: any copy of the book fulfils the holder's reservation; the held copy goes to the next in the queue.
-        Guid readyId = await HoldCopyAsync(13, Members.NarekSimonyan, Members.EvaHovsepyan);
+        Guid low = Guid.Parse($"00000000-0000-0000-0000-{book:D12}"), high = Guid.Parse($"ffffffff-ffff-ffff-ffff-{book:D12}");
+        (Guid holder, Guid next) = book == 13
+            ? (Members.NarekSimonyan, Members.EvaHovsepyan)
+            : (Members.LusineKarapetyan, Members.RubenHarutyunyan);
+        var ready = Reservation.Create(holderIdFirst ? low : high, CatalogSeedIds.Book(book), holder, DateTime.UtcNow.AddHours(-2), 1);
+        ready.MarkReady(CatalogSeedIds.Copy(book, 1), DateTime.UtcNow.AddDays(3));
+        var waiting = Reservation.Create(holderIdFirst ? high : low, CatalogSeedIds.Book(book), next, DateTime.UtcNow.AddHours(-1), 1);
+        await Db(async db =>
+        {
+            db.BookCopies.Single(copy => copy.Id == CatalogSeedIds.Copy(book, 1)).ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.AddRange(ready, waiting);
+            return await db.SaveChangesAsync();
+        });
 
         using var client = Client();
-        using var response = await Issue(client, Members.NarekSimonyan, CatalogSeedIds.CopyBarcode(13, 2));
+        using var response = await Issue(client, holder, CatalogSeedIds.CopyBarcode(book, 2));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var reservations = await Db(db => db.Reservations.AsNoTracking().Where(r => r.BookId == CatalogSeedIds.Book(13)).ToListAsync());
-        Assert.Equal(ReservationStatus.Fulfilled, reservations.Single(r => r.Id == readyId).Status);
-        Reservation next = reservations.Single(r => r.StaffMemberId == Members.EvaHovsepyan);
-        Assert.Equal(ReservationStatus.ReadyForPickup, next.Status);
-        Assert.Equal(CatalogSeedIds.Copy(13, 1), next.CopyId);
-        Assert.Equal(BookCopyStatus.Reserved, await CopyStatus(13, 1));
-        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatus(13, 2));
-        Assert.True(await Db(db => db.OutboxMessages.AnyAsync(m => m.Type.Contains(nameof(ReservationReady)) && m.Payload.Contains(next.Id.ToString()))));
+        var reservations = await Db(db => db.Reservations.AsNoTracking().Where(r => r.BookId == CatalogSeedIds.Book(book)).ToListAsync());
+        Assert.Equal(ReservationStatus.Fulfilled, reservations.Single(r => r.Id == ready.Id).Status);
+        Reservation handedOn = reservations.Single(r => r.Id == waiting.Id);
+        Assert.Equal((ReservationStatus.ReadyForPickup, CatalogSeedIds.Copy(book, 1)), (handedOn.Status, handedOn.CopyId));
+        Assert.Equal(BookCopyStatus.Reserved, await CopyStatus(book, 1));
+        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatus(book, 2));
+        Assert.True(await Db(db => db.OutboxMessages.AnyAsync(m => m.Type.Contains(nameof(ReservationReady)) && m.Payload.Contains(waiting.Id.ToString()))));
     }
 
     [Fact]

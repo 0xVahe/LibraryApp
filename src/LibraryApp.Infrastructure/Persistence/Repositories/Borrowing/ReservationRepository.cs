@@ -50,6 +50,8 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
                                || reservation.Status == ReservationStatus.ReadyForPickup),
             ct);
 
+    public Task FlushAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
+
     public async Task AddAsync(Reservation reservation, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(reservation);

@@ -147,6 +147,7 @@ public sealed class ReservationQueueServiceTests
 
     private sealed class WaitingQueueFake(List<string> log) : IReservationRepository
     {
+        public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
         public List<Reservation> Waiting { get; } = new();
 
         public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default)
