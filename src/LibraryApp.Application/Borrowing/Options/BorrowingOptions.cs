@@ -85,10 +85,13 @@ public sealed class ReservationOptions
     /// <summary>Whether a Suspended employee may place new reservations (BQ-BA-11); a Deactivated one never may.</summary>
     public bool SuspendedMayReserve { get; set; }
 }
-/// <summary>
-/// Section Borrowing:Loans.
-/// </summary>
 public sealed class LoanOptions
 {
+    /// <summary>
+    /// Allows an Active loan to be declared lost before it is overdue.
+    /// Enabled by default according to BQ-BA-06.
+    /// </summary>
+    public bool AllowLostBeforeDue { get; set; } = true;
+
     public OverdueFromMode OverdueFrom { get; set; }
 }
