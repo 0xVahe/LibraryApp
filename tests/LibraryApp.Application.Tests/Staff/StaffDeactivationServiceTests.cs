@@ -26,7 +26,7 @@ public class StaffDeactivationServiceTests
             "demo@ameriabank.am", _store.DepartmentId, "Engineer", null, _store.CategoryId, _store.UtcNow);
         if (status != StaffMemberStatus.Active) member.ChangeStatus(status);
         _store.Members.Add(member.Id, member);
-        _store.Accounts.Add(member.UserId, (member.CorporateEmail, StaffRoles.StaffMember));
+        _store.Accounts.Add(member.UserId, (member.CorporateEmail, StaffRoles.StaffMember, false));
         return member;
     }
 

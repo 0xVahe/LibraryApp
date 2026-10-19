@@ -56,7 +56,8 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
                 seedBook.Language,
                 description: null,
                 categoryId,
-                publisherId);
+                publisherId,
+                CatalogSeedIds.CoverImagePath(seedBook.Number));
 
             db.Books.Add(book);
             foreach (string author in seedBook.Authors)

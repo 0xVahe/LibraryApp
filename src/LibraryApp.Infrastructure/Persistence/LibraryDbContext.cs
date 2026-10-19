@@ -5,6 +5,7 @@ using LibraryApp.Infrastructure.Persistence.Conventions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using LibraryApp.Domain.Auditing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Domain.Borrowing;
@@ -60,6 +61,7 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
 
     // Platform (Integration Owner)
 
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();   // NFR-14, owner "Shared"
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();   // daily job runs (SD-10)
