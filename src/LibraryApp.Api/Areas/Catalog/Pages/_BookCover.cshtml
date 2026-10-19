@@ -1,0 +1,16 @@
+@model BookCoverModel
+@* The text cover always; the stored image over it when there is one (alt="": the title is next to the cover). *@
+<div class="@Model.CssClass" aria-hidden="true">
+    @if (Model.ImageUrl is { } imageUrl)
+    {
+        <img class="cover-img" src="@imageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
+    }
+    @if (!Model.Mini)
+    {
+        <span>@Model.Title</span>
+        @if (Model.Author is { } author)
+        {
+            <span class="small">@author</span>
+        }
+    }
+</div>
