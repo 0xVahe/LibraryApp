@@ -26,6 +26,7 @@ public class BorrowingRegistrationTests
         ["Borrowing:Reservations:MaxActive"] = "2",
         ["Borrowing:Reservations:PickupWorkingDays"] = "5",
         ["Borrowing:Reservations:PickupCountsReleaseDay"] = "true",
+        ["Borrowing:Reservations:AnyCopyFulfils"] = "false",
     };
 
     private static ServiceProvider Services(Dictionary<string, string?> settings)
@@ -47,6 +48,7 @@ public class BorrowingRegistrationTests
         Assert.Equal(2, options.Reservations.MaxActive);
         Assert.Equal(5, options.Reservations.PickupWorkingDays);
         Assert.True(options.Reservations.PickupCountsReleaseDay);
+        Assert.False(options.Reservations.AnyCopyFulfils);
         Assert.False(options.Reservations.RestrictedMayReserve);
         Assert.Equal(21, options.Penalties.SuspensionDays);
         Assert.Equal(LateAndDamagedMode.Highest, options.Penalties.LateAndDamaged);

@@ -25,8 +25,7 @@ public sealed class NotificationTemplatesMigrationTests : IAsyncLifetime
         return new LibraryDbContext(options.Options);
     }
 
-    private static string PreviousMigration(LibraryDbContext db) =>
-        db.Database.GetMigrations().TakeWhile(m => !m.EndsWith(Migration, StringComparison.Ordinal)).Last();
+    private static string PreviousMigration(LibraryDbContext db) => MigrationBefore(db, Migration);
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -115,5 +114,54 @@ public sealed class NotificationTemplatesMigrationTests : IAsyncLifetime
         await using var verify = Open();
         var left = await verify.NotificationTemplates.AsNoTracking().ToListAsync();
         Assert.Equal(NotificationType.Welcome, Assert.Single(left).Type);
+    }
+
+    private const string PasswordChangedMigration = "AddPasswordChangedTemplate";
+
+    private static string MigrationBefore(LibraryDbContext db, string migration) =>
+        db.Database.GetMigrations().TakeWhile(m => !m.EndsWith(migration, StringComparison.Ordinal)).Last();
+
+    [Fact]
+    public async Task A_PasswordChanged_template_added_before_the_migration_is_kept()
+    {
+        var own = new NotificationTemplate(Guid.NewGuid(), NotificationType.PasswordChanged, "Own subject", "<p>Own</p>");
+        await using (var db = Open())
+        {
+            await db.GetService<IMigrator>().MigrateAsync(MigrationBefore(db, PasswordChangedMigration));
+            db.NotificationTemplates.Add(own);
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = Open())
+            await db.Database.MigrateAsync();
+
+        await using var verify = Open();
+        var passwordChanged = await verify.NotificationTemplates.AsNoTracking()
+            .Where(t => t.Type == NotificationType.PasswordChanged).ToListAsync();
+        Assert.Equal(own.Id, Assert.Single(passwordChanged).Id);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task Rolling_back_the_PasswordChanged_migration_removes_only_an_unchanged_template(bool edited, bool kept)
+    {
+        await using (var db = Open())
+        {
+            await db.Database.MigrateAsync();
+            if (edited)
+            {
+                var template = await db.NotificationTemplates.SingleAsync(t => t.Type == NotificationType.PasswordChanged);
+                template.Update("Edited subject", "<p>Edited</p>");
+                await db.SaveChangesAsync();
+            }
+        }
+
+        await using (var db = Open())
+            await db.GetService<IMigrator>().MigrateAsync(MigrationBefore(db, PasswordChangedMigration));
+
+        await using var verify = Open();
+        Assert.Equal(kept, await verify.NotificationTemplates.AnyAsync(t => t.Type == NotificationType.PasswordChanged));
+        Assert.Equal(10, await verify.NotificationTemplates.CountAsync(t => t.Type != NotificationType.PasswordChanged));
     }
 }
