@@ -27,4 +27,16 @@ public sealed class MyLibraryController(IMyLibraryService myLibrary) : Controlle
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MyLibraryDto>> Get(CancellationToken ct) => Ok(await myLibrary.GetAsync(ct));
+
+    /// <summary>Updates the caller's first and last name (MEM-08, NFR-03).</summary>
+    /// <remarks>The member is taken from the access token. Email, department, category, position, role, status and EmployeeId are unchanged.</remarks>
+    [HttpPut]
+    [ProducesResponseType<MyProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<MyProfileDto>> UpdateProfile(UpdateMyProfileRequest request, CancellationToken ct) =>
+        Ok(await myLibrary.UpdateProfileAsync(request, ct));
 }

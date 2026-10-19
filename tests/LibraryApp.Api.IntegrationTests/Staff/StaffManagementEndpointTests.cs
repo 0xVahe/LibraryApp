@@ -560,12 +560,12 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
     }
 
     [Fact]
-    public async Task Update_deactivated_member_returns_409()
+    public async Task Update_deactivated_member_returns_422()
     {
         var id = StaffSeedIds.StaffMembers.HaykManukyan;
         var member = (await Client().GetFromJsonAsync<StaffMemberDto>($"{Route}/{id}"))!;
         await AssertError(await Client().PutAsJsonAsync($"{Route}/{id}", UpdateRequest(member)),
-            HttpStatusCode.Conflict, "staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
+            HttpStatusCode.UnprocessableEntity, "staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
     }
 
     [Fact]

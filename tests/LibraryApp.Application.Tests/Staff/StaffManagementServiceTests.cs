@@ -199,14 +199,14 @@ public class StaffManagementServiceTests
     }
 
     [Fact]
-    public async Task Update_deactivated_member_is_a_conflict_and_does_not_update_account()
+    public async Task Update_deactivated_member_is_a_business_rule_and_does_not_update_account()
     {
         var dto = await Service.EnrolAsync(Request);
         _fake.Members[dto.Id].Deactivate();
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(dto.Id,
             new("Demo", "Employee", "new@ameriabank.am", _fake.DepartmentId, "Engineer", null, _fake.CategoryId)));
         Assert.Equal("staff.deactivated_profile_locked", error.Error.Code);
-        Assert.Equal(ErrorKind.Conflict, error.Error.Kind);
+        Assert.Equal(ErrorKind.BusinessRule, error.Error.Kind);
         Assert.Equal(Request.CorporateEmail, Assert.Single(_fake.Accounts).Value.Email);
     }
 

@@ -81,6 +81,91 @@ public class MyLibraryEndpointTests(ApiHostFactory factory) : IClassFixture<ApiH
     }
 
     [Fact]
+    public async Task StaffMember_updates_only_their_own_first_and_last_name()
+    {
+        var memberId = Members.AnnaPetrosyan;
+        using var client = Client(StaffRoles.StaffMember, memberId);
+        var original = (await client.GetFromJsonAsync<MyLibraryDto>(Route))!.Profile;
+
+        try
+        {
+            using var response = await client.PutAsJsonAsync(Route, new
+            {
+                firstName = "  Anna Updated  ",
+                lastName = "New Lastname",
+                employeeId = "OTHER-EMPLOYEE",
+                corporateEmail = "other@ameriabank.am",
+                departmentId = Guid.NewGuid(),
+                position = "Other position",
+                staffCategoryId = Guid.NewGuid(),
+                role = StaffRoles.LibraryAdministrator,
+                status = "Deactivated",
+            });
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var updated = (await response.Content.ReadFromJsonAsync<MyProfileDto>())!;
+            Assert.Equal("Anna Updated", updated.FirstName);
+            Assert.Equal("New Lastname", updated.LastName);
+            Assert.Equal(original.CorporateEmail, updated.CorporateEmail);
+            Assert.Equal(original.DepartmentName, updated.DepartmentName);
+            Assert.Equal(original.Position, updated.Position);
+            Assert.Equal(original.StaffCategoryName, updated.StaffCategoryName);
+            Assert.Equal(original.Status, updated.Status);
+            Assert.Equal(memberId, updated.Id);
+        }
+        finally
+        {
+            using var restore = await client.PutAsJsonAsync(Route,
+                new UpdateMyProfileRequest(original.FirstName, original.LastName));
+            Assert.Equal(HttpStatusCode.OK, restore.StatusCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("", "Valid Last", "FirstName")]
+    [InlineData("Valid First", "", "LastName")]
+    public async Task Invalid_empty_name_returns_400_with_field_error(string firstName, string lastName, string field)
+    {
+        using var response = await Client(StaffRoles.StaffMember, Members.AnnaPetrosyan)
+            .PutAsJsonAsync(Route, new UpdateMyProfileRequest(firstName, lastName));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("errors").TryGetProperty(field, out _));
+    }
+
+    [Fact]
+    public async Task Too_long_name_returns_400_with_field_error()
+    {
+        using var response = await Client(StaffRoles.StaffMember, Members.AnnaPetrosyan)
+            .PutAsJsonAsync(Route, new UpdateMyProfileRequest(new string('A', 101), "Valid Last"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("errors").TryGetProperty("FirstName", out _));
+    }
+
+    [Theory]
+    [InlineData(StaffRoles.Librarian)]
+    [InlineData(StaffRoles.LibraryAdministrator)]
+    public async Task Librarian_and_Administrator_cannot_update_self_profile(string role)
+    {
+        using var response = await Client(role, Members.AnnaPetrosyan)
+            .PutAsJsonAsync(Route, new UpdateMyProfileRequest("New First", "New Last"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task No_token_cannot_update_self_profile()
+    {
+        using var response = await Client(null, null)
+            .PutAsJsonAsync(Route, new UpdateMyProfileRequest("New First", "New Last"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Token_without_a_staff_profile_gets_404_staff_not_found()
     {
         await AssertNotFound(await Client(StaffRoles.StaffMember, null).GetAsync(Route));
@@ -101,6 +186,14 @@ public class MyLibraryEndpointTests(ApiHostFactory factory) : IClassFixture<ApiH
         foreach (var status in new[] { "200", "401", "403", "404" })
             Assert.True(get.GetProperty("responses").TryGetProperty(status, out _));
         Assert.True(json.GetProperty("components").GetProperty("schemas").GetProperty(nameof(MyLibraryDto))
+            .TryGetProperty("example", out _));
+
+        var put = json.GetProperty("paths").GetProperty(Route).GetProperty("put");
+        foreach (var status in new[] { "200", "400", "401", "403", "404", "422" })
+            Assert.True(put.GetProperty("responses").TryGetProperty(status, out _));
+        var requestSchema = put.GetProperty("requestBody").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString()!.Split('/').Last();
+        Assert.True(json.GetProperty("components").GetProperty("schemas").GetProperty(requestSchema)
             .TryGetProperty("example", out _));
     }
 

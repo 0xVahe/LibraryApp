@@ -47,6 +47,15 @@ public sealed class UpdateStaffMemberRequestValidator : AbstractValidator<Update
     }
 }
 
+public sealed class UpdateMyProfileRequestValidator : AbstractValidator<UpdateMyProfileRequest>
+{
+    public UpdateMyProfileRequestValidator()
+    {
+        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
+    }
+}
+
 public sealed class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
     public ChangePasswordRequestValidator()
