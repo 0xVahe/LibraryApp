@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryApp.Api.Controllers.Borrowing;
 
-/// <summary>Loans (BOR-01, BOR-02). Issuing and reading a loan: Librarian or Administrator (NFR-03).</summary>
+/// <summary>Loans (BOR-01, BOR-02, BOR-03, BOR-09). Issuing, returning, declaring lost and reading a loan: Librarian or Administrator (NFR-03).</summary>
 [ApiController]
 [Route("api/loans")]
 [Authorize(Roles = Librarians)]
@@ -44,8 +44,11 @@ public sealed class LoansController(
     /// Declares a borrowed copy lost and applies lost points.
     /// </summary>
     /// <remarks>
-    /// No request body is required.
-    /// Active and Overdue loans are accepted by default.
+    /// No request body is required. The loan and the copy become Lost, and the lost points of the policy
+    /// (<c>Borrowing:Penalties:LostPoints</c>, default 10) are applied; the staff status changes when the points cross
+    /// a threshold. Active and Overdue loans are accepted by default; with
+    /// <c>Borrowing:Loans:AllowLostBeforeDue</c> = false an Active loan that is not past the overdue rule is refused
+    /// with 422. 404 when the loan does not exist; 422 when it is already returned or lost.
     /// </remarks>
     [HttpPost("{id:guid}/lost")]
     [ProducesResponseType<DeclareLostResponse>(
@@ -65,7 +68,7 @@ public sealed class LoansController(
 
         return Ok(result);
     }
-    
+
     /// <summary>One loan.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<LoanDto>(StatusCodes.Status200OK)]

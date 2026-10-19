@@ -347,6 +347,36 @@ public sealed class LoanLostEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Restricted_member_crossing_the_suspended_threshold_is_suspended()
+    {
+        Guid id = await SeedAsync(priorPoints: 5);
+
+        using var client = Client();
+        using var response = await LostAsync(client, id);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        Assert.Equal(
+            StaffMemberStatus.Suspended,
+            await StaffStatusAsync());
+
+        var applied = Assert.Single(
+            await EventsAsync<PenaltyApplied>(),
+            domainEvent => domainEvent.LoanId == id);
+
+        Assert.Equal(10, applied.Points);
+        Assert.Equal(15, applied.ActivePointsTotal);
+
+        var changed = Assert.Single(
+            await EventsAsync<StaffStatusChanged>(),
+            domainEvent => domainEvent.StaffMemberId == StaffId);
+
+        Assert.Equal(StaffMemberStatus.Restricted, changed.OldStatus);
+        Assert.Equal(StaffMemberStatus.Suspended, changed.NewStatus);
+        Assert.Equal(Now.AddDays(30), changed.EffectiveUntilUtc);
+    }
+
+    [Fact]
     public async Task Failure_after_sql_writes_rolls_back_all_changes()
     {
         Guid id = await SeedAsync(queue: true);

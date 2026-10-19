@@ -60,6 +60,7 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Penalties:SuspensionDays` | 30 | Calendar days a suspension lasts once the points cross the Suspended threshold | BR-BOR-6, BQ-BA-01 |
 | `Penalties:LateAndDamaged` | Sum | Late and damaged on one return: `Sum` — two records, points add up; `Highest` — one record with the higher points | BQ-BA-02 |
 | `Loans:OverdueFrom` | NextLocalDay | When a loan counts as late: `NextLocalDay` — from the day after the local due date; `DueTime` — from the exact due time | BOR-05, BQ-BA-05 |
+| `Loans:AllowLostBeforeDue` | true | An Active loan may be declared lost before it is overdue; false: only a loan past the overdue rule (`Loans:OverdueFrom`) may be declared lost | BOR-09, BQ-BA-06 |
 | `Reservations:MaxActive` | 3 | Active reservations per employee | BR-BOR-2 |
 | `Reservations:PickupWorkingDays` | 3 | Working days a copy is held for the first person in the queue | BOR-07 |
 | `Reservations:PickupCountsReleaseDay` | false | The day the copy is held counts as the first pickup day | BOR-07 |

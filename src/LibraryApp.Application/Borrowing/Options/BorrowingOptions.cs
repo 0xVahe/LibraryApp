@@ -92,11 +92,14 @@ public sealed class ReservationOptions
     /// </summary>
     public bool AnyCopyFulfils { get; set; } = true;
 }
+/// <summary>
+/// Section Borrowing:Loans.
+/// </summary>
 public sealed class LoanOptions
 {
     /// <summary>
-    /// Allows an Active loan to be declared lost before it is overdue.
-    /// Enabled by default according to BQ-BA-06.
+    /// Allows an Active loan to be declared lost before it is overdue (BOR-09).
+    /// Enabled by default according to BQ-BA-06; false: only a loan past the overdue rule may be declared lost.
     /// </summary>
     public bool AllowLostBeforeDue { get; set; } = true;
 
