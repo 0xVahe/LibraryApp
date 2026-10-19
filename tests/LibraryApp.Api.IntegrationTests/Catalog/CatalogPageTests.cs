@@ -34,6 +34,7 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.DoesNotContain("Add book", html);
         Assert.DoesNotContain("Import CSV", html);
         Assert.DoesNotContain("href=\"/catalog/import\"", html);
+        Assert.Contains("href=\"/catalog/suggestions\"", html);
     }
 
     [Theory]
@@ -49,6 +50,7 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.Contains("Add book", html);
         Assert.Contains("href=\"/catalog/import\"", html);
         Assert.Contains("Import CSV", html);
+        Assert.Contains("href=\"/catalog/suggestions\"", html);
     }
 
     [Fact]
