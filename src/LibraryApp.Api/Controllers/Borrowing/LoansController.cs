@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryApp.Api.Controllers.Borrowing;
 
-/// <summary>Loans (BOR-01, BOR-02). Issuing and reading a loan: Librarian or Administrator (NFR-03).</summary>
+/// <summary>Loans (BOR-01, BOR-02, BOR-03, BOR-09). Issuing, returning, declaring lost and reading a loan: Librarian or Administrator (NFR-03).</summary>
 [ApiController]
 [Route("api/loans")]
 [Authorize(Roles = Librarians)]
@@ -14,7 +14,8 @@ namespace LibraryApp.Api.Controllers.Borrowing;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
 public sealed class LoansController(
     ILoanService loans,
-    ILoanReturnService loanReturns) : ControllerBase
+    ILoanReturnService loanReturns,
+    ILoanLostService lostLoans) : ControllerBase
 {
     private const string Librarians = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
 
@@ -37,6 +38,35 @@ public sealed class LoansController(
     {
         LoanDto loan = await loans.IssueAsync(request, ct);
         return CreatedAtAction(nameof(Get), new { id = loan.LoanId }, loan);
+    }
+
+    /// <summary>
+    /// Declares a borrowed copy lost and applies lost points.
+    /// </summary>
+    /// <remarks>
+    /// No request body is required. The loan and the copy become Lost, and the lost points of the policy
+    /// (<c>Borrowing:Penalties:LostPoints</c>, default 10) are applied; the staff status changes when the points cross
+    /// a threshold. Active and Overdue loans are accepted by default; with
+    /// <c>Borrowing:Loans:AllowLostBeforeDue</c> = false an Active loan that is not past the overdue rule is refused
+    /// with 422. 404 when the loan does not exist; 422 when it is already returned or lost.
+    /// </remarks>
+    [HttpPost("{id:guid}/lost")]
+    [ProducesResponseType<DeclareLostResponse>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<DeclareLostResponse>> DeclareLost(
+        Guid id,
+        CancellationToken ct)
+    {
+        DeclareLostResponse result =
+            await lostLoans.DeclareLostAsync(id, ct);
+
+        return Ok(result);
     }
 
     /// <summary>One loan.</summary>

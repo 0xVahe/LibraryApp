@@ -88,4 +88,28 @@ public class BorrowingRegistrationTests
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<BorrowingOptions>>().Value);
     }
+    
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    public void Early_loss_defaults_to_allowed_and_can_be_disabled(
+        string? value,
+        bool expected)
+    {
+        var settings = new Dictionary<string, string?>(Valid);
+
+        if (value is not null)
+        {
+            settings["Borrowing:Loans:AllowLostBeforeDue"] = value;
+        }
+
+        using var services = Services(settings);
+
+        var options = services
+            .GetRequiredService<IOptions<BorrowingOptions>>()
+            .Value;
+
+        Assert.Equal(expected, options.Loans.AllowLostBeforeDue);
+    }
 }
