@@ -18,7 +18,8 @@ public class AuditLogEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHo
     [Fact]
     public async Task Creating_a_book_changing_its_authors_and_deleting_it_are_recorded_with_the_user_of_the_access_token()
     {
-        var userId = Guid.NewGuid();
+        var account = factory.Account(StaffRoles.Librarian);
+        var userId = account.UserId;
         var category = new Category(Guid.NewGuid(), $"Audit category {Guid.NewGuid():N}");
         var author = new Author(Guid.NewGuid(), "Audit author");
         var coAuthor = new Author(Guid.NewGuid(), "Audit co-author");
@@ -31,7 +32,7 @@ public class AuditLogEndpointTests(ApiHostFactory factory) : IClassFixture<ApiHo
 
         using var client = factory.CreateClient();
         string token = factory.Services.GetRequiredService<IAccessTokenIssuer>()
-            .Issue(new LoginAccount(userId, "librarian@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian]))
+            .Issue(account)
             .Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

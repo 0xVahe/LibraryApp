@@ -386,5 +386,10 @@ public sealed class LoanLostServiceTests
             Guid staffMemberId,
             CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<StaffMemberLookup?> FindAsync(
+            string employeeIdOrEmail,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }

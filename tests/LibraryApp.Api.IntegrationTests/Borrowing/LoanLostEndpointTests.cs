@@ -476,12 +476,7 @@ public sealed class LoanLostEndpointTests : IAsyncLifetime
 
         if (role is not null)
         {
-            var account = new LoginAccount(
-                Guid.NewGuid(),
-                "lost-test@ameriabank.am",
-                Guid.NewGuid(),
-                StaffMemberStatus.Active,
-                [role]);
+            var account = _host.Account(role);
 
             // Business operations use the fixed test date.
             // JWT tokens use the actual current time so they remain valid.

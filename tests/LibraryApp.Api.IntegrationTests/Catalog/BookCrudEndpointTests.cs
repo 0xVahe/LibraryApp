@@ -23,12 +23,7 @@ public class BookCrudEndpointTests(ApiHostFactory factory)
         {
             var token = factory.Services
                 .GetRequiredService<IAccessTokenIssuer>()
-                .Issue(new LoginAccount(
-                    Guid.NewGuid(),
-                    "demo@ameriabank.am",
-                    Guid.NewGuid(),
-                    StaffMemberStatus.Active,
-                    [role]))
+                .Issue(factory.Account(role))
                 .Token;
 
             client.DefaultRequestHeaders.Authorization =
