@@ -72,6 +72,7 @@ public class HttpCurrentUserTests
         {
             ["Jwt:Issuer"] = "LibraryApp",
             ["Jwt:Audience"] = "LibraryApp.Api",
+            ["Jwt:SecurityStampCacheSeconds"] = "30",
             ["Jwt:SigningKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
         }).Build();
         var services = new ServiceCollection();
@@ -82,7 +83,7 @@ public class HttpCurrentUserTests
         using var provider = services.BuildServiceProvider();
 
         var token = provider.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(UserId, Email, staffMemberId, StaffMemberStatus.Active, [StaffRoles.Librarian]));
+            new LoginAccount(UserId, Email, staffMemberId, StaffMemberStatus.Active, [StaffRoles.Librarian], "test-stamp"));
         var bearer = provider.GetRequiredService<IOptionsMonitor<JwtBearerOptions>>().Get(JwtBearerDefaults.AuthenticationScheme);
         var result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Token, bearer.TokenValidationParameters);
         Assert.True(result.IsValid);

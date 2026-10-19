@@ -74,7 +74,7 @@ public sealed class BookSearchServiceTests
     {
         _query.Result = new PagedResult<BookSearchResultDto>(
             [new BookSearchResultDto(Guid.NewGuid(), "Book", "9781000000000", 2020,
-                ["Author"], "Category", "en", 1, 1, "library-covers/01.png")],
+                ["Author"], Guid.NewGuid(), "Category", "en", 1, 1, "library-covers/01.png")],
             1,
             1,
             20);

@@ -181,7 +181,7 @@ public class BookPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFactor
     {
         var client = factory.CreateClient();
         var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(Guid.NewGuid(), "book-page@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.StaffMember])).Token;
+            factory.Account(StaffRoles.StaffMember)).Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }

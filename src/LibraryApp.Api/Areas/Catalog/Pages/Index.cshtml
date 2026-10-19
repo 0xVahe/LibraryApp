@@ -66,24 +66,16 @@
 else
 {
     <section class="grid grid-4" aria-label="Books">
-        @for (var index = 0; index < Model.Result.Items.Count; index++)
+        @foreach (var book in Model.Result.Items)
         {
-            var book = Model.Result.Items[index];
-            var hasCover = !string.IsNullOrWhiteSpace(book.CoverImageUrl);
+            var authors = string.Join(", ", book.Authors);
             var availability = book.TotalCopies == 0
                 ? "No copies"
                 : book.AvailableCopies > 0 ? $"{book.AvailableCopies} available" : "Not available now";
             <a class="book-card" href="/catalog/books/@book.Id">
-                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)" aria-hidden="true">
-                    @if (hasCover)
-                    {
-                        <img class="cover-img" src="@book.CoverImageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
-                    }
-                    <span>@book.Title</span>
-                    <span class="small">@string.Join(", ", book.Authors)</span>
-                </div>
+                <partial name="_BookCover" model="@(new BookCoverModel(book.Title, authors.Length == 0 ? null : authors, book.CoverImageUrl, book.CategoryId))" />
                 <span class="title">@book.Title</span>
-                <span>@string.Join(", ", book.Authors) · @book.PublicationYear</span>
+                <span>@authors · @book.PublicationYear</span>
                 <span class="badge @(book.AvailableCopies > 0 ? "badge-green" : "badge-grey")">@availability</span>
             </a>
         }
