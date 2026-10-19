@@ -24,6 +24,7 @@ public sealed class ReservationService(
     ICatalogService catalog,
     ILoanRepository loans,
     IReservationRepository reservations,
+    ReservationQueueService reservationQueue,
     IUnitOfWork unitOfWork,
     IApplicationLock applicationLock,
     ICurrentUser currentUser,
@@ -102,6 +103,83 @@ public sealed class ReservationService(
             throw new DomainException(BorrowingErrors.ReservationNotFound);
 
         return ToDto(reservation);
+    }
+
+    public async Task<ReservationDto> CancelAsync(Guid reservationId, CancellationToken ct = default)
+    {
+        Reservation cancelled = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            // Resolve the book and enforce NFR-03 before waiting on its queue lock.
+            Reservation initial = await reservations.FindAsync(reservationId, token)
+                ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
+
+            EnsureCanManage(initial);
+
+            await applicationLock.AcquireAsync(BorrowingLocks.Book(initial.BookId), token);
+
+            // Reload after the lock: another request may have cancelled or transferred this reservation while we waited.
+            Reservation reservation = await reservations.GetForUpdateAsync(reservationId, token)
+                ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
+
+            EnsureCanManage(reservation);
+
+            int removedQueuePosition = reservation.QueuePosition;
+            Guid? heldCopyId = null;
+            if (reservation.Status == ReservationStatus.ReadyForPickup)
+                heldCopyId = reservation.CopyId
+                    ?? throw new InvalidOperationException("A ready reservation must have a held copy.");
+
+            reservation.Cancel();
+            // Make the state transition visible to the subsequent queue query, which filters on persisted Waiting rows.
+            // This also frees the filtered unique index before a ReadyForPickup copy is assigned to its next holder.
+            await reservations.FlushAsync(token);
+
+            if (heldCopyId is { } copyId)
+            {
+                bool offered = await reservationQueue.TryOfferCopyUnderBookLockAsync(
+                    copyId,
+                    reservation.BookId,
+                    BookCopyStatus.Reserved,
+                    token);
+
+                if (!offered)
+                    await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Available, token);
+            }
+            else
+            {
+                IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(
+                    reservation.BookId,
+                    token);
+
+                int nextPosition = 1;
+                foreach (Reservation waitingReservation in waiting)
+                {
+                    // Decrement the positions after the removed row, then normalize the whole queue so it remains 1..n.
+                    int positionAfterRemoval = waitingReservation.QueuePosition > removedQueuePosition
+                        ? waitingReservation.QueuePosition - 1
+                        : waitingReservation.QueuePosition;
+                    int normalizedPosition = Math.Min(positionAfterRemoval, nextPosition);
+
+                    if (waitingReservation.QueuePosition != normalizedPosition)
+                        waitingReservation.SetQueuePosition(normalizedPosition);
+
+                    nextPosition++;
+                }
+            }
+
+            return reservation;
+        }, ct);
+
+        return ToDto(cancelled);
+    }
+
+    private void EnsureCanManage(Reservation reservation)
+    {
+        if (IsStaffMemberOnly &&
+            (currentUser.StaffMemberId is not { } staffMemberId || reservation.StaffMemberId != staffMemberId))
+        {
+            throw new DomainException(BorrowingErrors.ReservationNotFound);
+        }
     }
 
     private bool IsStaffMemberOnly =>

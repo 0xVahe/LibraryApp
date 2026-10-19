@@ -13,4 +13,7 @@ public interface IReservationService
 
     /// <summary>One reservation; a Staff Member sees only their own (others are reported as not found).</summary>
     Task<ReservationDto> GetAsync(Guid reservationId, CancellationToken ct = default);
+
+    /// <summary>Cancels an active reservation; Staff Members may cancel only their own (NFR-03).</summary>
+    Task<ReservationDto> CancelAsync(Guid reservationId, CancellationToken ct = default);
 }

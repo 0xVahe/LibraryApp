@@ -11,6 +11,7 @@ using LibraryApp.Application.Tests.Fakes;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Tests.Borrowing;
@@ -252,6 +253,95 @@ public sealed class ReservationServiceTests
         Assert.Equal(BorrowingErrors.ReservationNotFound, exception.Error);
     }
 
+    [Fact]
+    public async Task CancelAsync_cancels_a_waiting_reservation_and_compacts_the_queue()
+    {
+        var fixture = new Fixture();
+        var first = fixture.AddWaiting(1);
+        var cancelled = fixture.AddWaiting(2);
+        var third = fixture.AddWaiting(3);
+        fixture.CurrentUser.Role = StaffRoles.StaffMember;
+        fixture.CurrentUser.StaffMemberId = cancelled.StaffMemberId;
+
+        ReservationDto result = await fixture.Service.CancelAsync(cancelled.Id);
+
+        Assert.Equal(ReservationStatus.Cancelled, result.Status);
+        Assert.Equal(0, result.QueuePosition);
+        Assert.Equal(1, first.QueuePosition);
+        Assert.Equal(0, cancelled.QueuePosition);
+        Assert.Equal(2, third.QueuePosition);
+        Assert.Equal(1, fixture.UnitOfWork.CommitCount);
+        Assert.Equal(new[] { BorrowingLocks.Book(BookId) }, fixture.Lock.Resources);
+    }
+
+    [Fact]
+    public async Task CancelAsync_hides_another_members_reservation_as_not_found()
+    {
+        var fixture = new Fixture();
+        var reservation = fixture.AddWaiting(1);
+        fixture.CurrentUser.Role = StaffRoles.StaffMember;
+        fixture.CurrentUser.StaffMemberId = Guid.NewGuid();
+
+        DomainException exception = await Assert.ThrowsAsync<DomainException>(
+            () => fixture.Service.CancelAsync(reservation.Id));
+
+        Assert.Equal(BorrowingErrors.ReservationNotFound, exception.Error);
+        Assert.Equal(ReservationStatus.Waiting, reservation.Status);
+        Assert.Equal(0, fixture.UnitOfWork.CommitCount);
+        Assert.Empty(fixture.Lock.Resources);
+    }
+
+    [Fact]
+    public async Task CancelAsync_transfers_a_held_copy_to_the_next_waiter_without_changing_copy_status()
+    {
+        var fixture = new Fixture();
+        Guid copyId = Guid.NewGuid();
+        Reservation ready = fixture.AddReady(copyId);
+        Reservation next = fixture.AddWaiting(1);
+        Reservation afterNext = fixture.AddWaiting(2);
+        fixture.Catalog.Copies[copyId] = Copy(copyId, BookId) with { Status = BookCopyStatus.Reserved };
+
+        ReservationDto result = await fixture.Service.CancelAsync(ready.Id);
+
+        Assert.Equal(ReservationStatus.Cancelled, result.Status);
+        Assert.Equal(ReservationStatus.ReadyForPickup, next.Status);
+        Assert.Equal(copyId, next.CopyId);
+        Assert.NotNull(next.ReadyUntilUtc);
+        Assert.Equal(ReservationStatus.Waiting, afterNext.Status);
+        Assert.Equal(1, afterNext.QueuePosition);
+        Assert.Equal(BookCopyStatus.Reserved, fixture.Catalog.Copies[copyId].Status);
+        Assert.Equal(0, fixture.Catalog.SetStatusCalls);
+        Assert.Single(fixture.Events.Published.OfType<ReservationReady>());
+    }
+
+    [Fact]
+    public async Task CancelAsync_releases_a_held_copy_when_no_one_is_waiting()
+    {
+        var fixture = new Fixture();
+        Guid copyId = Guid.NewGuid();
+        Reservation ready = fixture.AddReady(copyId);
+        fixture.Catalog.Copies[copyId] = Copy(copyId, BookId) with { Status = BookCopyStatus.Reserved };
+
+        await fixture.Service.CancelAsync(ready.Id);
+
+        Assert.Equal(BookCopyStatus.Available, fixture.Catalog.Copies[copyId].Status);
+        Assert.Equal(1, fixture.Catalog.SetStatusCalls);
+        Assert.Empty(fixture.Events.Published.OfType<ReservationReady>());
+    }
+
+    [Fact]
+    public async Task CancelAsync_rejects_a_second_cancellation()
+    {
+        var fixture = new Fixture();
+        Reservation reservation = fixture.AddWaiting(1);
+
+        await fixture.Service.CancelAsync(reservation.Id);
+        DomainException exception = await Assert.ThrowsAsync<DomainException>(
+            () => fixture.Service.CancelAsync(reservation.Id));
+
+        Assert.Equal(BorrowingErrors.ReservationCannotBeCancelled, exception.Error);
+    }
+
     private static async Task AssertRejected(Fixture fixture, Error expectedError)
     {
         DomainException exception = await Assert.ThrowsAsync<DomainException>(
@@ -277,6 +367,7 @@ public sealed class ReservationServiceTests
         public readonly CatalogFake Catalog = new();
         public readonly StaffFake Staff = new();
         public readonly LockFake Lock = new();
+        public readonly FakeEventBus Events = new();
         public readonly UnitOfWorkFake UnitOfWork;
         public readonly FakeIdGenerator Ids = new();
         public readonly FakeCurrentUser CurrentUser = new();   // a Librarian unless a test says otherwise
@@ -301,14 +392,35 @@ public sealed class ReservationServiceTests
         public Fixture(Action<BorrowingOptions>? settings = null)
         {
             Catalog.Book = Book();
-            UnitOfWork = new UnitOfWorkFake(Reservations);
+            UnitOfWork = new UnitOfWorkFake(Reservations, Events);
+            var resolvedSettings = BorrowingTestSettings.Create(settings);
+            var clock = new TestClock(Now);
+            var queue = new ReservationQueueService(
+                Reservations, Catalog, Lock, Events, new WeekdayCalendar(), clock, Ids, resolvedSettings);
             Service = new ReservationService(
-                Staff, Catalog, Loans, Reservations, UnitOfWork, Lock, CurrentUser,
-                new TestClock(Now), Ids, BorrowingTestSettings.Create(settings));
+                Staff, Catalog, Loans, Reservations, queue, UnitOfWork, Lock, CurrentUser,
+                clock, Ids, resolvedSettings);
+        }
+
+        public Reservation AddWaiting(int position)
+        {
+            Reservation reservation = Reservation.Create(
+                Guid.NewGuid(), BookId, Guid.NewGuid(), Now.AddMinutes(position), position);
+            Reservations.Saved.Add(reservation);
+            return reservation;
+        }
+
+        public Reservation AddReady(Guid copyId)
+        {
+            Reservation reservation = Reservation.Create(
+                Guid.NewGuid(), BookId, Guid.NewGuid(), Now.AddMinutes(-10), 1);
+            reservation.MarkReady(copyId, Now.AddDays(3));
+            Reservations.Saved.Add(reservation);
+            return reservation;
         }
     }
 
-    private sealed class UnitOfWorkFake(ReservationRepositoryFake reservations) : IUnitOfWork
+    private sealed class UnitOfWorkFake(ReservationRepositoryFake reservations, FakeEventBus events) : IUnitOfWork
     {
         public int CommitCount { get; private set; }
         public int RollbackCount { get; private set; }
@@ -319,12 +431,14 @@ public sealed class ReservationServiceTests
             {
                 T result = await operation(ct);
                 reservations.Commit();
+                events.Commit();
                 CommitCount++;
                 return result;
             }
             catch
             {
                 reservations.Rollback();
+                events.Rollback();
                 RollbackCount++;
                 throw;
             }
@@ -378,7 +492,13 @@ public sealed class ReservationServiceTests
             IReadOnlyList<BookCopyDto> result = copyIds.Where(Copies.ContainsKey).Select(id => Copies[id]).ToList();
             return Task.FromResult(result);
         }
-        public Task SetCopyStatusAsync(Guid copyId, BookCopyStatus status, CancellationToken ct = default) => throw new NotSupportedException();
+        public int SetStatusCalls { get; private set; }
+        public Task SetCopyStatusAsync(Guid copyId, BookCopyStatus status, CancellationToken ct = default)
+        {
+            SetStatusCalls++;
+            Copies[copyId] = Copies[copyId] with { Status = status };
+            return Task.CompletedTask;
+        }
         public Task<BookCopyDto?> GetCopyByBarcodeAsync(string barcode, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<Guid>> GetCopyIdsAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
     }
@@ -411,7 +531,11 @@ public sealed class ReservationServiceTests
         public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => Task.FromResult(ActiveCount);
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => Task.FromResult(HasActiveForBook);
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => Task.FromResult(WaitingCount);
-        public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Reservation>>(Saved
+                .Where(r => r.BookId == bookId && r.Status == ReservationStatus.Waiting)
+                .OrderBy(r => r.QueuePosition)
+                .ToList());
         public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default)
@@ -421,11 +545,30 @@ public sealed class ReservationServiceTests
         }
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
             Task.FromResult(Saved.SingleOrDefault(r => r.Id == reservationId));
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) => FindAsync(reservationId, ct);
         public void Commit()
         {
             Saved.AddRange(_pending);
             _pending.Clear();
         }
         public void Rollback() => _pending.Clear();
+    }
+
+    private sealed class WeekdayCalendar : IWorkingDayCalendar
+    {
+        public bool IsWorkingDay(DateOnly date) => date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday);
+
+        public DateOnly AddWorkingDays(DateOnly from, int days)
+        {
+            DateOnly date = from;
+            while (days > 0)
+            {
+                date = date.AddDays(1);
+                if (IsWorkingDay(date)) days--;
+            }
+            return date;
+        }
+
+        public int CountWorkingDays(DateOnly fromExclusive, DateOnly toInclusive) => throw new NotSupportedException();
     }
 }

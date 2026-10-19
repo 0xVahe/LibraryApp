@@ -372,6 +372,11 @@ public sealed class LoanLostServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<StaffMemberLookup?> FindAsync(
+            string employeeIdOrEmail,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
             IReadOnlyCollection<Guid> staffMemberIds,
             CancellationToken ct = default) =>

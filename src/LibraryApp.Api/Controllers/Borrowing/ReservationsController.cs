@@ -44,4 +44,13 @@ public sealed class ReservationsController(IReservationService reservations) : C
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ReservationDto>> Get(Guid id, CancellationToken ct) =>
         Ok(await reservations.GetAsync(id, ct));
+
+    /// <summary>Cancels a waiting or ready reservation (BOR-12); a Staff Member may cancel only their own.</summary>
+    [HttpPost("{id:guid}/cancel")]
+    [ProducesResponseType<ReservationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<ReservationDto>> Cancel(Guid id, CancellationToken ct) =>
+        Ok(await reservations.CancelAsync(id, ct));
 }
