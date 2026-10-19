@@ -18,70 +18,39 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
+# Every check is its own job and the jobs run in parallel; each builds only the projects it needs
+# (.github/actions/dotnet-build). The integration tests are split into shards (matrix), each with its own SQL Server.
+# The last job, result, waits for all of them, writes the summary and fails when any check failed: it is the one
+# check to require in branch protection. A draft pull request runs no checks until it is marked ready for review.
 jobs:
-  # One job runs every check: Actions bills each job separately, rounded up to a whole minute, and each job would
-  # repeat checkout, SDK setup, restore and build. A check step runs even when an earlier check failed (!cancelled()),
-  # so one red run still reports every problem; the step name says which check failed.
-  build-and-test:
-    # A draft is not reviewed yet: its checks run when it is marked ready for review (ready_for_review above).
+  secret-scan:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-      pull-requests: write   # the needs-migration label
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: CiOnly_Throwaway_Passw0rd
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P CiOnly_Throwaway_Passw0rd -C -Q 'SELECT 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 12
-          --health-start-period 20s
-    env:
-      LIBRARYAPP_TEST_DB: Server=localhost,1433;Database=LibraryApp_CiTests;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # the secret scan reads the commits of the pull request
-
-      - name: secret-scan - gitleaks (NFR-04)
-        id: secrets
+          fetch-depth: 0   # gitleaks reads the commits of the pull request
+      - name: gitleaks (NFR-04)
         env:
           LOG_OPTS: ${{ github.event_name == 'pull_request' && format('origin/{0}..HEAD', github.base_ref) || 'HEAD' }}
         run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 detect --source /repo --redact --no-banner --log-opts="$LOG_OPTS"
 
-      - uses: actions/setup-dotnet@v4
-        if: ${{ !cancelled() }}
+  model-sync:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write   # the needs-migration label
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
         with:
-          dotnet-version: 8.0.x
-      - uses: actions/cache@v4
-        if: ${{ !cancelled() }}
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
-      - name: Restore
-        id: restore
-        if: ${{ !cancelled() }}
-        run: |
-          dotnet restore LibraryApp.sln
-          dotnet tool restore
-      - name: Build
-        id: build
-        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
-        run: dotnet build LibraryApp.sln --configuration Release --no-restore
-
-      - name: model-sync - no pending model changes
+          projects: src/LibraryApp.Infrastructure
+          tools: "true"
+      - name: No pending model changes
         id: model
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           set -eu
           # -z reads each file as one record, so a declaration split over several lines is still found.
@@ -112,19 +81,29 @@ jobs:
           fi
           echo "pending=false" >> "$GITHUB_OUTPUT"
       - name: Label needs-migration
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true' }}
+        if: ${{ failure() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels" -f "labels[]=needs-migration"
       - name: Remove needs-migration
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration') }}
+        if: ${{ github.event_name == 'pull_request' && steps.model.outputs.pending == 'false' && contains(github.event.pull_request.labels.*.name, 'needs-migration') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/labels/needs-migration"
 
+  unit-tests:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      coverage: ${{ steps.gate.outputs.coverage }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
+        with:
+          projects: tests/LibraryApp.Domain.Tests tests/LibraryApp.Application.Tests
       - name: Unit tests with coverage
         id: unit
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           dotnet test tests/LibraryApp.Domain.Tests --configuration Release --no-build \
             --collect:"XPlat Code Coverage" --results-directory ./coverage
@@ -135,7 +114,6 @@ jobs:
       #   APPLICATION_MIN_COVERAGE  minimum line coverage of LibraryApp.Application in percent; not set = 50 (NFR-09).
       - name: Coverage gate - Application line coverage (NFR-09)
         id: gate
-        if: ${{ !cancelled() && steps.unit.outcome == 'success' }}
         env:
           GATE: ${{ vars.COVERAGE_GATE || 'true' }}
           MIN_COVERAGE: ${{ vars.APPLICATION_MIN_COVERAGE || '50' }}
@@ -190,29 +168,81 @@ jobs:
           path: coverage
           if-no-files-found: ignore
 
-      # integration-tests: every migration is applied to an empty SQL Server database, so the whole chain is proven
-      # from scratch.
-      - name: integration-tests - Infrastructure
-        id: infra
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: dotnet test tests/LibraryApp.Infrastructure.IntegrationTests --configuration Release --no-build
-      - name: integration-tests - API
-        id: api
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: dotnet test tests/LibraryApp.Api.IntegrationTests --configuration Release --no-build
-
-      # One table on the run's Summary page: which check passed or failed, and the coverage.
-      - name: Summary
-        if: always()
+  integration-tests:
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    name: integration-tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false   # every shard reports its own result
+      matrix:
+        # Every migration is applied to an empty SQL Server database in each shard, so the whole chain is proven from
+        # scratch. "API - other" takes every API test outside the named shards, so a new test folder is never left out.
+        include:
+          - shard: Infrastructure
+            project: tests/LibraryApp.Infrastructure.IntegrationTests
+            filter: ""
+          - shard: API - Borrowing
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Borrowing.
+          - shard: API - Catalog
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Catalog.
+          - shard: API - Staff
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName~LibraryApp.Api.IntegrationTests.Staff.
+          - shard: API - other
+            project: tests/LibraryApp.Api.IntegrationTests
+            filter: FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Borrowing.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Catalog.&FullyQualifiedName!~LibraryApp.Api.IntegrationTests.Staff.
+    env:
+      SA_PASSWORD: CiOnly_Throwaway_Passw0rd   # a throw-away container that lives for this job only
+      LIBRARYAPP_TEST_DB: Server=localhost,1433;Database=LibraryApp_CiTests;User Id=sa;Password=CiOnly_Throwaway_Passw0rd;TrustServerCertificate=True
+    steps:
+      # Started in the background, so the image pull and the server start overlap with the SDK setup and the build;
+      # a service container would make the job wait for it before the first step.
+      - name: Start SQL Server
+        run: |
+          nohup docker run --name sqlserver -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" -p 1433:1433 \
+            -d mcr.microsoft.com/mssql/server:2022-latest > /tmp/sqlserver-start.log 2>&1 &
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dotnet-build
+        with:
+          projects: ${{ matrix.project }}
+      - name: Wait for SQL Server
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" -C -Q 'SELECT 1' > /dev/null 2>&1; then
+              echo "SQL Server is ready after $attempt checks"
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sqlserver-start.log
+          docker logs sqlserver 2>&1 | tail -50 || true
+          echo "::error::SQL Server did not start within 2 minutes."
+          exit 1
+      - name: Tests
         env:
-          SECRETS: ${{ steps.secrets.outcome }}
-          BUILD: ${{ steps.build.outcome }}
-          MODEL: ${{ steps.model.outcome }}
-          UNIT: ${{ steps.unit.outcome }}
-          GATE: ${{ steps.gate.outcome }}
-          INFRA: ${{ steps.infra.outcome }}
-          API: ${{ steps.api.outcome }}
-          COVERAGE: ${{ steps.gate.outputs.coverage }}
+          FILTER: ${{ matrix.filter }}
+          PROJECT: ${{ matrix.project }}
+        run: |
+          args=()
+          if [ -n "$FILTER" ]; then args=(--filter "$FILTER"); fi
+          dotnet test "$PROJECT" --configuration Release --no-build "${args[@]}"
+
+  result:
+    needs: [secret-scan, model-sync, unit-tests, integration-tests]
+    if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Summary
+        env:
+          SECRETS: ${{ needs.secret-scan.result }}
+          MODEL: ${{ needs.model-sync.result }}
+          UNIT: ${{ needs.unit-tests.result }}
+          INTEGRATION: ${{ needs.integration-tests.result }}
+          COVERAGE: ${{ needs.unit-tests.outputs.coverage }}
         run: |
           mark() {
             case "$1" in
@@ -228,16 +258,19 @@ jobs:
             echo "| Check | Result |"
             echo "|---|---|"
             echo "| secret-scan (NFR-04) | $(mark "$SECRETS") |"
-            echo "| build | $(mark "$BUILD") |"
             echo "| model-sync | $(mark "$MODEL") |"
-            echo "| unit tests | $(mark "$UNIT") |"
-            echo "| coverage gate (NFR-09) | $(mark "$GATE") |"
-            echo "| integration-tests - Infrastructure | $(mark "$INFRA") |"
-            echo "| integration-tests - API | $(mark "$API") |"
+            echo "| unit tests and coverage gate (NFR-09) | $(mark "$UNIT") |"
+            echo "| integration tests (all shards; the failed shard is marked in the job list) | $(mark "$INTEGRATION") |"
             echo
             echo "**Application line coverage:** ${COVERAGE:-not measured}"
             if [ "$MODEL" = "failure" ]; then
               echo
-              echo "**model-sync failed:** the model changed without a migration. The pull request is labelled needs-migration; the Integration Owner adds the migration."
+              echo "**model-sync failed:** the model changed without a migration, or the model check could not run. When a migration is missing, the pull request is labelled needs-migration and the Integration Owner adds the migration."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          for outcome in "$SECRETS" "$MODEL" "$UNIT" "$INTEGRATION"; do
+            if [ "$outcome" != "success" ]; then
+              echo "::error::At least one check did not pass; see the table above."
+              exit 1
+            fi
+          done

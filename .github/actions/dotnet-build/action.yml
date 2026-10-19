@@ -1,0 +1,37 @@
+name: dotnet-build
+description: Sets up the .NET SDK with the NuGet cache, then restores and builds the given projects in Release.
+
+inputs:
+  projects:
+    description: Projects to restore and build, separated by spaces. Their referenced projects are built too.
+    required: true
+  tools:
+    description: "true restores the local .NET tools (.config/dotnet-tools.json), for example dotnet-ef."
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+    - name: Restore
+      shell: bash
+      env:
+        PROJECTS: ${{ inputs.projects }}
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        for project in $PROJECTS; do dotnet restore "$project"; done
+        if [ "$TOOLS" = "true" ]; then dotnet tool restore; fi
+    - name: Build
+      shell: bash
+      env:
+        PROJECTS: ${{ inputs.projects }}
+      run: for project in $PROJECTS; do dotnet build "$project" --configuration Release --no-restore; done

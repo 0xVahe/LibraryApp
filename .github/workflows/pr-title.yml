@@ -13,13 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The title check and the branch-type label share one job: each job is billed as at least a whole minute.
   pr-title:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
-      pull-requests: write   # labels
+    timeout-minutes: 2
     steps:
       - name: Check the title
         env:
@@ -37,14 +33,3 @@ jobs:
               exit 1
             fi
           fi
-
-      # pr-labels: labels the pull request by its branch type (.github/labeler.yml), also when the title is wrong.
-      - uses: actions/checkout@v4
-        if: ${{ !cancelled() }}
-        with:
-          sparse-checkout: .github
-      - uses: actions/labeler@v5
-        if: ${{ !cancelled() }}
-        with:
-          configuration-path: .github/labeler.yml
-          sync-labels: false
