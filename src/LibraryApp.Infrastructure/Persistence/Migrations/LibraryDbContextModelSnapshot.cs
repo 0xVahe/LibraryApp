@@ -22,6 +22,43 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LibraryApp.Domain.Auditing.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TimestampUtc")
+                        .HasDatabaseName("IX_AuditLogs_TimestampUtc");
+
+                    b.HasIndex("EntityName", "EntityId")
+                        .HasDatabaseName("IX_AuditLogs_EntityName_EntityId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("LibraryApp.Domain.Borrowing.Loan", b =>
                 {
                     b.Property<Guid>("Id")

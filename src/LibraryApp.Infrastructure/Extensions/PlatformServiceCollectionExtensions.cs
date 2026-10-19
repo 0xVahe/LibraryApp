@@ -3,6 +3,7 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Auditing;
 using LibraryApp.Infrastructure.Persistence.Seed;
 using LibraryApp.Infrastructure.Time;
 using Microsoft.EntityFrameworkCore;
@@ -32,9 +33,13 @@ public static class PlatformServiceCollectionExtensions
                 $"(appsettings.Development.json, user-secrets or the environment variable ConnectionStrings__{ConnectionStringName}).");
 
         // Same SQL Server options as the EF tools (LibraryDbContextFactory): retry on transient failures, migrations assembly.
-        services.AddDbContext<LibraryDbContext>(options => options
+        // The audit interceptor records changes of audited entities in the same SaveChanges (NFR-14).
+        services.AddHttpContextAccessor();
+        services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddDbContext<LibraryDbContext>((provider, options) => options
             .UseLibrarySqlServer(connectionString)
-            .EnableSensitiveDataLogging(environment.IsDevelopment()));
+            .EnableSensitiveDataLogging(environment.IsDevelopment())
+            .AddInterceptors(provider.GetRequiredService<AuditSaveChangesInterceptor>()));
 
         services.Configure<TimeZoneOptions>(configuration.GetSection(TimeZoneOptions.SectionName));
         services.AddSingleton(TimeProvider.System);
