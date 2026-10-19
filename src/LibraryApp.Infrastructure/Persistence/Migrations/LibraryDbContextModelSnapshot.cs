@@ -648,6 +648,14 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                             IsActive = true,
                             Subject = "Return receipt for \"{{BookTitle}}\"",
                             Type = 10
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000011"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>The password of your library account was changed. If you made this change, no action is needed.</p><p>If you did not change your password, contact the library administrator immediately.</p>",
+                            IsActive = true,
+                            Subject = "Your library password was changed",
+                            Type = 11
                         });
                 });
 

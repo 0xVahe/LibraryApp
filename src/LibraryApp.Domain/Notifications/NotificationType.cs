@@ -36,4 +36,7 @@ public enum NotificationType
 
     /// <summary>Book returned (LoanReturned).</summary>
     ReturnReceipt = 10,
+
+    /// <summary>Security notice: a staff member changed their password (StaffPasswordChanged).</summary>
+    PasswordChanged = 11,
 }

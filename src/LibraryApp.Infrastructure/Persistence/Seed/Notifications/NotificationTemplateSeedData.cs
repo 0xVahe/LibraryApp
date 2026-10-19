@@ -71,5 +71,11 @@ public static class NotificationTemplateSeedData
         new(NotificationType.ReturnReceipt,
             "Return receipt for \"{{BookTitle}}\"",
             "<p>Dear {{EmployeeName}},</p><p>Thank you. \"{{BookTitle}}\" was returned on {{ReturnedDate}}.</p>"),
+
+        new(NotificationType.PasswordChanged,
+            "Your library password was changed",
+            "<p>Dear {{EmployeeName}},</p><p>The password of your library account was changed. " +
+            "If you made this change, no action is needed.</p>" +
+            "<p>If you did not change your password, contact the library administrator immediately.</p>"),
     ];
 }
