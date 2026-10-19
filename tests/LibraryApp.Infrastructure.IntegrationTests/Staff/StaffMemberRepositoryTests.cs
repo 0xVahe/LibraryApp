@@ -25,4 +25,21 @@ public class StaffMemberRepositoryTests(StaffSeederFixture fixture) : IClassFixt
         Assert.Equal("Anna Petrosyan", names[StaffSeedIds.StaffMembers.AnnaPetrosyan]);
         Assert.Empty(db.ChangeTracker.Entries());
     }
+    
+    [Fact]
+    public async Task Find_reads_a_member_by_employee_id_and_by_email()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        var repository = new StaffMemberRepository(db);
+
+        var byId = await repository.FindByEmployeeIdAsync("emp-10001", CancellationToken.None);
+        var byEmail = await repository.FindByCorporateEmailAsync(byId!.CorporateEmail, CancellationToken.None);
+
+        Assert.Equal(StaffSeedIds.StaffMembers.AnnaPetrosyan, byId.Id);
+        Assert.Equal("Anna Petrosyan", byId.FullName);
+        Assert.Equal(byId, byEmail);
+        Assert.Null(await repository.FindByEmployeeIdAsync("EMP-00000", CancellationToken.None));
+        Assert.Empty(db.ChangeTracker.Entries());
+    }
 }
