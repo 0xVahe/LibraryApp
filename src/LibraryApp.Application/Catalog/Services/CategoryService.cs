@@ -6,6 +6,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Categories (CAT-03); every change runs in one transaction under the "catalog:categories" lock.</summary>
 public sealed class CategoryService(
     ICategoryRepository repository, IUnitOfWork unitOfWork, IIdGenerator ids, IApplicationLock applicationLock) : ICategoryService
 {

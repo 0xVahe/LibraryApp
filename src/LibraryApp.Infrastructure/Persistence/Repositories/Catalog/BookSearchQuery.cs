@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 
+/// <summary>One SQL query for the page and one for the total; names and copy counts are subqueries, nothing is tracked.</summary>
 public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
 {
     public async Task<PagedResult<BookSearchResultDto>> SearchAsync(
@@ -80,7 +81,7 @@ public sealed class BookSearchQuery(LibraryDbContext db) : IBookSearchQuery
                 db.BookCopies.Count(copy => copy.BookId == book.Id
                     && copy.Status != BookCopyStatus.Lost
                     && copy.Status != BookCopyStatus.Withdrawn),
-                book.CoverImagePath))
+                book.CoverImagePath))                     // the stored path; the service builds the URL
             .ToListAsync(cancellationToken);
 
         return new PagedResult<BookSearchResultDto>(items, totalCount, paging.Page, paging.PageSize);

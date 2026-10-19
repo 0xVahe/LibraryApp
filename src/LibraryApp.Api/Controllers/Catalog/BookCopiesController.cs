@@ -36,7 +36,10 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
         return Ok(await copies.GetCopyAsync(bookId, copyId, ct));
     }
 
-    /// <summary>Registers a new copy; it starts as Available. The barcode must be unique across all copies (BR-CAT-2).</summary>
+    /// <summary>
+    /// Registers a new copy; the barcode must be unique across all copies (BR-CAT-2). The copy starts Available, or Reserved
+    /// at once when a reader is waiting for the book (BOR-07): the answer shows its real status.
+    /// </summary>
     [HttpPost]
     [Authorize(Roles = Writers)]
     [ProducesResponseType<BookCopyDto>(StatusCodes.Status201Created)]
@@ -50,7 +53,9 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
         return CreatedAtAction(nameof(GetById), new { bookId, copyId = copy.Id }, copy);
     }
 
-    /// <summary>Changes the condition and the shelf location of a copy.</summary>
+    /// <summary>
+    /// Changes the condition and the shelf location of a copy still in the collection; a Lost or Withdrawn copy answers 409.
+    /// </summary>
     [HttpPut("{copyId:guid}")]
     [Authorize(Roles = Writers)]
     [ProducesResponseType<BookCopyDto>(StatusCodes.Status200OK)]
@@ -65,7 +70,8 @@ public sealed class BookCopiesController(IBookCopyService copies) : ControllerBa
 
     /// <summary>
     /// Takes a copy out of circulation (UnderRepair, Lost, Withdrawn) or brings it back from repair (Available), BR-CAT-4.
-    /// A copy that is OnLoan or Reserved is changed only through Borrowing.
+    /// A copy that is OnLoan or Reserved is changed only through Borrowing. A repaired copy comes back Available, or Reserved
+    /// when a reader is waiting for the book (BOR-07).
     /// </summary>
     [HttpPost("{copyId:guid}/status")]
     [Authorize(Roles = Writers)]

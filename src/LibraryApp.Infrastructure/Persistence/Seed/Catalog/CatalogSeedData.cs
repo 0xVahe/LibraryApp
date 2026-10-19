@@ -100,7 +100,7 @@ public static class CatalogSeedData
         [50] = 3, [51] = 3, [52] = 4, [53] = 2, [54] = 2, [55] = 1, [56] = 1, [57] = 1,
     };
 
-    // Keep these name-to-ID mappings stable: downstream book seeds reference them.
+    // Fixed IDs: the seed books above and the tests find authors and publishers by them, so a name never changes its ID.
     public static readonly IReadOnlyList<(Guid Id, string Name)> Authors =
     [
         (new("10000000-0000-0000-0002-000000000001"), "Benjamin Graham"),

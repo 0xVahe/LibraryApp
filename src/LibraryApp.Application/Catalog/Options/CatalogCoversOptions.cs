@@ -10,6 +10,7 @@ public sealed class CatalogCoversOptions
     public string BaseUrl { get; set; } = string.Empty;
 }
 
+/// <summary>Checks <c>Catalog:Covers:BaseUrl</c> at start: empty, or an absolute HTTPS address ending in '/'.</summary>
 public sealed class CatalogCoversOptionsValidator : IValidateOptions<CatalogCoversOptions>
 {
     public ValidateOptionsResult Validate(string? name, CatalogCoversOptions options)

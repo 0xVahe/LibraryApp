@@ -34,7 +34,7 @@ public sealed class BookDetailsQuery(LibraryDbContext db) : IBookDetailsQuery
                     && copy.Status != BookCopyStatus.Withdrawn),
                 db.BookCopies.Count(copy => copy.BookId == book.Id && copy.Status == BookCopyStatus.Available),
                 book.IsDeleted,
-                book.CoverImagePath))
+                book.CoverImagePath))                     // the stored path; the service builds the URL
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

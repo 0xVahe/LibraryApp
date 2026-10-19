@@ -11,7 +11,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 
 public class CatalogSeedDataTests
 {
-    // Independent snapshots lock the reference implementation's mappings for downstream book seeds.
+    // Each list is written out here on purpose: a renamed or renumbered seed row fails a test instead of changing data silently.
     [Fact]
     public void Authors_keep_their_fixed_name_to_id_mapping() => AssertMapping(
         CatalogSeedData.Authors, "0002", """

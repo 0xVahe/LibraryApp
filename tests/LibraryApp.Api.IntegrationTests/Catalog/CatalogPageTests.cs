@@ -111,6 +111,19 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
     }
 
     [Fact]
+    public async Task A_page_past_the_last_one_says_so_and_links_the_first_page_with_the_filters()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync("/catalog?language=en&page=999");
+
+        Assert.Contains("This page is empty.", html);
+        Assert.Contains("<a href=\"/catalog?language=en\">Go to the first page</a>", html);
+        Assert.DoesNotContain("No books match your filters.", html);
+        Assert.DoesNotContain("Showing 0", html);
+    }
+
+    [Fact]
     public async Task A_book_without_a_cover_renders_only_the_text_cover()
     {
         var title = "Catalog page no-cover " + Guid.NewGuid().ToString("N")[..8];

@@ -17,7 +17,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Catalog;
 
-/// <summary>CAT-10 SQL checks use the EF model in a temporary database; production migrations remain Integration Owner work.</summary>
+/// <summary>CAT-10 SQL checks (constraints, indexes, paging) on a temporary database created from the EF model.</summary>
 public sealed class BookSuggestionDatabase : IAsyncLifetime
 {
     private readonly string _connectionString = TestDatabase.NewConnectionString();
