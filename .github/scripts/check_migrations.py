@@ -4,7 +4,8 @@ Usage: check_migrations.py <base> <head>   (any git tree-ish: a commit, a branch
 
 In CI, <base> is the tip of the target branch and <head> the merge result of the pull request, so the comparison sees
 exactly what the merge would bring. Three rules:
-  1. A migration that is already in the base branch is never changed or deleted: databases have applied it.
+  1. A migration that is already in the base branch is never changed or deleted, nor is its .Designer.cs: databases
+     have applied it, and EF Core reads the model of each migration from its Designer file.
   2. Every new migration is newer than every migration in the base branch. An older one would sit before a migration
      that another pull request merged meanwhile, while its model snapshot does not know that migration; the Integration
      Owner then re-creates it so it is the last one.
@@ -16,10 +17,11 @@ import sys
 
 MIGRATIONS = 'src/LibraryApp.Infrastructure/Persistence/Migrations/'
 NAME = re.compile(r'^(\d{14})_(\w+)\.cs$')
+FILE = re.compile(r'^\d{14}_\w+(\.Designer)?\.cs$')   # a migration or its Designer file
 
 
 def migrations(treeish):
-    """{file name: blob id} of the migration files (without Designer files and the snapshot) in treeish."""
+    """{file name: blob id} of every file in the migrations folder of treeish (migrations, Designer files, snapshot)."""
     out = subprocess.run(['git', 'ls-tree', '-r', treeish, '--', MIGRATIONS],
                          capture_output=True, text=True, check=True).stdout
     files = {}
@@ -36,11 +38,13 @@ def main(base, head):
     head_mig = {n: b for n, b in head_files.items() if NAME.match(n) and not n.endswith('.Designer.cs')}
     errors = []
 
-    for name, blob in sorted(base_mig.items()):
-        if name not in head_mig:
+    for name, blob in sorted(base_files.items()):
+        if not FILE.match(name):
+            continue   # the model snapshot changes with every new migration
+        if name not in head_files:
             errors.append(f'{name} is in the base branch and is deleted here. A merged migration is never removed; '
                           'add a new migration that reverts it instead.')
-        elif head_mig[name] != blob:
+        elif head_files[name] != blob:
             errors.append(f'{name} is in the base branch and is changed here. A merged migration is never edited; '
                           'add a new migration instead.')
 

@@ -16,11 +16,21 @@ runs:
     - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
+    # One cache per set of projects: jobs that restore different projects would otherwise share one key, and the
+    # first job to save it would leave the packages of the others out.
+    - name: NuGet cache key
+      id: key
+      shell: bash
+      env:
+        PROJECTS: ${{ inputs.projects }}
+        TOOLS: ${{ inputs.tools }}
+      run: echo "projects=$(echo "$PROJECTS tools-$TOOLS" | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
     - uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
-        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
+        key: nuget-${{ runner.os }}-${{ steps.key.outputs.projects }}-${{ hashFiles('**/*.csproj', '.config/dotnet-tools.json') }}
         restore-keys: |
+          nuget-${{ runner.os }}-${{ steps.key.outputs.projects }}-
           nuget-${{ runner.os }}-
     - name: Restore
       shell: bash
