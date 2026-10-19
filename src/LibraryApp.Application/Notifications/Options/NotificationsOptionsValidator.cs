@@ -20,6 +20,10 @@ public sealed class NotificationsOptionsValidator : IValidateOptions<Notificatio
             failures.Add($"{Delivery}:{nameof(delivery.BatchSize)} must be between 1 and 100 " +
                          $"(found {delivery.BatchSize}); set it in appsettings.json.");
 
+        if (delivery.Lease < TimeSpan.FromMinutes(1) || delivery.Lease > TimeSpan.FromHours(1))
+            failures.Add($"{Delivery}:{nameof(delivery.Lease)} must be between 00:01:00 and 01:00:00 " +
+                         $"(found {delivery.Lease}); set it in appsettings.json.");
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }

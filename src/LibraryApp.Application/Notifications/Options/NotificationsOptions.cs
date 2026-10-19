@@ -14,4 +14,7 @@ public sealed class DeliveryOptions
     public TimeSpan PollInterval { get; set; }
 
     public int BatchSize { get; set; }
+
+    /// <summary>How long a claimed email is reserved for one instance; longer than sending one batch.</summary>
+    public TimeSpan Lease { get; set; }
 }

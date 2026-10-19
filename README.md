@@ -74,6 +74,7 @@ Point values are at most 10 per record (database constraint). The Development se
 |---|---|---|---|
 | `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
 | `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
+| `Delivery:Lease` | 00:15:00 | How long a claimed email is reserved for one API instance; must be longer than sending one batch | NOT-03 |
 
 Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
 
