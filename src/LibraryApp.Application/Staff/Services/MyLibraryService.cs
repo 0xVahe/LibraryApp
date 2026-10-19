@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace LibraryApp.Application.Staff.Services;
 
-/// <summary>MEM-08 "My library". Read only, no transaction.</summary>
+/// <summary>MEM-08 "My library" reads and the S2-01 self-profile update.</summary>
 public sealed class MyLibraryService(
     ICurrentUser currentUser,
     IStaffManagementRepository members,
@@ -58,20 +58,18 @@ public sealed class MyLibraryService(
 
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var member = await members.GetByIdAsync(memberId, token)
-                         ?? throw new DomainException(StaffErrors.NotFound);
+            var profile = await members.GetForProfileUpdateAsync(memberId, token)
+                          ?? throw new DomainException(StaffErrors.NotFound);
+            var member = profile.Member;
             if (member.Status == StaffMemberStatus.Deactivated)
                 throw new DomainException(StaffErrors.DeactivatedProfileLocked);
-
-            var existing = await members.GetDetailsAsync(memberId, token)
-                           ?? throw new DomainException(StaffErrors.NotFound);
 
             // Reuse the domain profile rule while retaining every HR-managed field as-is.
             member.UpdateProfile(request.FirstName, request.LastName, member.CorporateEmail, member.Position,
                 member.LineManagerEmail);
 
-            return new MyProfileDto(member.Id, member.FirstName, member.LastName, existing.CorporateEmail,
-                existing.DepartmentName, existing.Position, existing.StaffCategoryName, existing.Status);
+            return new MyProfileDto(member.Id, member.FirstName, member.LastName, member.CorporateEmail,
+                profile.DepartmentName, member.Position, profile.StaffCategoryName, member.Status.ToString());
         }, ct);
     }
 

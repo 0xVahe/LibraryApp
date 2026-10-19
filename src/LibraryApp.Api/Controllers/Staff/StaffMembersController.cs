@@ -123,7 +123,7 @@ public sealed class StaffMembersController(
     public async Task<ActionResult<StaffMemberDto>> Get(Guid id, CancellationToken ct) => Ok(await staff.GetAsync(id, ct));
 
     /// <summary>Updates a staff profile and synchronizes the account's email and username (MEM-01, MEM-03).</summary>
-    /// <remarks>EmployeeId and role are immutable here. Deactivated profiles cannot be updated.</remarks>
+    /// <remarks>EmployeeId and role are immutable here. Deactivated profiles cannot be updated; this returns 422 staff.deactivated_profile_locked.</remarks>
     [HttpPut("{id:guid}")]
     [ProducesResponseType<StaffMemberDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -131,6 +131,7 @@ public sealed class StaffMembersController(
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<StaffMemberDto>> Update(Guid id, UpdateStaffMemberRequest request, CancellationToken ct) =>
         Ok(await staff.UpdateAsync(id, request, ct));
 }

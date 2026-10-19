@@ -112,6 +112,10 @@ public class MyLibraryEndpointTests(ApiHostFactory factory) : IClassFixture<ApiH
             Assert.Equal(original.StaffCategoryName, updated.StaffCategoryName);
             Assert.Equal(original.Status, updated.Status);
             Assert.Equal(memberId, updated.Id);
+
+            var persisted = (await client.GetFromJsonAsync<MyLibraryDto>(Route))!.Profile;
+            Assert.Equal(updated.FirstName, persisted.FirstName);
+            Assert.Equal(updated.LastName, persisted.LastName);
         }
         finally
         {

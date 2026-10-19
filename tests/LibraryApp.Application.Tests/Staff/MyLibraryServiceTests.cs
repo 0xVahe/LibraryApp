@@ -202,6 +202,10 @@ public class MyLibraryServiceTests
 
         public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
             Task.FromResult(_entities.GetValueOrDefault(id));
+        public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(_entities.TryGetValue(id, out var member)
+                ? new StaffMemberProfile(member, "Retail Banking", "Employee")
+                : null);
         public Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();

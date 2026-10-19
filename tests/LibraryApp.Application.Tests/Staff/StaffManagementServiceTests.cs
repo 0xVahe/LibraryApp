@@ -259,6 +259,11 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(Members.GetValueOrDefault(id));
 
+    public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult<StaffMemberProfile?>(Members.TryGetValue(id, out var member)
+            ? new StaffMemberProfile(member, "IT", "Employee")
+            : null);
+
     public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) => Task.FromResult(
         Members.TryGetValue(id, out var m)
             ? new StaffMemberDto(m.Id, m.EmployeeId, m.FirstName, m.LastName, m.CorporateEmail, m.DepartmentId, "IT",
