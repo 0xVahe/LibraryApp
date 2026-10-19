@@ -14,7 +14,8 @@ namespace LibraryApp.Api.Controllers.Borrowing;
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
 public sealed class LoansController(
     ILoanService loans,
-    ILoanReturnService loanReturns) : ControllerBase
+    ILoanReturnService loanReturns,
+    ILoanLostService lostLoans) : ControllerBase
 {
     private const string Librarians = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
 
@@ -36,6 +37,32 @@ public sealed class LoansController(
         return CreatedAtAction(nameof(Get), new { id = loan.LoanId }, loan);
     }
 
+    /// <summary>
+    /// Declares a borrowed copy lost and applies lost points.
+    /// </summary>
+    /// <remarks>
+    /// No request body is required.
+    /// Active and Overdue loans are accepted by default.
+    /// </remarks>
+    [HttpPost("{id:guid}/lost")]
+    [ProducesResponseType<DeclareLostResponse>(
+        StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(
+        StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<DeclareLostResponse>> DeclareLost(
+        Guid id,
+        CancellationToken ct)
+    {
+        DeclareLostResponse result =
+            await lostLoans.DeclareLostAsync(id, ct);
+
+        return Ok(result);
+    }
+    
     /// <summary>One loan.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<LoanDto>(StatusCodes.Status200OK)]
