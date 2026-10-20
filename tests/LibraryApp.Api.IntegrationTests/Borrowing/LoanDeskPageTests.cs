@@ -1,4 +1,5 @@
 using System.Net;
+using FluentValidation;
 using LibraryApp.Api.Areas.Borrowing.Components;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
@@ -7,10 +8,12 @@ using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
@@ -264,8 +267,10 @@ public class LoanDeskPageTests(BorrowingUiHost factory) : IClassFixture<Borrowin
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string html = await UiBrowser.HtmlAsync(response);
-        Assert.Contains($"The return note may have at most {Loan.ReturnNoteMaxLength} characters.", html);
-        Assert.Contains("id=\"return-note\" name=\"Note\"", html);
+        // Beside the Note field, not as an error of the whole card.
+        Assert.Contains($"<span class=\"error-text\">The return note may have at most {Loan.ReturnNoteMaxLength} characters.</span>", html);
+        Assert.Matches("<input id=\"return-note\" name=\"Note\"[^>]*aria-invalid=\"true\"", html);
+        Assert.DoesNotContain("The book was not taken back.", html);
         Assert.Equal(LoanStatus.Active, Assert.Single(await LoansAsync(Members.SofiaHambardzumyan)).Status);
     }
 
@@ -316,5 +321,40 @@ public class LoanDeskPageTests(BorrowingUiHost factory) : IClassFixture<Borrowin
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Empty(await LoansAsync(Members.VahanStepanyan));
+    }
+}
+
+/// <summary>The Borrowing UI host without <c>ReturnLoanRequestValidator</c>: the note reaches the loan's own rule.</summary>
+public sealed class BorrowingUiHostWithoutReturnValidator : ApiHostFactory
+{
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.Remove(services.Single(d => d.ServiceType == typeof(IModuleSeeder) && d.ImplementationType == typeof(BorrowingSeeder)));
+        services.RemoveAll<IValidator<ReturnLoanRequest>>();
+    }
+}
+
+/// <summary>The loan's note rule (<c>borrowing.return_note_too_long</c>) is shown beside the Note field like the validator's.</summary>
+public class LoanDeskNoteRuleTests(BorrowingUiHostWithoutReturnValidator factory) : IClassFixture<BorrowingUiHostWithoutReturnValidator>
+{
+    [Fact]
+    public async Task The_domain_note_rule_is_a_field_error_too()
+    {
+        using (var scope = factory.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<ILoanService>()
+                .IssueAsync(new IssueLoanRequest(Members.SofiaHambardzumyan, CatalogSeedIds.CopyBarcode(11, 1)));
+        var browser = await UiBrowser.SignInAsync(factory, Members.AramSargsyan);
+
+        var response = await browser.PostAsync("/desk", "/desk?handler=Return",
+            ("ReturnBarcode", CatalogSeedIds.CopyBarcode(11, 1)), ("Damaged", "false"), ("Note", new string('x', Loan.ReturnNoteMaxLength + 1)));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await UiBrowser.HtmlAsync(response);
+        Assert.Contains($"<span class=\"error-text\">{BorrowingErrors.ReturnNoteTooLong.Message}</span>", html);
+        Assert.Matches("<input id=\"return-note\" name=\"Note\"[^>]*aria-invalid=\"true\"", html);
+        Assert.DoesNotContain("The book was not taken back.", html);
+        using var check = factory.Services.CreateScope();
+        Assert.Equal(LoanStatus.Active, (await check.ServiceProvider.GetRequiredService<LibraryDbContext>().Loans.AsNoTracking()
+            .SingleAsync(l => l.StaffMemberId == Members.SofiaHambardzumyan)).Status);
     }
 }

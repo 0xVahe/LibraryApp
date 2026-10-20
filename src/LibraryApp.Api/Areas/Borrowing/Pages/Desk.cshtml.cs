@@ -8,6 +8,7 @@ using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Dto;
 using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Application.Common;
+using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -105,7 +106,8 @@ public sealed class DeskModel(
         }
         catch (DomainException ex) when (IsFormError(ex))
         {
-            ModelState.AddModelError(ReturnForm, ex.Error.Message);
+            // The note rule of the loan (the same as ReturnLoanRequestValidator) belongs to the Note field, not to the card.
+            ModelState.AddModelError(ex.Error == BorrowingErrors.ReturnNoteTooLong ? nameof(Note) : ReturnForm, ex.Error.Message);
             return await PageAsync(ct);
         }
     }
