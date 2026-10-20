@@ -114,6 +114,44 @@ public sealed class LoanService(
                      ?? throw new DomainException(BorrowingErrors.NoOpenLoanForCopy));
     }
 
+    /// <inheritdoc />
+    public async Task<LoanDto> RenewAsync(
+        Guid loanId,
+        CancellationToken ct = default)
+    {
+        if (loanId == Guid.Empty)
+            throw new DomainException(BorrowingErrors.LoanNotFound);
+
+        Loan loan = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            Loan currentLoan = await loans.GetForUpdateAsync(loanId, token)
+                ?? throw new DomainException(BorrowingErrors.LoanNotFound);
+
+            await locks.AcquireAsync(
+                BorrowingLocks.Staff(currentLoan.StaffMemberId),
+                token);
+
+            EligibilityResult eligibility =
+                await staffMembers.CanBorrowAsync(
+                    currentLoan.StaffMemberId,
+                    token);
+
+            if (!eligibility.IsAllowed)
+                throw new DomainException(eligibility.Error!);
+
+            LendingRules rules =
+                await staffMembers.GetLendingRulesAsync(
+                    currentLoan.StaffMemberId,
+                    token);
+
+            currentLoan.Renew(rules.LoanDays);
+
+            return currentLoan;
+        }, ct);
+
+        return ToDto(loan);
+    }
+
     // Maps the entity to the DTO. Entities never leave the Application layer.
     private static LoanDto ToDto(Loan loan) => new(
         loan.Id,

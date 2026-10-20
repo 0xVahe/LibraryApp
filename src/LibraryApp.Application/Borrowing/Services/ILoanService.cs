@@ -28,4 +28,6 @@ public interface ILoanService
     /// for an unknown barcode and <c>borrowing.no_open_loan_for_copy</c> when the copy is not on loan.
     /// </summary>
     Task<LoanDto> FindOpenByBarcodeAsync(string barcode, CancellationToken ct = default);
+
+    Task<LoanDto> RenewAsync(Guid loanId, CancellationToken ct = default);
 }

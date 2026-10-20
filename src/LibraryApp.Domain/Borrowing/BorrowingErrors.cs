@@ -82,8 +82,8 @@ public static class BorrowingErrors
     public static readonly Error ReturnNoteTooLong = Error.Validation(
         "borrowing.return_note_too_long",
         "The return note may have at most 500 characters.");
-    
-    
+
+
     // Reservation errors
 
     /// <summary>An available copy exists, so this book does not need to be reserved.</summary>
@@ -210,4 +210,8 @@ public static class BorrowingErrors
     public static readonly Error PenaltyNotDueToExpire = Error.BusinessRule(
         "borrowing.penalty_not_due_to_expire",
         "The penalty has not reached its expiry timestamp.");
+
+    public static readonly Error PenaltyNotFound = new(
+    "Borrowing.PenaltyNotFound",
+    "The specified penalty record was not found.");
 }

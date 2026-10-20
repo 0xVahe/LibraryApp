@@ -27,6 +27,18 @@ public interface IPenaltyService
         Guid staffMemberId,
         DateTime nowUtc,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Waives an active borrowing penalty by its unique identifier and records the waiver reason.
+    /// </summary>
+    /// <param name="penaltyId">The unique identifier of the penalty record.</param>
+    /// <param name="reason">The mandatory explanation for the waiver.</param>
+    /// <param name="cancellationToken">A token to observe while waiting for the task to complete.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task WaivePenaltyAsync(
+        Guid penaltyId,
+        string reason,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record PenaltyApplicationResult(

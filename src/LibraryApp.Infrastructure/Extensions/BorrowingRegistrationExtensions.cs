@@ -69,6 +69,9 @@ public static class BorrowingRegistrationExtensions
         // Demo data, Development only (SD-17)
         services.AddScoped<IModuleSeeder, BorrowingSeeder>();
 
+        //G3-09
+        services.AddScoped<ILoanQueryService, LoanQueryService>();
+
         return services;
     }
 }
