@@ -19,7 +19,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-26 on SQL Server through the real host: a book deleted through the Catalog endpoint (BQ-G1-09, BR-CAT-3) and a
+/// Reservations that can never be served, on SQL Server through the real host: a book deleted through the Catalog endpoint (BR-CAT-3) and a
 /// member deactivated through the Staff endpoint (BR-MEM-4) leave reservations that can never be served; the next
 /// Borrowing daily job cancels them, frees the member's places (BR-BOR-2) and hands a held copy to the next member.
 /// </summary>

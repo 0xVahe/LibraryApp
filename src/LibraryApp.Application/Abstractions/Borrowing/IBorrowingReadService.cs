@@ -9,13 +9,13 @@ public interface IBorrowingReadService
     Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default);
 
     /// <summary>
-    /// MEM-08 "My library" (BQ-G2-11): open loans (earliest due date first), Waiting and ReadyForPickup reservations and
+    /// MEM-08 "My library": open loans (earliest due date first), Waiting and ReadyForPickup reservations and
     /// active penalties (oldest first). Ids only; Staff adds titles from Catalog.
     /// </summary>
     Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default);
 
     /// <summary>
-    /// NOT-05 (BQ-G4-04): the open loans due on this local Asia/Yerevan date, earliest first, for the 09:00 due-soon
+    /// NOT-05: the open loans due on this local Asia/Yerevan date, earliest first, for the 09:00 due-soon
     /// reminder of Notifications.
     /// </summary>
     Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default);

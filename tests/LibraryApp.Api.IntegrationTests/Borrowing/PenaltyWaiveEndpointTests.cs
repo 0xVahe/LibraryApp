@@ -19,7 +19,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-08 (BOR-08) through HTTP on SQL Server: finding a staff member's penalty records and waiving one with a mandatory
+/// BOR-08 through HTTP on SQL Server: finding a staff member's penalty records and waiving one with a mandatory
 /// reason; the waiver recalculates the status at once, with <c>StaffStatusChanged</c> only on a real change. Every test
 /// uses its own staff member, so the tests of the class do not share records.
 /// </summary>

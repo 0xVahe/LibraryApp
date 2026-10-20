@@ -26,7 +26,7 @@ public interface IPenaltyAdministrationService
 }
 
 /// <summary>
-/// The waiver runs under the staff lock of the record's owner (the lock of every penalty operation, SD-10) and uses the
+/// The waiver runs under the staff lock of the record's owner (the lock of every penalty operation) and uses the
 /// shared penalty component for the status (<see cref="IPenaltyService.RecalculateStatusAsync"/>): below
 /// <c>RestrictedFromPoints</c> the member is Active, <c>StaffStatusChanged</c> is published only on a real change.
 /// </summary>

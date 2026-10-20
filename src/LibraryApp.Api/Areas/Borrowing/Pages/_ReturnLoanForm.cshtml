@@ -1,6 +1,6 @@
 @model DeskModel
-@* ReturnLoanForm (Group 3): the copy by barcode (G3-21), "Damaged — send to repair" and a note (BOR-03, BOR-09; no "Worn");
-   DeclareLostButton (G3-22) posts the same barcode to the Lost handler. *@
+@* ReturnLoanForm (Group 3): the copy by barcode, "Damaged — send to repair" and a note (BOR-03, BOR-09; no "Worn");
+   DeclareLostButton posts the same barcode to the Lost handler. *@
 <section class="card" aria-labelledby="return-title">
     <div class="card-head"><h2 id="return-title">Take back a book</h2></div>
     @foreach (var error in Model.ErrorsOf(DeskModel.ReturnForm))

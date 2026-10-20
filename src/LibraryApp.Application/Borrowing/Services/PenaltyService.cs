@@ -82,7 +82,7 @@ public sealed class PenaltyService(
     }
 
     /// <summary>
-    /// The policy table (section 8) with BQ-BA-01: below the Restricted threshold the member is Active; a suspension
+    /// The penalty-point policy table: below the Restricted threshold the member is Active; a suspension
     /// lasts until its end; after it, and whenever points are at or above the Restricted threshold, the member is
     /// Restricted. A suspension is never started here: only a return that crosses the threshold starts one
     /// (<see cref="ApplyAsync"/>).
@@ -103,10 +103,10 @@ public sealed class PenaltyService(
     }
 
     /// <summary>
-    /// End of the latest suspension, computed from the records (BQ-G2-03, no stored field): the suspension starts at the
+    /// End of the latest suspension, computed from the records (no stored field): the suspension starts at the
     /// creation time of the record with which the counting points first reached the Suspended threshold, and lasts
     /// <c>Borrowing:Penalties:SuspensionDays</c>. Waived records never count, so waiving the record that made the
-    /// threshold moves the start (intended by the decision). Null when the points never reached the threshold.
+    /// threshold moves the start (by design). Null when the points never reached the threshold.
     /// </summary>
     private DateTime? SuspensionEndsAtUtc(IReadOnlyList<PenaltyRecord> records, DateTime nowUtc)
     {
@@ -239,7 +239,7 @@ public sealed class PenaltyService(
         StaffMemberStatus byPoints = policy.GetStatus(finalActivePoints);
 
         // A suspension starts only when this operation crosses the threshold: after a suspension has ended the
-        // employee stays Restricted while the points stay high (BQ-BA-01), and is not suspended again without a crossing.
+        // employee stays Restricted while the points stay high, and is not suspended again without a crossing.
         bool startsSuspension =
             policy.GetStatus(previousActivePoints) != StaffMemberStatus.Suspended
             && byPoints == StaffMemberStatus.Suspended;

@@ -1,5 +1,5 @@
 @model DeskModel
-@* IssueLoanForm (Group 3): the member by employee ID or corporate email (Q-G3-06), the copy by barcode (BOR-01). *@
+@* IssueLoanForm (Group 3): the member by employee ID or corporate email, the copy by barcode (BOR-01). *@
 <section class="card" aria-labelledby="issue-title">
     <div class="card-head"><h2 id="issue-title">Issue a book</h2></div>
     @foreach (var error in Model.ErrorsOf(DeskModel.IssueForm))

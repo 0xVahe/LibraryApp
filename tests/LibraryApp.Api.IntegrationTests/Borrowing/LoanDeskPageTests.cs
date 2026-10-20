@@ -19,7 +19,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-19: the Loan desk <c>/desk</c> by the UI guide (Part 2 "Loan desk", demo <c>desk.html</c>, corrections of the UI guide
+/// The Loan desk <c>/desk</c> by the UI guide (Part 2 "Loan desk", demo <c>desk.html</c>, corrections of the UI guide
 /// check): issue by employee ID or email and barcode (BOR-01), take back by barcode with "Damaged — send to repair" and a
 /// note (BOR-03, BOR-05, BOR-09), the copies waiting for pickup (BOR-07). Every test uses its own members and books.
 /// </summary>

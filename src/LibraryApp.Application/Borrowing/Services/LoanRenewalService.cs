@@ -18,10 +18,10 @@ namespace LibraryApp.Application.Borrowing.Services;
 /// BOR-04: a renewal moves <c>DueAtUtc</c> by the category's <c>LoanDays</c>, adds one to <c>RenewalCount</c> and
 /// publishes <c>LoanRenewed</c>, in one transaction (BR-BOR-4) under the staff lock, then the book lock (the order of
 /// issue and return). BR-BOR-1 refusals, all 422, in this order: the loan is Overdue (or past the overdue rule before
-/// the daily job marked it); the employee is Restricted (BR-MEM-3) or Suspended (BQ-BA-11, unless
+/// the daily job marked it); the employee is Restricted (BR-MEM-3) or Suspended (unless
 /// <c>Borrowing:Loans:SuspendedMayRenew</c>); <c>RenewalCount</c> reached <c>MaxRenewals</c>; another employee has a
 /// Waiting reservation for the book. The status comes before the count: Staff gives a Restricted employee
-/// <c>MaxRenewals = 0</c> (BQ-G2-05), and the status is the more precise reason.
+/// <c>MaxRenewals = 0</c>, and the status is the more precise reason.
 /// </summary>
 public sealed class LoanRenewalService(
     ILoanRepository loans,

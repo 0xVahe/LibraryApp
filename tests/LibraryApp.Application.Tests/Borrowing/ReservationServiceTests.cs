@@ -271,7 +271,7 @@ public sealed class ReservationServiceTests
         Assert.Equal(0, cancelled.QueuePosition);
         Assert.Equal(2, third.QueuePosition);
         Assert.Equal(1, fixture.UnitOfWork.CommitCount);
-        // Staff, then book: the order of issue, return and reserve, so the operations cannot deadlock (SD-10).
+        // Staff, then book: the order of issue, return and reserve, so the operations cannot deadlock.
         Assert.Equal(new[] { BorrowingLocks.Staff(cancelled.StaffMemberId), BorrowingLocks.Book(BookId) }, fixture.Lock.Resources);
     }
 

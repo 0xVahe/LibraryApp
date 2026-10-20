@@ -5,7 +5,7 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Domain.Tests.Borrowing;
 
 /// <summary>
-/// The numbers are stored in the database (SD-11) and the index filters and CHECK constraints use them
+/// The numbers are stored in the database and the index filters and CHECK constraints use them
 /// ([Status] IN (1, 2), [Status] = 1, [Status] <> 3): if one changes, existing rows and constraints change meaning.
 /// </summary>
 public class BorrowingEnumValuesTests
