@@ -38,6 +38,10 @@ public static class NotificationErrors
     public static readonly Error RecipientNotFound =
         Error.NotFound("notifications.recipient_not_found", "The staff member to notify does not exist.");
 
+    /// <summary>The book a notification is about does not exist. A permanent failure for the event.</summary>
+    public static readonly Error BookNotFound =
+        Error.NotFound("notifications.book_not_found", "The book to notify about does not exist.");
+
     // Template
     /// <summary>No active template of the type exists (NOT-02, G4-08).</summary>
     public static readonly Error TemplateNotFound =
