@@ -357,6 +357,19 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 .search { position: relative; flex: 1; min-width: 200px; }
 .form-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
+/* Staff CSV import: scoped feedback for the normal multipart POST. */
+.staff-csv-import button:disabled { cursor: wait; }
+.staff-csv-import .staff-import-spinner:not([hidden]) {
+  width: 24px; height: 24px; flex: none;
+  border: 4px solid var(--white);
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .staff-csv-import .staff-import-spinner:not([hidden]) { animation: staff-import-spin 1s linear infinite; }
+}
+@keyframes staff-import-spin { to { transform: rotate(360deg); } }
+
 .drop {
   border: 2px dashed #b9b9b9;
   border-radius: var(--radius);
