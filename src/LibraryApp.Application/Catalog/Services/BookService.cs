@@ -8,6 +8,10 @@ using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>
+/// Books (CAT-01): create (one, or a batch for the CSV import), update and soft delete. Every change runs in one
+/// transaction under the "catalog:books" lock, so two requests cannot both take the same ISBN.
+/// </summary>
 public sealed class BookService : IBookService
 {
     private readonly IBookRepository _bookRepository;
@@ -83,18 +87,15 @@ public sealed class BookService : IBookService
     /// </summary>
     private async Task<Guid> AddBookAsync(CreateBookRequest request, CancellationToken token)
     {
-        // 1. Ensure that at least one author is provided.
         if (request.AuthorIds is not { Count: > 0 })
             throw new DomainException(CatalogErrors.BookAuthorsRequired);
 
-        // 2. Verify that the category exists.
         if (!await _bookRepository.CategoryExistsAsync(
                 request.CategoryId, token))
         {
             throw new DomainException(CatalogErrors.CategoryNotFound);
         }
 
-        // 3. Verify that the publisher exists when one is provided.
         if (request.PublisherId.HasValue &&
             !await _bookRepository.PublisherExistsAsync(
                 request.PublisherId.Value, token))
@@ -102,14 +103,13 @@ public sealed class BookService : IBookService
             throw new DomainException(CatalogErrors.PublisherNotFound);
         }
 
-        // 4. Ensure that the ISBN is unique among active books.
+        // BR-CAT-1: the ISBN is stored as 13 digits and is unique among active books.
         if (!IsbnRules.TryNormalize(request.Isbn, out var isbn))
             throw new DomainException(CommonErrors.ValidationFailed);
 
         if (await _bookRepository.IsbnExistsAsync(isbn, null, token))
             throw new DomainException(CatalogErrors.BookIsbnDuplicate);
 
-        // 5. Verify that all provided authors exist.
         var authorIds = request.AuthorIds.Distinct().ToArray();
 
         if (await _authorRepository.CountAuthorsAsync(
@@ -118,7 +118,6 @@ public sealed class BookService : IBookService
             throw new DomainException(CatalogErrors.AuthorNotFound);
         }
 
-        // 6. Create the book entity.
         var book = new Book(
             _idGenerator.NewId(),
             request.Title,
@@ -132,14 +131,12 @@ public sealed class BookService : IBookService
 
         _bookRepository.Add(book);
 
-        // 7. Create a link between the book and each author.
         foreach (var authorId in authorIds)
         {
             _authorRepository.AddLink(
                 new BookAuthor(book.Id, authorId));
         }
 
-        // 8. Return the ID of the created book.
         return book.Id;
     }
 
@@ -152,23 +149,20 @@ public sealed class BookService : IBookService
 
         return _unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            // 1. Serialize book creation and update operations.
+            // Serialize book creation and update operations.
             await _applicationLock.AcquireAsync("catalog:books", token);
 
-            // 2. Find the book and ensure that it is active.
             var book = await _bookRepository.FindAsync(id, token);
 
             if (book is null || book.IsDeleted)
                 throw new DomainException(CatalogErrors.BookNotFound);
 
-            // 3. Verify that the category exists.
             if (!await _bookRepository.CategoryExistsAsync(
                     request.CategoryId, token))
             {
                 throw new DomainException(CatalogErrors.CategoryNotFound);
             }
 
-            // 4. Verify that the publisher exists when one is provided.
             if (request.PublisherId.HasValue &&
                 !await _bookRepository.PublisherExistsAsync(
                     request.PublisherId.Value, token))
@@ -176,14 +170,13 @@ public sealed class BookService : IBookService
                 throw new DomainException(CatalogErrors.PublisherNotFound);
             }
 
-            // 5. Ensure that the ISBN is unique among other active books.
+            // BR-CAT-1: unique among the other active books.
             if (!IsbnRules.TryNormalize(request.Isbn, out var isbn))
                 throw new DomainException(CommonErrors.ValidationFailed);
 
             if (await _bookRepository.IsbnExistsAsync(isbn, id, token))
                 throw new DomainException(CatalogErrors.BookIsbnDuplicate);
 
-            // 6. Update the book details.
             book.Update(
                 request.Title,
                 isbn,
@@ -201,16 +194,15 @@ public sealed class BookService : IBookService
         CancellationToken ct = default) =>
         _unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            // 1. Serialize book deletion with other book operations.
+            // Serialize book deletion with other book operations.
             await _applicationLock.AcquireAsync("catalog:books", token);
 
-            // 2. Find the book and ensure that it is active.
             var book = await _bookRepository.FindAsync(id, token);
 
             if (book is null || book.IsDeleted)
                 throw new DomainException(CatalogErrors.BookNotFound);
 
-            // 3. Load all copies and prevent deletion while copies are in circulation.
+            // BR-CAT-3: no deletion while a copy is on loan or reserved.
             var copies = await _bookRepository.GetCopiesForUpdateAsync(id, token);
 
             if (copies.Any(c =>
@@ -219,15 +211,13 @@ public sealed class BookService : IBookService
                 throw new DomainException(CatalogErrors.BookHasCopiesInCirculation);
             }
 
-            // 4. Withdraw copies that must no longer be available for lending.
-            // Lost copies remain Lost because Lost is a final status.
+            // The other copies are withdrawn; Lost copies stay Lost because Lost is a final status.
             foreach (var copy in copies.Where(
                          c => c.CanChangeStatusTo(BookCopyStatus.Withdrawn)))
             {
                 copy.ChangeStatus(BookCopyStatus.Withdrawn);
             }
 
-            // 5. Soft-delete the book.
             book.Delete(_clock.UtcNow);
         }, ct);
 }

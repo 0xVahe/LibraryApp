@@ -2,6 +2,7 @@ using LibraryApp.Application.Catalog.Dto;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Authors and the authors of a book (CAT-02). An author linked to a book is never deleted.</summary>
 public interface IAuthorService
 {
     Task<IReadOnlyList<AuthorDto>> ListAsync(CancellationToken ct = default);

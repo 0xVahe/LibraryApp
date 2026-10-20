@@ -21,6 +21,7 @@ public sealed record RejectBookSuggestionRequest(string? Comment);
 public sealed record BookSuggestionListRequest(
     BookSuggestionStatus? Status = null, int Page = 1, int PageSize = PageRequest.DefaultPageSize);
 
+/// <summary>A book suggestion with the staff member's name and the review, when there is one (CAT-10).</summary>
 public sealed record BookSuggestionDto(
     Guid Id, Guid StaffMemberId, string StaffMemberName, string Title, string AuthorName, string? Isbn, string Reason,
     BookSuggestionStatus Status, DateTime CreatedAtUtc, DateTime? ReviewedAtUtc,

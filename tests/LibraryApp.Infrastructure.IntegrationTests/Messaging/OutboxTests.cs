@@ -25,7 +25,7 @@ public sealed class OutboxFixture : IAsyncLifetime
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:LibraryDb"] = TestDatabase.NewConnectionString(),
+            ["ConnectionStrings:LibraryDb"] = TestDatabase.NewDatabase(),
             ["Messaging:DispatcherEnabled"] = "false",          // tests deliver by hand
             ["Messaging:MaxAttempts"] = MaxAttempts.ToString(),
             ["Messaging:RetryBaseDelay"] = "00:00:00",           // a failed message is due again at once

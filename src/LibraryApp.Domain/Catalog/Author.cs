@@ -2,6 +2,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Domain.Catalog;
 
+/// <summary>An author of books (CAT-02). Names may repeat: books link to authors by ID.</summary>
 public sealed class Author : Entity
 {
     public const int FullNameMaxLength = 200;
