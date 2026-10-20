@@ -83,6 +83,17 @@ Account state is cached per user and token stamp, with absolute expiration on ea
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 
+
+### Reporting (`Reporting`)
+
+Configure reporting in `src/LibraryApp.Api/appsettings.json`.
+
+- `DashboardCacheMinutes` (default: 5): Dashboard cache lifetime in minutes.
+- `TopBooksLimit` (default: 10): Maximum number of top books returned.
+- `TopCategoriesLimit` (default: 5): Maximum number of top categories returned.
+
+All values must be positive integers. Invalid configuration prevents application startup.
+
 ## Daily jobs
 
 A module job that must run once per local (Asia/Yerevan) day — for example the Borrowing daily job (BOR-06) or the 09:00 reminders (NOT-05) — implements `IDailyJob` (`Application/Abstractions/Common`) and is registered in the module's `Add<Module>Module`:
