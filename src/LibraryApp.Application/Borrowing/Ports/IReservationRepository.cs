@@ -24,6 +24,13 @@ public interface IReservationRepository
     /// </summary>
     Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default);
 
+    /// <summary>
+    /// The active (Waiting or ReadyForPickup) reservations of this staff member, read only, ordered by book id so that a
+    /// caller taking the book locks one after another always takes them in the same order. Load each one again with
+    /// <see cref="GetForUpdateAsync"/> after its book lock.
+    /// </summary>
+    Task<IReadOnlyList<Reservation>> FindActiveForStaffAsync(Guid staffMemberId, CancellationToken ct = default);
+
     Task AddAsync(Reservation reservation, CancellationToken ct = default);
 
     /// <summary>
