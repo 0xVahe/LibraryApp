@@ -132,9 +132,9 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         var html = await client.GetStringAsync($"/catalog?language=en&categoryId={banking}");
 
         var subcategories = SubcategoryRow(html, "Banking &amp; Finance");
-        Assert.Contains($"<a class=\"chip\" href=\"/catalog?language=en&amp;categoryId={banking}\" aria-current=\"true\">All in Banking &amp; Finance</a>", subcategories);
-        Assert.Contains($"<a class=\"chip\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(9)}\">Investing &amp; Markets</a>", subcategories);
-        Assert.Contains($"<a class=\"chip\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(10)}\">Banking &amp; Financial History</a>", subcategories);
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={banking}\" aria-current=\"true\">All in Banking &amp; Finance</a>", subcategories);
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(9)}\">Investing &amp; Markets</a>", subcategories);
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(10)}\">Banking &amp; Financial History</a>", subcategories);
     }
 
     [Fact]
@@ -190,6 +190,6 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
     }
 
     private static string SubcategoryRow(string html, string encodedParentName) =>
-        Regex.Match(html, $"<nav class=\"chips\" aria-label=\"Subcategories of {Regex.Escape(encodedParentName)}\">.*?</nav>",
+        Regex.Match(html, $"<nav class=\"chips chips-subcategories\" aria-label=\"Subcategories of {Regex.Escape(encodedParentName)}\">.*?</nav>",
             RegexOptions.Singleline).Value;
 }
