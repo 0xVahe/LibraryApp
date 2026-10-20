@@ -17,7 +17,7 @@ namespace LibraryApp.Application.Borrowing.Services;
 
 /// <summary>
 /// Implements the loan use cases: issuing a copy and reading a loan.
-/// The input is validated by <c>IssueLoanRequestValidator</c> before the endpoint is reached (SD-15).
+/// The input is validated by <c>IssueLoanRequestValidator</c> before the endpoint is reached.
 /// </summary>
 public sealed class LoanService(
     IStaffMemberService staffMembers,
@@ -43,7 +43,7 @@ public sealed class LoanService(
         Loan loan = await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
             // 0. The staff lock deactivation also takes (BR-MEM-4): no loan is issued while the employee is being
-            //    deactivated, and two parallel issues cannot both pass the loan limit (SD-10).
+            // deactivated, and two parallel issues cannot both pass the loan limit.
             await locks.AcquireAsync(BorrowingLocks.Staff(request.StaffMemberId), token);
 
             // 1. Check the employee's status.
@@ -89,7 +89,7 @@ public sealed class LoanService(
             else if (copy.Status != BookCopyStatus.Available)
                 throw new DomainException(BorrowingErrors.CopyNotAvailable);
 
-            // BQ-BA-08 (setting Borrowing:Reservations:AnyCopyFulfils): issuing any copy of the book closes this
+            // With the setting Borrowing:Reservations:AnyCopyFulfils, issuing any copy of the book closes this
             // member's active reservation for it, so no copy is held later for someone who already has the book.
             if (heldReservation is null && copy.Status == BookCopyStatus.Available && options.Value.Reservations.AnyCopyFulfils)
                 await CloseReservationForIssuedBookAsync(request.StaffMemberId, copy.BookId, token);

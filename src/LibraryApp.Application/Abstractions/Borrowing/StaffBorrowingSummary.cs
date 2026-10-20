@@ -2,11 +2,11 @@ using LibraryApp.Domain.Borrowing;
 
 namespace LibraryApp.Application.Abstractions.Borrowing;
 
-/// <summary>Borrowing data of one staff member for MEM-08 "My library" (BQ-G2-11).</summary>
+/// <summary>Borrowing data of one staff member for MEM-08 "My library".</summary>
 /// <param name="ActiveLoans">Active and Overdue loans, earliest due date first.</param>
 /// <param name="Reservations">Waiting and ReadyForPickup reservations, oldest first.</param>
 /// <param name="ActivePenaltyPoints">The sum of <paramref name="ActivePenalties"/>.</param>
-/// <param name="ActivePenalties">Active penalty records that have not expired yet (BR-BOR-6), oldest first.</param>
+/// <param name="ActivePenalties">Active penalty records that have not expired yet (penalty-point policy), oldest first.</param>
 public sealed record StaffBorrowingSummary(
     Guid StaffMemberId,
     IReadOnlyList<OpenLoanInfo> ActiveLoans,

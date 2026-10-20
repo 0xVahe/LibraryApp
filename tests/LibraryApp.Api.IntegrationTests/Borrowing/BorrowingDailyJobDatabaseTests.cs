@@ -38,7 +38,7 @@ public sealed class BorrowingDailyJobHost : ApiHostFactory
 }
 
 /// <summary>
-/// G3-04 (BOR-06) on SQL Server through the real host: the job is registered with the shared runner, one run changes
+/// BOR-06 on SQL Server through the real host: the job is registered with the shared runner, one run changes
 /// loans, penalty records and staff statuses with their events in the outbox, and a second run changes nothing.
 /// </summary>
 public class BorrowingDailyJobDatabaseTests(BorrowingDailyJobHost factory) : IClassFixture<BorrowingDailyJobHost>
@@ -305,7 +305,7 @@ public class BorrowingDailyJobDatabaseTests(BorrowingDailyJobHost factory) : ICl
         var gorExpired = PenaltyRecord.Create(Guid.NewGuid(), Members.GorMkrtchyan, late.Id, 5, "Returned late",
             now.AddDays(-95), now.AddDays(-5));
         // Sona (Suspended in the Staff seed): 10 points reached 40 days ago → the 30-day suspension is over, the points
-        // still count → Restricted (policy table, BQ-BA-01; start computed from the records, BQ-G2-03).
+        // still count → Restricted (policy table; start computed from the records).
         var sonaLost = PenaltyRecord.Create(Guid.NewGuid(), Members.SonaVardanyan, late.Id, 10, "Copy lost",
             now.AddDays(-40), now.AddDays(50));
 

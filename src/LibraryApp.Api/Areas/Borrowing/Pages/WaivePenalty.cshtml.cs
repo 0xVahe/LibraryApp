@@ -15,9 +15,9 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 namespace LibraryApp.Api.Areas.Borrowing.Pages;
 
 /// <summary>
-/// Waives one active penalty record with a mandatory reason (BOR-08, G3-23) from its form in the "Standing" card of
+/// Waives one active penalty record with a mandatory reason (BOR-08) from its form in the "Standing" card of
 /// <c>StaffBorrowingSummary</c> on Group 2's Staff member page, then goes back to that page (Post/Redirect/Get). Library
-/// staff only: the G3-08 service leaves the role to its caller, as the API does.
+/// staff only: the service leaves the role to its caller, as the API does.
 /// <para>
 /// The form lives on another group's page, so a reason error travels back in TempData (<see cref="WaiveFormError"/>)
 /// and is shown beside the reason field of that record's form, which keeps what was typed. Any other refusal (the record

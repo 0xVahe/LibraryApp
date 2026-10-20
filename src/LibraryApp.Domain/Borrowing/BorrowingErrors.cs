@@ -232,7 +232,7 @@ public static class BorrowingErrors
         "borrowing.restricted_renewal_forbidden",
         "A Restricted employee cannot renew a loan.");
 
-    /// <summary>BQ-BA-11: a Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
+    /// <summary>A Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
     public static readonly Error SuspendedRenewalForbidden = Error.BusinessRule(
         "borrowing.suspended_renewal_forbidden",
         "A Suspended employee cannot renew a loan.");

@@ -12,7 +12,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-23: <c>WaivePenaltyForm</c> by the UI guide (Part 1 "Group 3", demo <c>staff-member.html</c>) — one form per active
+/// <c>WaivePenaltyForm</c> by the UI guide (Part 1 "Group 3", demo <c>staff-member.html</c>) — one form per active
 /// penalty record in the "Standing" card of <c>StaffBorrowingSummary</c>, reason required (BOR-08), library staff only;
 /// and the barcode of a copy held for pickup in the "Loans and reservations" table. Every test uses its own members.
 /// </summary>

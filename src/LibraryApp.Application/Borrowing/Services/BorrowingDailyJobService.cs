@@ -183,7 +183,7 @@ public sealed class BorrowingDailyJobService(
         return unitOfWork.ExecuteInTransactionAsync(
             async token =>
             {
-                // BQ-G1-09: Catalog deletes a book without asking Borrowing (only OnLoan/Reserved copies block it,
+                // Catalog deletes a book without asking Borrowing (only OnLoan/Reserved copies block it,
                 // BR-CAT-3), so its queue can never be served. GetBookAsync returns a deleted book with IsDeleted.
                 BookDto? book = await catalog.GetBookAsync(bookId, token);
                 if (book is { IsDeleted: false })

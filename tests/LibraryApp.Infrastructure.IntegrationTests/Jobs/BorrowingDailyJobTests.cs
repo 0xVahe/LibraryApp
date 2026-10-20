@@ -139,7 +139,7 @@ public sealed class BorrowingDailyJobTests
         Assert.Equal(state.QueuedBookIds.ToArray(), state.BookCalls.ToArray());
         Assert.Equal(state.ReservingStaffIds.ToArray(), state.MemberCalls.ToArray());
 
-        // G3-26 runs after the pickup expiry: a held copy of an expired pickup is first offered to the queue.
+        // The clean-up of reservations that can never be served runs after the pickup expiry: a held copy of an expired pickup is first offered to the queue.
         Assert.Equal(
             new[] { "pickup", "book", "book", "member", "member" },
             state.Steps.ToArray());

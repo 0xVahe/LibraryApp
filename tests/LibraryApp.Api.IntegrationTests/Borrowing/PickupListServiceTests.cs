@@ -11,7 +11,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-20: the Loan desk's list of copies held for pickup (BOR-07) on SQL Server, without the Borrowing seed, so the
+/// The Loan desk's list of copies held for pickup (BOR-07) on SQL Server, without the Borrowing seed, so the
 /// class owns every reservation in its database.
 /// </summary>
 public class PickupListServiceTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>

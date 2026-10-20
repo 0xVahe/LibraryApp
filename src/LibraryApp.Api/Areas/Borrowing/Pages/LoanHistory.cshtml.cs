@@ -15,10 +15,10 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace LibraryApp.Api.Areas.Borrowing.Pages;
 
 /// <summary>
-/// Loan history of one staff member (BOR-10, G3-24; UI guide Part 2 "Loan history", demo <c>staff-loans.html</c>): every
+/// Loan history of one staff member (BOR-10; UI guide Part 2 "Loan history", demo <c>staff-loans.html</c>): every
 /// loan, also Returned and Lost, newest issue first, filtered by status (the effective one: an Active loan past the overdue
 /// rule is Overdue, in the badge and in the filter) and by issue period through the query string, with
-/// the shared pager. Library staff only; an unknown staff member is the Not found page. Data from the G3-09 service, titles
+/// the shared pager. Library staff only; an unknown staff member is the Not found page. Data from the loan history service, titles
 /// and barcodes from Catalog, the name from Staff and the points of each loan from the penalty records (waived ones left
 /// out: they no longer count).
 /// </summary>

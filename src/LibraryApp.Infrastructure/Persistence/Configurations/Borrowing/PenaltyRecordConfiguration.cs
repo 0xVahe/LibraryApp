@@ -18,7 +18,7 @@ public sealed class PenaltyRecordConfiguration : IEntityTypeConfiguration<Penalt
         // A penalty belongs to one loan (same module); a loan with penalties is never deleted (Restrict, default).
         builder.HasOne<Loan>().WithMany().HasForeignKey(x => x.LoanId);
 
-        // Reference to another module: id and foreign key only (SD-13).
+        // Reference to another module: id and foreign key only.
         builder.HasOne<StaffMember>().WithMany().HasForeignKey(x => x.StaffMemberId);
 
         // Active points of a member.
@@ -27,7 +27,7 @@ public sealed class PenaltyRecordConfiguration : IEntityTypeConfiguration<Penalt
 
         builder.HasIndex(x => x.LoanId).HasDatabaseName("IX_PenaltyRecords_LoanId");
 
-        // Points 0..10 and a reason when waived (G3-04). PenaltyRecordStatus: Waived = 3.
+        // Points 0..10 and a reason when waived. PenaltyRecordStatus: Waived = 3.
         // Keep CHECK SQL on one line: a multi-line string carries the line endings of the checkout into the model.
         builder.ToTable(t =>
         {
