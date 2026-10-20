@@ -48,7 +48,9 @@ public class StaffMemberPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
                      member.Position, member.StaffCategoryName, member.LineManagerEmail! })
             Assert.Contains(text, html);
         Assert.Contains($"href=\"/staff/{member.Id}/edit\"", html);
-        Assert.Contains("Borrowing details are currently unavailable.", html);
+        // Group 3's StaffBorrowingSummary fills the slot (G3-19); its content is tested in BorrowingBlocksPageTests.
+        Assert.Contains("Loans and reservations", html);
+        Assert.DoesNotContain("Borrowing details are currently unavailable.", html);
         Assert.DoesNotContain("class=\"owner", html);
         Assert.DoesNotContain("style=\"", html);
     }
@@ -381,30 +383,5 @@ public class StaffMemberPageTests(ApiHostFactory factory) : IClassFixture<ApiHos
         Assert.Equal("/forbidden", target.AbsolutePath);
         using var forbidden = await client.GetAsync(target.PathAndQuery);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
-    }
-}
-
-/// <summary>Proves the page can consume Group 3's component when it is registered, without owning its implementation.</summary>
-public sealed class StaffBorrowingSlotFactory : ApiHostFactory
-{
-    protected override void ConfigureTestServices(IServiceCollection services) =>
-        services.AddControllers().AddApplicationPart(typeof(TestStaffBorrowingSummaryViewComponent).Assembly);
-}
-
-[ViewComponent(Name = "StaffBorrowingSummary")]
-public sealed class TestStaffBorrowingSummaryViewComponent : ViewComponent
-{
-    public IViewComponentResult Invoke(Guid staffMemberId) => Content($"Borrowing summary for {staffMemberId}");
-}
-
-public class StaffBorrowingSlotTests(StaffBorrowingSlotFactory factory) : IClassFixture<StaffBorrowingSlotFactory>
-{
-    [Fact]
-    public async Task The_registered_component_receives_the_viewed_staff_id()
-    {
-        using var client = await UiTestClient.SignedInAsync(factory, "aram.sargsyan@ameriabank.am", StaffSeedData.Password);
-        var html = await client.GetStringAsync($"/staff/{Members.AnnaPetrosyan}");
-        Assert.Contains($"Borrowing summary for {Members.AnnaPetrosyan}", html);
-        Assert.DoesNotContain("Borrowing details are currently unavailable.", html);
     }
 }

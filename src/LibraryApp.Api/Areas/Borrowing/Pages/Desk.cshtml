@@ -1,0 +1,22 @@
+@page "/desk"
+@model DeskModel
+@inject Microsoft.AspNetCore.Mvc.ViewComponents.IViewComponentSelector ViewComponents
+@{
+    ViewData["Title"] = "Loan desk";
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Loan desk", "Issue and take back books. Scan the copy barcode or type it in."))" />
+
+<div class="stack-lg">
+    <div class="grid grid-2">
+        <partial name="_IssueLoanForm" model="Model" />
+        <partial name="_ReturnLoanForm" model="Model" />
+    </div>
+
+    <partial name="_PickupQueueTable" model="Model" />
+
+    @* Group 4's read-only overdue table (Q-G3-07, option A); the desk works before it is merged. *@
+    @if (ViewComponents.SelectComponent("OverdueTable") is not null)
+    {
+        @await Component.InvokeAsync("OverdueTable")
+    }
+</div>

@@ -1,0 +1,59 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* "Loans and reservations" and "Standing" (Group 3) on Group 2's Staff member page. *@
+<section class="card flush" aria-labelledby="staff-loans-title">
+    <div class="card-head">
+        <div><h2 id="staff-loans-title">Loans and reservations</h2><p class="small muted">Open loans and reservations of this staff member.</p></div>
+    </div>
+    @if (Model.Loans.Count + Model.Reservations.Count == 0)
+    {
+        <div class="card-foot"><p class="muted">No open loans or reservations.</p></div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Book</th><th scope="col">Copy</th><th scope="col">Due / hold until</th><th scope="col">Status</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var loan in Model.Loans)
+                {
+                    <tr>
+                        <td data-label="Book">@loan.Book.Title</td>
+                        <td class="nowrap" data-label="Copy">@(loan.Barcode ?? "—")</td>
+                        <td data-label="Due">@Texts.Date(loan.Due)</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="loan.Status" /></td>
+                    </tr>
+                }
+                @foreach (var reservation in Model.Reservations)
+                {
+                    <tr>
+                        <td data-label="Book">@reservation.Book.Title</td>
+                        <td class="nowrap" data-label="Copy">—</td>
+                        <td data-label="Hold until">@(reservation.ReadyUntil is { } until ? Texts.Date(until) : $"{Texts.Ordinal(reservation.QueuePosition)} in the queue")</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="reservation.Status" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<section class="card" aria-labelledby="staff-standing-title">
+    <div class="card-head"><h2 id="staff-standing-title">Standing</h2></div>
+    <div class="stat"><span class="small muted">Active penalty points</span><span class="stat-value">@Model.ActivePenaltyPoints</span></div>
+    @if (Model.Penalties.Count > 0)
+    {
+        <ul class="list mt-16">
+            @foreach (var penalty in Model.Penalties)
+            {
+                <li>
+                    <div class="grow">
+                        <p class="title">@Texts.Count(penalty.Points, "point") · @penalty.Reason</p>
+                        <p class="small muted">@Texts.Quoted(penalty.Book.Title), expires @Texts.Date(penalty.Expires)</p>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>

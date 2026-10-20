@@ -1,0 +1,43 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* "Books on loan" (Group 3) on My library; Renew posts to /loans/renew and comes back here (Post/Redirect/Get). *@
+@{
+    var back = Context.Request.Path + Context.Request.QueryString;
+}
+<section class="card" aria-labelledby="my-loans-title">
+    <div class="card-head">
+        <div><h2 id="my-loans-title">Books on loan</h2><p class="small muted">Take them back to the library desk.</p></div>
+    </div>
+    @if (Model.Loans.Count == 0)
+    {
+        <p class="muted">No books on loan.</p>
+    }
+    else
+    {
+        <ul class="list">
+            @foreach (var loan in Model.Loans)
+            {
+                var badge = loan.Badge;
+                <li>
+                    <partial name="/Areas/Catalog/Pages/_BookCover.cshtml" model="loan.Book.Cover" />
+                    <div class="grow">
+                        <partial name="/Areas/Borrowing/Components/_BookTitle.cshtml" model="loan.Book" />
+                        <p class="small muted">@loan.CopyText</p>
+                        <p class="small">@loan.DueText(Model.Rules)</p>
+                    </div>
+                    <div class="row">
+                        <span class="@badge.CssClass">@badge.Text</span>
+                        @if (loan.CanRenew(Model.Rules))
+                        {
+                            <form method="post" asp-area="Borrowing" asp-page="/RenewLoan">
+                                <input type="hidden" name="LoanId" value="@loan.LoanId" />
+                                <input type="hidden" name="ReturnUrl" value="@back" />
+                                <button class="btn btn-secondary btn-sm" type="submit" aria-label="Renew @loan.Book.Title">Renew</button>
+                            </form>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>

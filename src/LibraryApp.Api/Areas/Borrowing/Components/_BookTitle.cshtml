@@ -1,0 +1,11 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.BorrowedBook
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* The title in the Borrowing lists: a link to the Book page, plain text for a book Catalog no longer shows. *@
+@if (Model.Href is { } href)
+{
+    <a class="title" href="@href">@Model.Title</a>
+}
+else
+{
+    <p class="title">@Model.Title</p>
+}
