@@ -81,25 +81,6 @@ public sealed class PenaltyService(
         return new PenaltyRecalculationResult(expiredRecords, activePoints, StatusChanged: true);
     }
 
-    /// <inheritdoc />
-    public async Task WaivePenaltyAsync(Guid penaltyId, string reason, CancellationToken cancellationToken = default)
-    {
-        if (penaltyId == Guid.Empty)
-        {
-            throw new DomainException(BorrowingErrors.InvalidReferenceId);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        PenaltyRecord? penalty = await penalties.GetByIdAsync(penaltyId, cancellationToken);
-        if (penalty == null)
-        {
-            // Replace with your project's actual error definition if named differently (e.g., BorrowingErrors.PenaltyRecordNotFound)
-            throw new DomainException(BorrowingErrors.PenaltyNotFound);
-        }
-
-        penalty.Waive(reason);
-    }
     /// <summary>
     /// The policy table (section 8) with BQ-BA-01: below the Restricted threshold the member is Active; a suspension
     /// lasts until its end; after it, and whenever points are at or above the Restricted threshold, the member is
