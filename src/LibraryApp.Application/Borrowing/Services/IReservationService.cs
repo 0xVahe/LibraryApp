@@ -13,4 +13,10 @@ public interface IReservationService
 
     /// <summary>One reservation; a Staff Member sees only their own (others are reported as not found).</summary>
     Task<ReservationDto> GetAsync(Guid reservationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Cancels a Waiting or ReadyForPickup reservation (BOR-12); a Staff Member may cancel only their own, another one is
+    /// reported as not found (NFR-03). A held copy goes to the next waiting member or becomes Available.
+    /// </summary>
+    Task<ReservationDto> CancelAsync(Guid reservationId, CancellationToken ct = default);
 }
