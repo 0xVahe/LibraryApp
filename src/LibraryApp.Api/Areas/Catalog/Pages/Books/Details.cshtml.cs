@@ -28,8 +28,8 @@ public sealed class DetailsModel(
 
     public BookDetailsDto Book { get; private set; } = null!;
 
-    /// <summary>"Parent / Child" for a subcategory, the name for a top-level category.</summary>
-    public string CategoryPath { get; private set; } = "";
+    /// <summary>The category as links to the Catalog page: the parent, then the subcategory; only the category when top-level.</summary>
+    public IReadOnlyList<CategoryDto> CategoryTrail { get; private set; } = [];
 
     public string LanguageName { get; private set; } = "";
 
@@ -55,7 +55,8 @@ public sealed class DetailsModel(
             .ToList();
 
         var tree = new CategoryTree(await categories.ListAsync(ct));
-        CategoryPath = tree.PathOf(Book.CategoryId) ?? Book.CategoryName;
+        var category = new CategoryDto(Book.CategoryId, Book.CategoryName, null);
+        CategoryTrail = tree.ParentOf(Book.CategoryId) is { } parent ? [parent, category] : [category];
         LanguageName = CatalogLanguages.NameOf(Book.Language);
 
         // One more than shown, so the list is still full after this book is left out.

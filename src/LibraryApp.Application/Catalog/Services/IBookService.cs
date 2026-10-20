@@ -2,6 +2,7 @@ using LibraryApp.Application.Catalog.Dto;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Creates, updates and soft-deletes books (CAT-01, BR-CAT-1, BR-CAT-3, BR-CAT-5).</summary>
 public interface IBookService
 {
     Task<Guid> CreateAsync(

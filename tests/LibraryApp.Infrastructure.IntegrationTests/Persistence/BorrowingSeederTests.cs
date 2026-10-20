@@ -8,7 +8,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 /// <summary>The Borrowing seed without the Staff and Catalog seed: skipped with a warning, nothing written, no error.</summary>
 public sealed class BorrowingSeederTests : IAsyncLifetime
 {
-    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly string _connectionString = TestDatabase.NewDatabase();
 
     private LibraryDbContext Open()
     {

@@ -20,7 +20,8 @@ public sealed class CatalogBookSeedTests(CatalogReferenceFixture fixture) : ICla
         Assert.Equal(CatalogSeedData.Authors.Count, await verify.Authors.CountAsync());
         Assert.Equal(CatalogSeedData.Publishers.Count, await verify.Publishers.CountAsync());
         Assert.Equal(bookIds.Length, bookIds.Distinct().Count());
-        Assert.Equal(8, await verify.Books.Where(book => bookIds.Contains(book.Id)).Select(book => book.CategoryId).Distinct().CountAsync());
+        // 13 of the 14 categories: "IT & Software Engineering" keeps all its books in its two subcategories.
+        Assert.Equal(13, await verify.Books.Where(book => bookIds.Contains(book.Id)).Select(book => book.CategoryId).Distinct().CountAsync());
         Assert.Equal(CatalogSeedData.CopiesPerBook.Values.Sum(),
             await verify.BookCopies.CountAsync(copy => bookIds.Contains(copy.BookId)));
 

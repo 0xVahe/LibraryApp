@@ -24,4 +24,5 @@ public sealed class CopiesPanelViewComponent(IBookCopyService copies) : ViewComp
     }
 }
 
+/// <summary>Model of the copies panel: the book and all its copies, retired ones included.</summary>
 public sealed record CopiesPanelModel(Guid BookId, IReadOnlyList<BookCopyDto> Copies);

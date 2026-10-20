@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LibraryApp.Api.Areas.Catalog.Pages;
 
+/// <summary>Publishers page for library staff: create, rename and delete publishers.</summary>
 [Authorize(Policy = UiPolicies.LibraryStaff)]
 public sealed class PublishersModel(IPublisherService service) : PageModel
 {

@@ -6,6 +6,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Authors and the authors of a book (CAT-02, BR-CAT-5); every change runs in one transaction.</summary>
 public sealed class AuthorService(
     IAuthorRepository repository, IUnitOfWork unitOfWork, IIdGenerator ids, IApplicationLock applicationLock) : IAuthorService
 {
