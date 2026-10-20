@@ -2,6 +2,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Books and the checks <see cref="Services.BookService"/> makes before a write. Entities are tracked.</summary>
 public interface IBookRepository
 {
     Task<Book?> FindAsync(Guid id, CancellationToken ct);

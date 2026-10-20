@@ -8,6 +8,7 @@ namespace LibraryApp.Application.Staff.Ports;
 public interface IStaffManagementRepository
 {
     Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct);
+    Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct);
     Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct);
     Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct);
     Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct);

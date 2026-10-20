@@ -51,4 +51,17 @@ public sealed class StaffMemberService(IStaffMemberRepository staffMembers) : IS
 
         return await staffMembers.GetNamesAsync(staffMemberIds.Distinct().ToArray(), ct);
     }
+    
+    public async Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(employeeIdOrEmail);
+
+        var value = employeeIdOrEmail.Trim();
+        if (value.Length == 0)
+            return null;
+
+        return value.Contains('@')
+            ? await staffMembers.FindByCorporateEmailAsync(value.ToLowerInvariant(), ct)
+            : await staffMembers.FindByEmployeeIdAsync(value, ct);
+    }
 }

@@ -31,6 +31,7 @@ public static class BorrowingTestSettings
         {
             MaxActive = 3,
             PickupWorkingDays = 3,
+            AnyCopyFulfils = true,
         },
     };
 

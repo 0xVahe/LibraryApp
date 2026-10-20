@@ -36,4 +36,11 @@ public interface IStaffMemberService
     Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
         IReadOnlyCollection<Guid> staffMemberIds,
         CancellationToken ct = default);
+    
+    /// <summary>
+    /// Finds one staff member by employee ID or corporate email, for the Loan desk. A value with <c>@</c> is an
+    /// email; the search ignores case and spaces around the value. Unknown or empty → <c>null</c> (no exception).
+    /// Deactivated members are found too: whether they may borrow is still decided by <see cref="CanBorrowAsync"/>.
+    /// </summary>
+    Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default);
 }

@@ -29,7 +29,7 @@ public class NotificationEndpointTests(ApiHostFactory factory) : IClassFixture<A
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "reader@ameriabank.am", staffMemberId ?? Guid.NewGuid(), StaffMemberStatus.Active, [role])).Token;
+                factory.Account(role) with { StaffMemberId = staffMemberId ?? Guid.NewGuid() }).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;
@@ -176,7 +176,7 @@ public class NotificationEndpointTests(ApiHostFactory factory) : IClassFixture<A
     }
 
     [Fact]
-    public async Task An_account_without_a_staff_profile_sees_nothing_and_unauthenticated_requests_are_401()
+    public async Task A_token_without_a_staff_member_claim_sees_nothing_and_unauthenticated_requests_are_401()
     {
         using var anonymous = Client(null);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/notifications/me")).StatusCode);
@@ -185,7 +185,7 @@ public class NotificationEndpointTests(ApiHostFactory factory) : IClassFixture<A
             (await anonymous.PatchAsync($"/api/notifications/{Guid.NewGuid()}/read", null)).StatusCode);
 
         var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(Guid.NewGuid(), "nobody@ameriabank.am", null, StaffMemberStatus.Active, [StaffRoles.StaffMember])).Token;
+            factory.Account(StaffRoles.StaffMember) with { StaffMemberId = null }).Token;
         using var noProfile = factory.CreateClient();
         noProfile.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

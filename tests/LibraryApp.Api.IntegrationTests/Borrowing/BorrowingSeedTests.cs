@@ -105,7 +105,7 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         // REP-02 acceptance: "Given 40 seeded loans of which 6 are overdue … overdue count is 6 and overdue rate is 15.0%".
         using var client = factory.CreateClient();
         string token = factory.Services.GetRequiredService<IAccessTokenIssuer>()
-            .Issue(new LoginAccount(Guid.NewGuid(), "seed-tests@example.com", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian]))
+            .Issue(factory.Account(StaffRoles.Librarian))
             .Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

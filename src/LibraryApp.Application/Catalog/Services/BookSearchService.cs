@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Application.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
@@ -18,7 +19,7 @@ public sealed class BookSearchService(IBookSearchQuery query, ICatalogCoverUrlBu
 
         var filter = new BookSearchFilter(
             Text: text,
-            IsbnText: text?.Replace("-", string.Empty).Replace(" ", string.Empty),
+            IsbnText: IsbnText(text),
             CategoryId: request.CategoryId,
             Language: Normalize(request.Language)?.ToLowerInvariant(),
             Available: request.Available);
@@ -40,6 +41,16 @@ public sealed class BookSearchService(IBookSearchQuery query, ICatalogCoverUrlBu
             result.Page,
             result.PageSize);
     }
+
+    /// <summary>
+    /// The search text as it is compared with the stored ISBNs, which are 13 digits (BR-CAT-1): a whole ISBN-10 or
+    /// ISBN-13 becomes that ISBN-13, so an ISBN-10 finds its book too; any other text loses its hyphens and spaces,
+    /// so part of an ISBN still matches.
+    /// </summary>
+    private static string? IsbnText(string? text) =>
+        text is null ? null
+        : IsbnRules.TryNormalize(text, out var isbn) ? isbn
+        : text.Replace("-", string.Empty).Replace(" ", string.Empty);
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

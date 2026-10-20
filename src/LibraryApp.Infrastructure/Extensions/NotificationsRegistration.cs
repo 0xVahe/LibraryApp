@@ -1,10 +1,8 @@
-using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Notifications;
 using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Infrastructure.Mail;
 using LibraryApp.Infrastructure.Persistence.Repositories.Notifications;
-using LibraryApp.Infrastructure.Persistence.Seed.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,9 +23,6 @@ public static class NotificationsRegistrationExtensions
         // In-app notifications of the current staff member (NOT-04)
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationService, NotificationService>();
-
-        // Default notification templates, development seed (NOT-02).
-        services.AddScoped<IModuleSeeder, NotificationTemplateSeeder>();
 
         // Template renderer (NOT-02): stateless, so one instance.
         services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();

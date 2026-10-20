@@ -46,6 +46,7 @@ public static class BorrowingRegistrationExtensions
         services.AddScoped<ReturnPenaltyCalculator>();
         services.AddScoped<IPenaltyService, PenaltyService>();
         services.AddScoped<ILoanService, LoanService>();
+        services.AddScoped<ILoanLostService, LoanLostService>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();
 

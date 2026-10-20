@@ -178,6 +178,19 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
     }
 
     [Fact]
+    public async Task Status_pages_show_the_illustration_also_on_a_nested_path()
+    {
+        var client = UiTestClient.Anonymous(factory);
+
+        var html = await (await client.GetAsync("/staff/00000000-0000-0000-0000-000000000000/nope")).Content.ReadAsStringAsync();
+        var image = await client.GetAsync("/img/error-fallback.webp");
+
+        Assert.Contains("<img class=\"error-art\" src=\"/img/error-fallback.webp\" alt=\"\"", html);
+        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+        Assert.Equal("image/webp", image.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task The_stylesheet_has_the_agreed_brand_colours()
     {
         var css = await (await UiTestClient.Anonymous(factory).GetAsync("/css/site.css")).Content.ReadAsStringAsync();
