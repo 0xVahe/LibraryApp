@@ -1,0 +1,16 @@
+@page "/staff"
+@model IndexModel
+@{
+    ViewData["Title"] = "Staff members";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Staff members",
+             "Find library members by name, employee ID, department or status.",
+             [new PageAction("Import CSV", "/staff/import"), new PageAction("Enrol staff member", "/staff/new", Primary: true)]))' />
+
+<partial name="_StaffFilters" model="Model" />
+@if (ViewData.ModelState.IsValid)
+{
+    <partial name="_StaffTable" model="Model.Result" />
+    <partial name="/Pages/Shared/_Pager.cshtml" model="PagerModel.From(Model.Result, Request)" />
+}

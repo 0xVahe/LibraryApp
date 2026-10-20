@@ -1,0 +1,40 @@
+@page "/staff/{id:guid}"
+@model DetailsModel
+@inject Microsoft.AspNetCore.Mvc.ViewComponents.IViewComponentSelector ViewComponents
+@{
+    ViewData["Title"] = Model.FullName;
+}
+<p class="crumbs"><a class="link-btn" href="/staff">Staff members</a> / @Model.FullName</p>
+<div class="page-head">
+    <div class="row gap-16">
+        <span class="avatar lg" aria-hidden="true">@Model.Initials</span>
+        <div class="text-wrap">
+            <div class="row"><h1>@Model.FullName</h1><partial name="/Pages/Shared/_StatusBadge.cshtml" model="Model.Status" /></div>
+            <p class="muted mt-4">@Model.Member.Position · @Model.Member.DepartmentName</p>
+        </div>
+    </div>
+    @if (!Model.IsDeactivated)
+    {
+        <a class="btn btn-secondary" href="/staff/@Model.Member.Id/edit">Edit profile</a>
+    }
+</div>
+
+<div class="grid grid-side">
+    <div class="stack-lg">
+        <partial name="_StaffProfileCard" model="Model.Member" />
+        @if (ViewComponents.SelectComponent("StaffBorrowingSummary") is not null)
+        {
+            @await Component.InvokeAsync("StaffBorrowingSummary", new { staffMemberId = Model.Member.Id })
+        }
+        else
+        {
+            <section class="card" aria-labelledby="borrowing-title">
+                <div class="card-head"><h2 id="borrowing-title">Loans and reservations</h2></div>
+                <p class="muted">Borrowing details are currently unavailable.</p>
+            </section>
+        }
+    </div>
+    <aside class="stack-lg" aria-label="Account actions">
+        <partial name="_DeactivateStaffForm" model="Model" />
+    </aside>
+</div>
