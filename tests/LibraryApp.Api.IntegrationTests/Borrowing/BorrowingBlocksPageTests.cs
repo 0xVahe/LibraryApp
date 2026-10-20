@@ -331,6 +331,37 @@ public class BorrowingBlocksPageTests(BorrowingUiHost factory) : IClassFixture<B
     }
 
     [Fact]
+    public void A_past_due_date_is_never_due_today_even_before_the_loan_is_marked_overdue()
+    {
+        var book = new BorrowedBook(Guid.Empty, "Book", null, new("Book", null, null, Guid.Empty, Mini: true), null);
+
+        var line = new LoanLine(Guid.Empty, book, null, DateOnly.MinValue, IsOverdue: false, 0, DaysLeft: -1, 0);
+
+        Assert.Equal(("badge badge-red", "Overdue"), (line.Badge.CssClass, line.Badge.Text));
+    }
+
+    [Fact]
+    public async Task A_loan_due_yesterday_that_the_daily_job_has_not_marked_yet_is_overdue_on_the_page()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            var clock = scope.ServiceProvider.GetRequiredService<IClock>();
+            // Issued 15 days ago for 14 days: due yesterday, still Active (the job runs once a day).
+            db.Loans.Add(Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(41, 1), Members.AnahitMartirosyan, clock.UtcNow.AddDays(-15), 14));
+            (await db.BookCopies.SingleAsync(c => c.Id == CatalogSeedIds.Copy(41, 1))).ChangeStatus(BookCopyStatus.OnLoan);
+            await db.SaveChangesAsync();
+        }
+        var browser = await UiBrowser.SignInAsync(factory, Members.AnahitMartirosyan);
+
+        var (_, html, _) = await browser.GetAsync(Block("MyLoans", Members.AnahitMartirosyan));
+
+        Assert.Matches("<span class=\"badge badge-red\">Overdue( · \\d+ working days?)?</span>", html);
+        Assert.DoesNotContain("Due today", html);
+        Assert.DoesNotContain("action=\"/loans/renew\"", html);
+    }
+
+    [Fact]
     public void Overdue_days_are_working_days()
     {
         var book = new BorrowedBook(Guid.Empty, "Book", null, new("Book", null, null, Guid.Empty, Mini: true), null);

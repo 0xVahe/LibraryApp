@@ -52,11 +52,15 @@ public sealed record LoanLine(
     /// </summary>
     public const int DueSoonDays = 5;
 
-    /// <summary>Overdue in red (in working days, BOR-05), due soon in amber, otherwise "On loan" in blue.</summary>
-    public BadgeModel Badge => IsOverdue
+    /// <summary>
+    /// Overdue in red (in working days, BOR-05), due soon in amber, otherwise "On loan" in blue. A due date in the past is
+    /// never "Due today": the reader takes "today" from the same moment as the overdue rule, so such a loan is overdue;
+    /// should the two ever disagree, the badge still says Overdue.
+    /// </summary>
+    public BadgeModel Badge => IsOverdue || DaysLeft < 0
         ? StatusBadge.Custom(OverdueWorkingDays > 0 ? $"Overdue · {Texts.Count(OverdueWorkingDays, "working day")}" : "Overdue", "red")
         : DaysLeft <= DueSoonDays
-            ? StatusBadge.Custom(DaysLeft switch { <= 0 => "Due today", 1 => "Due tomorrow", var n => $"Due in {n} days" }, "amber")
+            ? StatusBadge.Custom(DaysLeft switch { 0 => "Due today", 1 => "Due tomorrow", var n => $"Due in {n} days" }, "amber")
             : StatusBadge.For(LoanStatus.Active);
 
     /// <summary>The status of the loan for the staff table: Overdue (red) or On loan (blue).</summary>
@@ -143,8 +147,9 @@ public sealed class StaffBorrowingReader(
             ? []
             : (await catalog.GetCopiesAsync(copyIds, ct)).ToDictionary(c => c.Id, c => c.Barcode);
 
+        // One moment for the overdue rule and the day count, so a loan cannot be "not overdue" and "due yesterday" at midnight.
         DateTime now = clock.UtcNow;
-        DateOnly today = clock.LocalToday;
+        DateOnly today = clock.ToLocalDate(now);
 
         var loans = summary.ActiveLoans.Select(loan =>
         {
