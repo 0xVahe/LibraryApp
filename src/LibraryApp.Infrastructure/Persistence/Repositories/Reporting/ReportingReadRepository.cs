@@ -1,5 +1,7 @@
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
@@ -7,7 +9,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Reporting;
 
-public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingReadRepository
+public sealed class ReportingReadRepository(
+    LibraryDbContext db,
+    IOptions<ReportingOptions> options) : IReportingReadRepository
 {
     public async Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
         DateTime overdueCutoffUtc,
@@ -79,7 +83,7 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
             group loan by new { book.Id, book.Title } into grouped
             orderby grouped.Count() descending, grouped.Key.Title
             select new TopBookReportItemDto(grouped.Key.Id, grouped.Key.Title, grouped.Count()))
-            .Take(10)
+            .Take(options.Value.TopBooksLimit)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(
@@ -94,6 +98,6 @@ public sealed class ReportingReadRepository(LibraryDbContext db) : IReportingRea
             group loan by new { category.Id, category.Name } into grouped
             orderby grouped.Count() descending, grouped.Key.Name
             select new TopCategoryReportItemDto(grouped.Key.Id, grouped.Key.Name, grouped.Count()))
-            .Take(5)
+            .Take(options.Value.TopCategoriesLimit)
             .ToListAsync(ct);
 }

@@ -84,6 +84,18 @@ Account state is cached per user and token stamp, with absolute expiration on ea
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 
+### Reporting (`Reporting`)
+
+Configure reporting in `src/LibraryApp.Api/appsettings.json`.
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `DashboardCacheMinutes` | 5 | Dashboard cache lifetime in minutes (1–60) | REP-02 / REP-F4 |
+| `TopBooksLimit` | 10 | Maximum top books returned (1–100) | REP-03 |
+| `TopCategoriesLimit` | 5 | Maximum top categories returned (1–100) | REP-03 |
+
+All three settings are required. Missing or out-of-range values prevent application startup.
+
 ### Notifications (`Notifications`)
 
 | Key | Value | Meaning | Requirement |
