@@ -28,8 +28,8 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
 /// Cancelling a reservation (BOR-12, NFR-03) through HTTP on the real host and database: who may cancel, which states
-/// may be cancelled, the hand-over of a held copy with its event, one transaction, and a cancel racing the issue of the
-/// held copy. Every test has its own host and database, so the books and staff members are not shared.
+/// may be cancelled, the hand-over of a held copy with its event, one transaction, and races against issue and pickup
+/// expiry. Every test has its own host and database, so the books and staff members are not shared.
 /// </summary>
 public sealed class ReservationCancelEndpointTests : IAsyncLifetime
 {
@@ -229,6 +229,69 @@ public sealed class ReservationCancelEndpointTests : IAsyncLifetime
             foreach (HttpResponseMessage response in responses)
                 response.Dispose();
         }
+    }
+
+    /// <summary>
+    /// A cancellation and the daily expiry job compete for the same expired pickup. The book lock lets one operation
+    /// close it and offer its copy; the other observes the closed state and does not offer the copy a second time.
+    /// </summary>
+    [Fact]
+    public async Task Cancel_racing_the_pickup_expiry_leaves_one_consistent_outcome()
+    {
+        DateTime now = _host.Services.GetRequiredService<IClock>().UtcNow;
+        var holderReservation = Reservation.Create(
+            Guid.NewGuid(), BookId, Members.AnnaPetrosyan, now.AddDays(-5), 1);
+        holderReservation.MarkReady(CopyId, now.AddTicks(-1));
+        var nextReservation = Reservation.Create(
+            Guid.NewGuid(), BookId, Members.MariamAvetisyan, now.AddDays(-4), 1);
+
+        await Db(async db =>
+        {
+            (await db.BookCopies.SingleAsync(copy => copy.Id == CopyId))
+                .ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.AddRange(holderReservation, nextReservation);
+            return await db.SaveChangesAsync();
+        });
+
+        int readyEventsBefore = await Db(db => db.OutboxMessages
+            .CountAsync(message => message.Type.EndsWith("ReservationReady")));
+
+        using var holder = Client(StaffRoles.StaffMember, Members.AnnaPetrosyan);
+        Task<HttpResponseMessage> cancelTask = CancelAsync(holder, holderReservation.Id);
+        Task<bool> expireTask = Task.Run(async () =>
+        {
+            using var scope = _host.Services.CreateScope();
+            return await scope.ServiceProvider
+                .GetRequiredService<IBorrowingDailyJobService>()
+                .ExpirePickupAsync(holderReservation.Id);
+        });
+
+        using HttpResponseMessage cancelResponse = await cancelTask;
+        bool expired = await expireTask;
+
+        Reservation savedHolder = await ReadAsync(holderReservation.Id);
+        Reservation savedNext = await ReadAsync(nextReservation.Id);
+
+        if (cancelResponse.StatusCode == HttpStatusCode.OK)
+        {
+            Assert.False(expired);
+            Assert.Equal(ReservationStatus.Cancelled, savedHolder.Status);
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, cancelResponse.StatusCode);
+            Assert.Equal(BorrowingErrors.ReservationCannotBeCancelled.Code,
+                await CodeAsync(cancelResponse));
+            Assert.True(expired);
+            Assert.Equal(ReservationStatus.Expired, savedHolder.Status);
+        }
+
+        Assert.Equal((ReservationStatus.ReadyForPickup, (Guid?)CopyId),
+            (savedNext.Status, savedNext.CopyId));
+        Assert.Equal(BookCopyStatus.Reserved, await CopyStatusAsync());
+        Assert.Equal(readyEventsBefore + 1,
+            await Db(db => db.OutboxMessages.CountAsync(
+                message => message.Type.EndsWith("ReservationReady"))));
     }
 
     [Fact]
