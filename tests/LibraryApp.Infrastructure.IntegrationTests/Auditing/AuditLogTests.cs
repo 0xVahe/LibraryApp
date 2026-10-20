@@ -27,7 +27,7 @@ public sealed class AuditFixture : IAsyncLifetime
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["ConnectionStrings:LibraryDb"] = TestDatabase.NewConnectionString(),
+            ["ConnectionStrings:LibraryDb"] = TestDatabase.NewDatabase(),
             ["Messaging:DispatcherEnabled"] = "false",
             ["Time:TimeZoneId"] = "Asia/Yerevan",
         }).Build();

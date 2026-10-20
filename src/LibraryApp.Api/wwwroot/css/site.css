@@ -349,7 +349,7 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, a:focus-visible, 
   border-color: var(--green-text);
   box-shadow: 0 0 0 4px rgba(114, 191, 68, 0.35);
 }
-input[aria-invalid="true"] { border-color: var(--red); }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--red); }
 input[readonly] { background: var(--surface); color: var(--text); }
 input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) brightness(0); }
 .check { display: flex; align-items: center; gap: 12px; min-height: 44px; font-weight: 400; font-size: 16px; color: var(--text); }
@@ -695,5 +695,6 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 .min-w-160 { min-width: 160px; }
 .min-w-200 { min-width: 200px; }
 .grow-160 { flex: 1; min-width: 160px; }
+.text-wrap { min-width: 0; overflow-wrap: anywhere; }
 .card-foot { padding: 0 24px 24px; }
 @media (max-width: 600px) { .card-foot { padding: 0 16px 16px; } }

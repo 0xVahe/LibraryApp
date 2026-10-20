@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LibraryApp.Api.Areas.Catalog.Pages;
 
+/// <summary>Categories page (CAT-03) for library staff: create, rename, move and delete categories.</summary>
 [Authorize(Policy = UiPolicies.LibraryStaff)]
 public sealed class CategoriesModel(ICategoryService service) : PageModel
 {

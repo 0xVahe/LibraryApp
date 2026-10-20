@@ -14,6 +14,11 @@ public interface IBorrowingDailyJobService
         Guid loanId,
         CancellationToken ct = default);
 
+    /// <summary>Expires a pickup reservation and releases or reoffers its held copy.</summary>
+    Task<bool> ExpirePickupAsync(
+        Guid reservationId,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Expires a staff member's penalties and recalculates their status.
     /// </summary>

@@ -28,7 +28,19 @@ internal static partial class TestSqlServer
 
     private static readonly Lazy<string?> Failure = new(() => Check(Setting.Value.Server, Setting.Value.Source));
 
-    /// <summary>A connection string to a new database on the test server; the caller creates and deletes it.</summary>
+    /// <summary>
+    /// Name of the server-wide application lock every test database creation takes (see <see cref="CreateDatabase"/>).
+    /// </summary>
+    internal const string CreateLockResource = "LibraryApp.Tests.CreateDatabase";
+
+    /// <summary>How long one creation waits for the creations before it.</summary>
+    private static readonly TimeSpan CreateLockTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// A connection string to a new database on the test server that does not exist yet. Only for the code that
+    /// creates it through <see cref="CreateDatabase"/> (<see cref="NewDatabase"/>, the API test host) and for a test
+    /// that checks a database is not created; every other test uses <see cref="NewDatabase"/>.
+    /// </summary>
     /// <param name="prefix">Start of the database name, for example <c>LibraryApp_Tests</c>.</param>
     public static string NewConnectionString(string prefix)
     {
@@ -39,6 +51,56 @@ internal static partial class TestSqlServer
         {
             InitialCatalog = $"{prefix}_{Guid.NewGuid():N}",
         }.ConnectionString;
+    }
+
+    /// <summary>
+    /// A new, empty database on the test server, created by <see cref="CreateDatabase"/>; returns its connection string.
+    /// The caller fills it (migrations or <c>EnsureCreated</c>) and deletes it.
+    /// </summary>
+    /// <param name="prefix">Start of the database name, for example <c>LibraryApp_Tests</c>.</param>
+    public static string NewDatabase(string prefix)
+    {
+        var connectionString = NewConnectionString(prefix);
+        CreateDatabase(connectionString);
+        return connectionString;
+    }
+
+    /// <summary>
+    /// Creates the empty database of <paramref name="connectionString"/> unless it exists. SQL Server copies the
+    /// <c>model</c> database for every <c>CREATE DATABASE</c> and needs an exclusive lock on it; two creations at the same
+    /// moment do not wait for each other, one of them fails with error 1807 ("Could not obtain exclusive lock on database
+    /// 'model'"). Test classes run in parallel and several test processes may use one server (<c>dotnet test</c> of the
+    /// solution), so every creation first takes one server-wide application lock (<see cref="CreateLockResource"/>):
+    /// the creations of all test processes on this server run one after another. Migrations and <c>EnsureCreated</c>
+    /// then find the database and only create its tables, which needs no lock on <c>model</c>.
+    /// </summary>
+    public static void CreateDatabase(string connectionString)
+    {
+        var name = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+        if (!TestDatabaseName().IsMatch(name))
+            throw new ArgumentException($"'{name}' is not a test database name; refusing to create it.", nameof(connectionString));
+
+        var master = new SqlConnectionStringBuilder(connectionString) { InitialCatalog = "master", Pooling = false };
+        using var connection = new SqlConnection(master.ConnectionString);
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = (int)CreateLockTimeout.TotalSeconds + 60;
+        // The name matches TestDatabaseName (a prefix and 32 hex digits), so it is safe inside the brackets.
+        // The lock belongs to the session: closing the connection (no pooling) releases it, also after an error.
+        command.CommandText = $"""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = N'Exclusive', @LockOwner = N'Session', @LockTimeout = @timeout;
+            IF @result < 0
+                THROW 50000, N'The test database creation lock was not granted in time.', 1;
+            IF DB_ID(@name) IS NULL
+                CREATE DATABASE [{name}];
+            EXEC sp_releaseapplock @Resource = @resource, @LockOwner = N'Session';
+            """;
+        command.Parameters.AddWithValue("@resource", CreateLockResource);
+        command.Parameters.AddWithValue("@timeout", (int)CreateLockTimeout.TotalMilliseconds);
+        command.Parameters.AddWithValue("@name", name);
+        command.ExecuteNonQuery();
     }
 
     /// <summary>The order of the class summary: environment, then <paramref name="dotEnvPath"/>, then LocalDB.</summary>

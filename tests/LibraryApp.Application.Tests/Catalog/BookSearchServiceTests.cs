@@ -30,6 +30,20 @@ public sealed class BookSearchServiceTests
         Assert.Equal("9780134757599", _query.Filter.IsbnText);
     }
 
+    [Theory]
+    [InlineData("1000000060", "9781000000061")]
+    [InlineData(" 1-000-00006-0 ", "9781000000061")]
+    [InlineData("100000001X", "9781000000016")]
+    [InlineData("9781000000061", "9781000000061")]
+    [InlineData("000-0006", "0000006")]
+    public async Task A_whole_isbn_10_or_13_is_searched_as_the_stored_isbn_13_and_part_of_an_isbn_as_typed(
+        string search, string expectedIsbnText)
+    {
+        await _service.SearchAsync(Request(search: search));
+
+        Assert.Equal(expectedIsbnText, _query.Filter!.IsbnText);
+    }
+
     [Fact]
     public async Task The_language_is_trimmed_and_lower_case()
     {

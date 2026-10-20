@@ -3,6 +3,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Publishers; lists are read without tracking.</summary>
 public interface IPublisherRepository
 {
     Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct);

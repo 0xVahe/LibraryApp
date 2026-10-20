@@ -88,6 +88,22 @@ public class ReservationCopyIdTests
     }
 
     [Fact]
+    public void Expire_at_exact_deadline_is_rejected_without_changing_reservation()
+    {
+        var reservation = CreateReservation();
+        var copyId = Guid.NewGuid();
+        var deadline = CreatedAtUtc.AddDays(2);
+        reservation.MarkReady(copyId, deadline);
+
+        DomainException exception = Assert.Throws<DomainException>(
+            () => reservation.Expire(deadline));
+
+        Assert.Equal(BorrowingErrors.PickupDeadlineNotPassed.Code, exception.Error.Code);
+        Assert.Equal(ReservationStatus.ReadyForPickup, reservation.Status);
+        Assert.Equal(copyId, reservation.CopyId);
+    }
+
+    [Fact]
     public void Fulfil_preserves_assigned_copy_id()
     {
         var reservation = CreateReservation();

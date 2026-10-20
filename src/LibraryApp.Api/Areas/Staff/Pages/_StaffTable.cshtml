@@ -1,0 +1,40 @@
+@using LibraryApp.Application.Common
+@using LibraryApp.Application.Staff.Dto
+@using LibraryApp.Domain.Staff
+@model PagedResult<StaffMemberListItemDto>
+<section class="card flush" aria-label="Staff members">
+    <div class="card-head">
+        <p class="small muted" role="status">@Model.TotalCount @(Model.TotalCount == 1 ? "staff member" : "staff members")</p>
+    </div>
+    @if (Model.Items.Count == 0)
+    {
+        <div class="card-foot">
+            <p class="muted">No staff members match your filters.</p>
+            <a class="link-btn" href="/staff">View all staff members</a>
+        </div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Name</th><th scope="col">Employee ID</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var member in Model.Items)
+                {
+                    <tr>
+                        <td data-label="Name">
+                            <a class="row-link link-btn" href="/staff/@member.Id" aria-label="@member.FirstName @member.LastName">
+                                <span>@member.FirstName @member.LastName<br><span class="small muted">@member.CorporateEmail</span></span>
+                            </a>
+                        </td>
+                        <td data-label="Employee ID">@member.EmployeeId</td>
+                        <td data-label="Department">@member.DepartmentName</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="Enum.Parse<StaffMemberStatus>(member.Status)" /></td>
+                        <td class="actions" data-label="Actions"><a class="btn btn-secondary btn-sm" href="/staff/@member.Id" aria-label="View @member.FirstName @member.LastName">View</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>

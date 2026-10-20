@@ -117,7 +117,7 @@ Scheduled jobs:
 
 | Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
 |---|---|---|---|---|
-| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints` | BOR-06, policy table, BQ-BA-01, BQ-G2-03 |
+| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G2-03 |
 
 ## Tests
 
@@ -179,6 +179,10 @@ Razor Pages live in the API host (UI guide in the team docs): the shared shell i
 - **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
 - **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
 - **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
+
+Staff pages (MEM-01, MEM-07): `/staff` provides search, department/status filters and pagination; `/staff/{id}` shows the profile and deactivation form. Both routes require a Librarian or Library Administrator.
+
+The profile invokes Group 3's `StaffBorrowingSummary` View Component with `staffMemberId` when available; otherwise it displays an unavailable message. Borrowing actions remain owned by Group 3.
 
 ## Test accounts
 

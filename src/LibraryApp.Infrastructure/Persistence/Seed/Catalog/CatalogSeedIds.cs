@@ -6,9 +6,11 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 /// </summary>
 public static class CatalogSeedIds
 {
+    /// <summary>Seeded category <paramref name="number"/>: 10000000-…-0001-{number}, in the order of <see cref="CatalogSeedData.Categories"/>.</summary>
     public static Guid Category(int number) =>
         new($"10000000-0000-0000-0001-{number:D12}");
 
+    /// <summary>Seeded book <paramref name="number"/>: b0000000-…-{number}, the same number as in <see cref="SeedBook.Number"/>.</summary>
     public static Guid Book(int number) =>
         new($"b0000000-0000-0000-0000-{number:D12}");
 
@@ -20,6 +22,7 @@ public static class CatalogSeedIds
     public static string CopyBarcode(int bookNumber, int copyNumber) =>
         $"BK-{bookNumber:D4}-{copyNumber:D2}";
 
+    /// <summary>Stored cover path of that book, for example library-covers/01.png; the URL is built from Catalog:Covers:BaseUrl.</summary>
     public static string CoverImagePath(int bookNumber) =>
         $"library-covers/{bookNumber:D2}.png";
 }

@@ -8,8 +8,12 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace LibraryApp.Api.Controllers.Catalog;
 
+/// <summary>
+/// Books of the catalog (CAT-01, CAT-05, CAT-06, CAT-09). Reads: any signed-in user; writes: Librarian or Administrator.
+/// </summary>
 [ApiController]
 [Route("api/books")]
+[Authorize]
 public sealed class BooksController(
     IBookSearchService searchService,
     IBookDetailsService detailsService,
@@ -80,7 +84,11 @@ public sealed class BooksController(
         return CreatedAtAction(nameof(GetById), new { id }, book);
     }
 
-    /// <summary>Updates a book (CAT-01).</summary>
+    /// <summary>Updates a book (CAT-01). Every field is replaced; the authors are changed with PUT /api/books/{id}/authors.</summary>
+    /// <remarks>
+    /// Send the current <c>coverImagePath</c> (GET /api/books/{id} returns it) to keep the cover: an empty or missing value
+    /// removes it. The ISBN must stay unique among active books (BR-CAT-1); a deleted book answers 404.
+    /// </remarks>
     [HttpPut("{id:guid}")]
     [Authorize(Roles = Writers)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -131,7 +139,11 @@ public sealed class BooksController(
         return Ok(await importService.ImportAsync(stream, file.Length, cancellationToken));
     }
 
-    /// <summary>Soft-deletes a book (CAT-01).</summary>
+    /// <summary>Soft-deletes a book (CAT-01, BR-CAT-3).</summary>
+    /// <remarks>
+    /// The book leaves the catalog and its copies are withdrawn; Lost copies stay Lost. While a copy is on loan or reserved,
+    /// the answer is 409 <c>catalog.book_has_copies_in_circulation</c> and nothing changes.
+    /// </remarks>
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = Writers)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

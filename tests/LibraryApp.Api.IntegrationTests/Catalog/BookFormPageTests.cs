@@ -28,7 +28,7 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
 
     /// <summary>A category, an author and (optionally) a book of them, with names no other test uses.</summary>
     private async Task<(Guid CategoryId, Guid AuthorId, Guid BookId, string Isbn)> SeedAsync(bool withOnLoanCopy = false,
-        string? coverImagePath = null)
+        string? coverImagePath = null, string language = "en")
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
@@ -36,7 +36,7 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         var category = new Category(Guid.NewGuid(), $"Page category {suffix}");
         var author = new Author(Guid.NewGuid(), $"Page author {suffix}");
         var isbn = NewIsbn();
-        var book = new Book(Guid.NewGuid(), $"Page book {suffix}", isbn, 2020, "en", null, category.Id, null, coverImagePath);
+        var book = new Book(Guid.NewGuid(), $"Page book {suffix}", isbn, 2020, language, null, category.Id, null, coverImagePath);
         db.AddRange(category, author, book, new BookAuthor(book.Id, author.Id));
         if (withOnLoanCopy)
         {
@@ -169,6 +169,21 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
         Assert.Equal("Renamed Page Book", (await db.Books.SingleAsync(x => x.Id == bookId)).Title);
+    }
+
+    [Fact]
+    public async Task A_language_the_form_does_not_offer_stays_selected_on_the_Edit_page()
+    {
+        // The API accepts any ISO 639-1 code; without its own option the select would fall back to its first choice.
+        var (_, _, bookId, _) = await SeedAsync(language: "fr");
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync($"/catalog/books/{bookId}/edit");
+
+        var select = Regex.Match(html, "<select[^>]*name=\"Input.Language\"[^>]*>(.*?)</select>", RegexOptions.Singleline).Value;
+        var selected = Regex.Matches(select, "<option(?=[^>]*selected)[^>]*value=\"([^\"]*)\"").Cast<Match>()
+            .Select(match => match.Groups[1].Value);
+        Assert.Equal(new[] { "fr" }, selected);
     }
 
     [Fact]

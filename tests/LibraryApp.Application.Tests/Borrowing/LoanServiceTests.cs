@@ -354,6 +354,7 @@ public sealed class LoanServiceTests
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class TestCalendar : IWorkingDayCalendar

@@ -15,8 +15,8 @@ namespace LibraryApp.Infrastructure.Extensions;
 public static class CatalogRegistrationExtensions
 {
     /// <summary>
-    /// Catalog module services. Called from Program.cs. Each member adds the registrations of their own part here
-    /// (repositories, services, seeder), one line per class, in their own pull request. Validators are registered automatically.
+    /// The Catalog module, called from Program.cs: the cover settings, repositories, queries, services and the seeder.
+    /// Validators are registered automatically (AddValidatorsFromAssembly in AddPlatform).
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {

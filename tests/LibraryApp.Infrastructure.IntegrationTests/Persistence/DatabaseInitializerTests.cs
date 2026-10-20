@@ -35,7 +35,7 @@ public class DatabaseInitializerTests
     [Fact]
     public async Task Does_not_touch_the_database_when_MigrateOnStartup_is_false()
     {
-        await using var db = NewDatabase();
+        await using var db = NewDatabase(created: false);
 
         await Initializer(db, migrate: false, seed: false, Environments.Development).InitializeAsync();
 
@@ -96,10 +96,14 @@ public class DatabaseInitializerTests
         }
     }
 
-    private static LibraryDbContext NewDatabase()
+    /// <summary>
+    /// A context on its own database: created empty (the initializer applies the migrations to it), or not created at
+    /// all for the test that checks the initializer leaves the server alone.
+    /// </summary>
+    private static LibraryDbContext NewDatabase(bool created = true)
     {
         var options = new DbContextOptionsBuilder<LibraryDbContext>();
-        options.UseLibrarySqlServer(TestDatabase.NewConnectionString());
+        options.UseLibrarySqlServer(created ? TestDatabase.NewDatabase() : TestDatabase.NewConnectionString());
         return new LibraryDbContext(options.Options);
     }
 
