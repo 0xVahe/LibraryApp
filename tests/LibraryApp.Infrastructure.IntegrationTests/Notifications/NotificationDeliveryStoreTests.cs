@@ -14,7 +14,7 @@ public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
     private static readonly DateTime LeaseUntil = Now.AddMinutes(15);
     private static readonly Guid StaffId = Guid.NewGuid();
 
-    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly string _connectionString = TestDatabase.NewDatabase();
     private readonly Guid _older = Guid.NewGuid();
     private readonly Guid _newer = Guid.NewGuid();
 
