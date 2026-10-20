@@ -20,7 +20,7 @@ namespace LibraryApp.Api.Areas.Borrowing.Pages;
 /// <summary>
 /// The Loan desk (UI guide Part 2, demo <c>desk.html</c>; start page of library staff): issue a copy by barcode to a
 /// staff member found by employee ID or corporate email (BOR-01, Q-G3-06), take a copy back by barcode with the
-/// "Damaged — send to repair" checkbox and a note (BOR-03, G3-21), issue the copies held for pickup (BOR-07, G3-20) and
+/// "Damaged — send to repair" checkbox and a note (BOR-03, G3-21) or declare it lost (BOR-09, G3-22), issue the copies held for pickup (BOR-07, G3-20) and
 /// Group 4's read-only overdue table (Q-G3-07). Success → Post/Redirect/Get with a green or amber <c>_Alert</c>.
 /// <para>
 /// Every form value here is typed or scanned at the desk, so a domain error — including "no copy with this barcode"
@@ -31,6 +31,7 @@ namespace LibraryApp.Api.Areas.Borrowing.Pages;
 public sealed class DeskModel(
     ILoanService loans,
     ILoanReturnService returns,
+    ILoanLostService lost,
     IPickupListService pickups,
     ICatalogService catalog,
     IStaffMemberService staffMembers,
@@ -111,6 +112,40 @@ public sealed class DeskModel(
             return await PageAsync(ct);
         }
     }
+
+    /// <summary>
+    /// "Declare lost" next to "Take back" (BOR-09, G3-22): the open loan of the copy (G3-21) becomes Lost, the copy is
+    /// marked Lost and the lost points of the policy are added (G3-07). The checkbox and the note of the return are not used.
+    /// </summary>
+    public async Task<IActionResult> OnPostLostAsync(string? returnBarcode, CancellationToken ct)
+    {
+        ReturnBarcode = returnBarcode?.Trim();
+        CheckBarcode(nameof(ReturnBarcode), ReturnBarcode);
+        if (!ModelState.IsValid)
+            return await PageAsync(ct);
+
+        try
+        {
+            LoanDto loan = await loans.FindOpenByBarcodeAsync(ReturnBarcode!, ct);
+            DeclareLostResponse result = await lost.DeclareLostAsync(loan.LoanId, ct);
+            var (title, barcode) = await CopyAsync(loan.BookCopyId, ct);
+            IReadOnlyDictionary<Guid, string> names = await staffMembers.GetNamesAsync([loan.StaffMemberId], ct);
+            TempData.SetAlert(AlertKind.Amber, "Declared lost",
+                $"{Texts.Quoted(title)} ({barcode}) from {names.GetValueOrDefault(loan.StaffMemberId, "the staff member")}. " +
+                LostText(result));
+            return RedirectToPage();
+        }
+        catch (DomainException ex) when (IsFormError(ex))
+        {
+            ModelState.AddModelError(ReturnForm, ex.Error.Message);
+            return await PageAsync(ct);
+        }
+    }
+
+    /// <summary>"10 penalty points added. The copy is marked Lost and leaves circulation."</summary>
+    public static string LostText(DeclareLostResponse result) =>
+        (result.PenaltyPointsApplied > 0 ? $"{Texts.Count(result.PenaltyPointsApplied, "penalty point")} added. " : "") +
+        "The copy is marked Lost and leaves circulation.";
 
     /// <summary>
     /// "Issue" in the pickup table: the normal issue of the held copy to its member; the issue fulfils the reservation
