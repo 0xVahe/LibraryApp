@@ -10,7 +10,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Identity;
 /// <summary>Migrates a throw-away database and runs no seeder: what every non-Development environment gets.</summary>
 public sealed class MigratedWithoutSeedFixture : IAsyncLifetime
 {
-    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewConnectionString());
+    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewDatabase());
 
     private static ServiceProvider BuildServices(string connectionString)
     {

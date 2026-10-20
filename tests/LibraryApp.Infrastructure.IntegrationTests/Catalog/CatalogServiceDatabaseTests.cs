@@ -36,7 +36,7 @@ public sealed class CatalogServiceDatabase : IAsyncLifetime
     public static readonly Guid StatusCopyId = new("e3000000-0000-0000-0000-000000000007");          // ST-1
     public static readonly Guid ConflictCopyId = new("e3000000-0000-0000-0000-000000000008");        // ST-2
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

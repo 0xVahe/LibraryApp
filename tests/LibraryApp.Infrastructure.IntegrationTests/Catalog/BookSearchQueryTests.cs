@@ -26,7 +26,7 @@ public sealed class BookSearchDatabase : IAsyncLifetime
 
     public const int PagingBookCount = 22;
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

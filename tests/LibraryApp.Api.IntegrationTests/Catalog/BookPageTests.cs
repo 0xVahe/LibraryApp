@@ -123,6 +123,22 @@ public class BookPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFactor
     }
 
     [Fact]
+    public async Task The_category_links_to_the_catalog_with_the_parent_first_for_a_subcategory()
+    {
+        using var client = await SignedInAsync(StaffSeedIds.StaffMembers.AnnaPetrosyan);
+
+        var inSubcategory = CategoryOf(await client.GetStringAsync(BookPath(SeededBook)));
+        var inTopLevel = CategoryOf(await client.GetStringAsync(BookPath(CatalogSeedIds.Book(2))));
+
+        Assert.Matches($"^\\s*{Link(CatalogSeedIds.Category(1), "Banking &amp; Finance")}\\s*/\\s*{Link(CatalogSeedIds.Category(9), "Investing &amp; Markets")}\\s*$", inSubcategory);
+        Assert.Matches($"^\\s*{Link(CatalogSeedIds.Category(1), "Banking &amp; Finance")}\\s*$", inTopLevel);
+
+        static string CategoryOf(string html) =>
+            Regex.Match(html, "<dt>Category</dt>\\s*<dd>(.*?)</dd>", RegexOptions.Singleline).Groups[1].Value;
+        static string Link(Guid categoryId, string name) => Regex.Escape($"<a href=\"/catalog?categoryId={categoryId}\">{name}</a>");
+    }
+
+    [Fact]
     public async Task More_in_the_category_shows_up_to_three_other_books_and_never_this_one()
     {
         var book = await DetailsAsync(SeededBook);

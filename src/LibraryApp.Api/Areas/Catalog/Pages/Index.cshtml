@@ -49,13 +49,25 @@
 </section>
 
 <div class="catalog-category-row">
-    <nav class="chips" aria-label="Categories">
-        <a class="chip" href="@Model.CategoryHref(null)" aria-current="@(Model.CategoryId is null ? "true" : null)">All</a>
-        @foreach (var category in Model.CategoryTree.TopLevel)
+    <div class="stack">
+        <nav class="chips" aria-label="Categories">
+            <a class="chip" href="@Model.CategoryHref(null)" aria-current="@(Model.CategoryId is null ? "true" : null)">All</a>
+            @foreach (var category in Model.CategoryTree.TopLevel)
+            {
+                <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.SelectedTopLevel?.Id == category.Id ? "true" : null)">@category.Name</a>
+            }
+        </nav>
+        @if (Model.SelectedTopLevel is { } topLevel && Model.Subcategories.Count > 0)
         {
-            <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.CategoryId == category.Id ? "true" : null)">@category.Name</a>
+            <nav class="chips" aria-label="Subcategories of @topLevel.Name">
+                <a class="chip" href="@Model.CategoryHref(topLevel.Id)" aria-current="@(Model.CategoryId == topLevel.Id ? "true" : null)">All in @topLevel.Name</a>
+                @foreach (var subcategory in Model.Subcategories)
+                {
+                    <a class="chip" href="@Model.CategoryHref(subcategory.Id)" aria-current="@(Model.CategoryId == subcategory.Id ? "true" : null)">@subcategory.Name</a>
+                }
+            </nav>
         }
-    </nav>
+    </div>
     <p class="catalog-count">@(Model.Result.Items.Count > 0
         ? $"Showing {firstResult}–{lastResult} of {Model.Result.TotalCount}"
         : $"{Model.Result.TotalCount} {(Model.Result.TotalCount == 1 ? "book" : "books")} in total")</p>

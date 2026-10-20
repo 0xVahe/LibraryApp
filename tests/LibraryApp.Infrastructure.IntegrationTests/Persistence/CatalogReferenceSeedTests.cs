@@ -44,7 +44,7 @@ public class CatalogReferenceSeedTests
     {
         await new UnitOfWork(db).ExecuteInTransactionAsync(_ =>
         {
-            foreach (var (id, name) in CatalogSeedData.Categories.Take(3))
+            foreach (var (id, name, _) in CatalogSeedData.Categories.Take(3))
                 db.Categories.Add(new Category(id, name));
             foreach (var (id, name) in CatalogSeedData.Authors.Take(30))
                 db.Authors.Add(new Author(id, name));
@@ -92,7 +92,7 @@ public class CatalogReferenceSeedTests
             var categories = await db.Categories.ToDictionaryAsync(x => x.Id, x => x.Name);
             Assert.Equal(76, authors.Count);
             Assert.Equal(28, publishers.Count);
-            Assert.Equal(9, categories.Count);
+            Assert.Equal(15, categories.Count);
             Assert.Equal("Edited author", authors[CatalogSeedData.Authors[0].Id]);
             Assert.Equal("Edited publisher", publishers[CatalogSeedData.Publishers[0].Id]);
             Assert.Equal("Edited category", categories[CatalogSeedData.Categories[0].Id]);
@@ -105,8 +105,13 @@ public class CatalogReferenceSeedTests
                 Assert.Equal(name, authors[id]);
             foreach (var (id, name) in CatalogSeedData.Publishers.Skip(1))
                 Assert.Equal(name, publishers[id]);
-            foreach (var (id, name) in CatalogSeedData.Categories.Skip(1))
+            foreach (var (id, name, _) in CatalogSeedData.Categories.Skip(1))
                 Assert.Equal(name, categories[id]);
+
+            // "Banking & Finance" is no longer top-level, so its seeded subcategories stay top-level instead of a third level.
+            var parents = await db.Categories.ToDictionaryAsync(x => x.Id, x => x.ParentCategoryId);
+            foreach (var (id, _, parentId) in CatalogSeedData.Categories.Skip(1))
+                Assert.Equal(parentId == CatalogSeedData.Categories[0].Id ? null : parentId, parents[id]);
         }
     });
 
@@ -118,7 +123,7 @@ public class CatalogReferenceSeedTests
         var categories = await db.Categories.ToDictionaryAsync(x => x.Id);
         Assert.Equal(75, authors.Count);
         Assert.Equal(27, publishers.Count);
-        Assert.Equal(8, categories.Count);
+        Assert.Equal(14, categories.Count);
         Assert.Equal(75, authors.Values.Distinct().Count());
         Assert.Equal(27, publishers.Values.Distinct().Count());
         Assert.DoesNotContain("no publisher", publishers.Values);
@@ -126,10 +131,10 @@ public class CatalogReferenceSeedTests
             Assert.Equal(name, authors[id]);
         foreach (var (id, name) in CatalogSeedData.Publishers)
             Assert.Equal(name, publishers[id]);
-        foreach (var (id, name) in CatalogSeedData.Categories)
+        foreach (var (id, name, parentId) in CatalogSeedData.Categories)
         {
             Assert.Equal(name, categories[id].Name);
-            Assert.Null(categories[id].ParentCategoryId);
+            Assert.Equal(parentId, categories[id].ParentCategoryId);
         }
     }
 
@@ -158,7 +163,7 @@ public class CatalogReferenceSeedTests
     private static async Task WithDatabaseAsync(Func<LibraryDbContext, Task> test)
     {
         var options = new DbContextOptionsBuilder<LibraryDbContext>();
-        options.UseLibrarySqlServer(TestDatabase.NewConnectionString());
+        options.UseLibrarySqlServer(TestDatabase.NewDatabase());
         await using var db = new LibraryDbContext(options.Options);
         try
         {
