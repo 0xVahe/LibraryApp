@@ -84,15 +84,87 @@ public sealed class BorrowingSwaggerTests(ApiHostFactory factory) : IClassFixtur
             example.GetProperty("pageSize").GetInt32(), example.GetProperty("totalPages").GetInt32()));
     }
 
+    /// <summary>
+    /// Every response example is one seeded record: the example and the record read through the API agree on every field
+    /// except the times (the seed's times are relative to the day it runs). A return or lost example also agrees with the
+    /// penalty records of its loan.
+    /// </summary>
+    [Fact]
+    public async Task Every_response_example_is_one_seeded_record()
+    {
+        JsonElement schemas = (await SwaggerAsync()).GetProperty("components").GetProperty("schemas");
+        JsonElement Example(string name) => schemas.GetProperty(name).GetProperty("example");
+        using HttpClient client = Client(StaffRoles.LibraryAdministrator);
+
+        JsonElement loan = Example("LoanDto");
+        AssertSameRecord("LoanDto", loan, await client.GetFromJsonAsync<JsonElement>($"/api/loans/{Id(loan, "loanId")}"));
+
+        JsonElement reservation = Example("ReservationDto");
+        AssertSameRecord("ReservationDto", reservation,
+            await client.GetFromJsonAsync<JsonElement>($"/api/reservations/{Id(reservation, "reservationId")}"));
+
+        JsonElement historyItem = Example("LoanHistoryItemDto");
+        JsonElement history = await client.GetFromJsonAsync<JsonElement>($"/api/loans?staffMemberId={Id(historyItem, "staffMemberId")}&pageSize=100");
+        AssertSameRecord("LoanHistoryItemDto", historyItem, Find(history, "loanId", Id(historyItem, "loanId")));
+
+        JsonElement penalty = Example("PenaltyDto");
+        AssertSameRecord("PenaltyDto", penalty, Find(await PenaltiesAsync(client, Id(penalty, "staffMemberId")), "penaltyId", Id(penalty, "penaltyId")));
+
+        foreach (string name in new[] { "ReturnLoanResponse", "DeclareLostResponse" })
+        {
+            JsonElement result = Example(name);
+            JsonElement record = await client.GetFromJsonAsync<JsonElement>($"/api/loans/{Id(result, "loanId")}");
+            Assert.True(result.GetProperty("status").GetString() == record.GetProperty("status").GetString(), $"{name}: status differs from loan");
+
+            JsonElement[] records = (await PenaltiesAsync(client, record.GetProperty("staffMemberId").GetString()!)).GetProperty("items")
+                .EnumerateArray().Where(p => p.GetProperty("loanId").GetString() == Id(result, "loanId")).ToArray();
+            Assert.True(result.GetProperty("penaltyPointsApplied").GetInt32() == records.Sum(p => p.GetProperty("points").GetInt32()),
+                $"{name}: penaltyPointsApplied differs from the penalty records of the loan");
+            if (result.TryGetProperty("overdueWorkingDays", out JsonElement days))
+                Assert.Contains(records, p => p.GetProperty("reason").GetString()!.Contains($"{days.GetInt32()} working days", StringComparison.Ordinal));
+        }
+
+        // The page examples hold the item examples.
+        Assert.Equal(Compact(historyItem), Compact(Example("LoanHistoryItemDtoPagedResult").GetProperty("items")[0]));
+        Assert.Equal(Compact(penalty), Compact(Example("PenaltyDtoPagedResult").GetProperty("items")[0]));
+    }
+
+    private static string Compact(JsonElement element) => JsonSerializer.Serialize(element);
+
+    private static string Id(JsonElement example, string property) => example.GetProperty(property).GetString()!;
+
+    private static JsonElement Find(JsonElement page, string property, string id) =>
+        page.GetProperty("items").EnumerateArray().Single(item => item.GetProperty(property).GetString() == id);
+
+    private static async Task<JsonElement> PenaltiesAsync(HttpClient client, string staffMemberId) =>
+        await client.GetFromJsonAsync<JsonElement>($"/api/penalties?staffMemberId={staffMemberId}&pageSize=100");
+
+    /// <summary>Every field of the example but the times (<c>…AtUtc</c>) has the value of the record.</summary>
+    private static void AssertSameRecord(string schema, JsonElement example, JsonElement record)
+    {
+        foreach (JsonProperty field in example.EnumerateObject().Where(f => !f.Name.EndsWith("AtUtc", StringComparison.Ordinal)))
+        {
+            Assert.True(record.TryGetProperty(field.Name, out JsonElement actual), $"{schema}.{field.Name}: not in the record");
+            Assert.True(field.Value.GetRawText() == actual.GetRawText(),
+                $"{schema}.{field.Name}: example {field.Value.GetRawText()}, seeded record {actual.GetRawText()}");
+        }
+    }
+
+    private HttpClient Client(string role)
+    {
+        HttpClient client = factory.CreateClient();
+        string token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(factory.Account(role)).Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
+
     [Theory]
     [InlineData("IssueLoanRequest", "/api/loans")]
     [InlineData("CreateReservationRequest", "/api/reservations")]
     public async Task The_request_example_works_on_the_seeded_data(string schema, string endpoint)
     {
         JsonElement example = (await SwaggerAsync()).GetProperty("components").GetProperty("schemas").GetProperty(schema).GetProperty("example");
-        using var client = factory.CreateClient();
-        string token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(factory.Account(StaffRoles.Librarian)).Token;
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using HttpClient client = Client(StaffRoles.Librarian);
 
         using var response = await client.PostAsync(endpoint, new StringContent(example.GetRawText(), Encoding.UTF8, "application/json"));
 

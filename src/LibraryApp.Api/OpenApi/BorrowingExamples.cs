@@ -2,30 +2,31 @@ using LibraryApp.Application.Borrowing.Dto;
 using LibraryApp.Application.Common;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
-using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.StaffMembers;
 
 namespace LibraryApp.Api.OpenApi;
 
 /// <summary>
-/// Request and response examples of the Borrowing endpoints (NFR-11), built from the seed so that a request copied from
-/// Swagger works on a freshly seeded Development database: the issue lends the only copy of book 5 (no seed loan uses it)
-/// to Elen Danielyan (no open loan, no points); the reservation queues Sofia Hambardzumyan for book 1, whose three copies
-/// are all on loan (a reservation needs a book without an Available copy, BR-BOR-3) and which she neither holds nor
-/// reserves. <c>BorrowingSwaggerTests</c> posts both examples to the seeded host.
+/// Request and response examples of the Borrowing endpoints (NFR-11), taken from the Development seed: the requests work on
+/// a freshly seeded database and each response is one seeded record (checked by <c>BorrowingSwaggerTests</c>).
 /// </summary>
 public sealed class BorrowingExamples : ISchemaFilter
 {
-    private static readonly Guid Anna = StaffSeedIds.StaffMembers.AnnaPetrosyan;
-
     /// <summary>The member and the copy of the issue example; the member and the book of the reservation example.</summary>
-    public static readonly Guid IssueStaffMember = StaffSeedIds.StaffMembers.ElenDanielyan;
+    public static readonly Guid IssueStaffMember = Members.ElenDanielyan;
     public static readonly string IssueBarcode = CatalogSeedIds.CopyBarcode(5, 1);
-    public static readonly Guid ReservationStaffMember = StaffSeedIds.StaffMembers.SofiaHambardzumyan;
+    public static readonly Guid ReservationStaffMember = Members.SofiaHambardzumyan;
     public static readonly Guid ReservationBook = CatalogSeedIds.Book(1);
-    private static readonly Guid Loan = BorrowingSeedIds.Loan(1);
+
+    /// <summary>The seeded records the response examples show.</summary>
+    public static readonly Guid OpenLoan = BorrowingSeedIds.Loan(1);
+    public static readonly Guid ReturnedLoan = BorrowingSeedIds.Loan(9);
+    public static readonly Guid LostLoan = BorrowingSeedIds.Loan(6);
+    public static readonly Guid WaivedPenalty = BorrowingSeedIds.Penalty(4);
+    public static readonly Guid WaitingReservation = BorrowingSeedIds.Reservation(1);
 
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
@@ -48,30 +49,30 @@ public sealed class BorrowingExamples : ISchemaFilter
             },
             Type type when type == typeof(WaivePenaltyRequest) => new OpenApiObject
             {
-                ["reason"] = new OpenApiString("The library desk was closed on the due date."),
+                ["reason"] = new OpenApiString("Late because of a business trip"),
             },
             Type type when type == typeof(LoanDto) => new OpenApiObject
             {
-                ["loanId"] = Id(Loan),
+                ["loanId"] = Id(OpenLoan),
                 ["bookCopyId"] = Id(CatalogSeedIds.Copy(1, 1)),
-                ["staffMemberId"] = Id(Anna),
-                ["issuedAtUtc"] = Utc("2026-10-20T06:30:00Z"),
-                ["dueAtUtc"] = Utc("2026-11-10T06:30:00Z"),
+                ["staffMemberId"] = Id(Members.AnnaPetrosyan),
+                ["issuedAtUtc"] = Utc("2026-10-15T06:30:00Z"),
+                ["dueAtUtc"] = Utc("2026-11-05T06:30:00Z"),
                 ["renewalCount"] = new OpenApiInteger(0),
                 ["status"] = new OpenApiString("Active"),
             },
             Type type when type == typeof(ReturnLoanResponse) => new OpenApiObject
             {
-                ["loanId"] = Id(Loan),
-                ["returnedAtUtc"] = Utc("2026-11-13T07:15:00Z"),
+                ["loanId"] = Id(ReturnedLoan),
+                ["returnedAtUtc"] = Utc("2026-08-27T07:15:00Z"),
                 ["status"] = new OpenApiString("Returned"),
                 ["overdueWorkingDays"] = new OpenApiInteger(3),
                 ["penaltyPointsApplied"] = new OpenApiInteger(3),
             },
             Type type when type == typeof(DeclareLostResponse) => new OpenApiObject
             {
-                ["loanId"] = Id(Loan),
-                ["declaredAtUtc"] = Utc("2026-11-20T08:00:00Z"),
+                ["loanId"] = Id(LostLoan),
+                ["declaredAtUtc"] = Utc("2026-09-20T08:00:00Z"),
                 ["status"] = new OpenApiString("Lost"),
                 ["penaltyPointsApplied"] = new OpenApiInteger(10),
             },
@@ -79,12 +80,12 @@ public sealed class BorrowingExamples : ISchemaFilter
             Type type when type == typeof(PagedResult<LoanHistoryItemDto>) => Page(HistoryItem()),
             Type type when type == typeof(ReservationDto) => new OpenApiObject
             {
-                ["reservationId"] = Id(BorrowingSeedIds.Reservation(1)),
+                ["reservationId"] = Id(WaitingReservation),
                 ["bookId"] = Id(CatalogSeedIds.Book(1)),
-                ["staffMemberId"] = Id(Anna),
-                ["createdAtUtc"] = Utc("2026-10-20T06:30:00Z"),
+                ["staffMemberId"] = Id(Members.AramSargsyan),
+                ["createdAtUtc"] = Utc("2026-10-19T06:30:00Z"),
                 ["status"] = new OpenApiString("Waiting"),
-                ["queuePosition"] = new OpenApiInteger(2),
+                ["queuePosition"] = new OpenApiInteger(1),
                 ["copyId"] = new OpenApiNull(),
                 ["readyUntilUtc"] = new OpenApiNull(),
             },
@@ -107,29 +108,31 @@ public sealed class BorrowingExamples : ISchemaFilter
         ["totalPages"] = new OpenApiInteger(1),
     };
 
+    /// <summary>Loan 9: Anna's copy 3 of book 16, issued for 21 days and returned 3 working days late.</summary>
     private static OpenApiObject HistoryItem() => new()
     {
-        ["loanId"] = Id(Loan),
-        ["bookCopyId"] = Id(CatalogSeedIds.Copy(1, 1)),
-        ["staffMemberId"] = Id(Anna),
-        ["issuedAtUtc"] = Utc("2026-09-01T06:30:00Z"),
-        ["dueAtUtc"] = Utc("2026-09-22T06:30:00Z"),
-        ["returnedAtUtc"] = Utc("2026-09-25T07:15:00Z"),
-        ["renewalCount"] = new OpenApiInteger(1),
+        ["loanId"] = Id(ReturnedLoan),
+        ["bookCopyId"] = Id(CatalogSeedIds.Copy(16, 3)),
+        ["staffMemberId"] = Id(Members.AnnaPetrosyan),
+        ["issuedAtUtc"] = Utc("2026-08-03T06:30:00Z"),
+        ["dueAtUtc"] = Utc("2026-08-24T06:30:00Z"),
+        ["returnedAtUtc"] = Utc("2026-08-27T07:15:00Z"),
+        ["renewalCount"] = new OpenApiInteger(0),
         ["status"] = new OpenApiString("Returned"),
     };
 
+    /// <summary>Penalty 4: the 3 points of Anna's late return of loan 9, waived by a librarian.</summary>
     private static OpenApiObject PenaltyRecord() => new()
     {
-        ["penaltyId"] = Id(BorrowingSeedIds.Penalty(1)),
-        ["staffMemberId"] = Id(Anna),
-        ["loanId"] = Id(Loan),
+        ["penaltyId"] = Id(WaivedPenalty),
+        ["staffMemberId"] = Id(Members.AnnaPetrosyan),
+        ["loanId"] = Id(ReturnedLoan),
         ["points"] = new OpenApiInteger(3),
-        ["reason"] = new OpenApiString("Late return: 3 overdue working day(s)."),
-        ["status"] = new OpenApiString("Active"),
-        ["createdAtUtc"] = Utc("2026-11-13T07:15:00Z"),
-        ["expiresAtUtc"] = Utc("2027-02-11T07:15:00Z"),
-        ["waivedReason"] = new OpenApiNull(),
+        ["reason"] = new OpenApiString("Returned 3 working days late"),
+        ["status"] = new OpenApiString("Waived"),
+        ["createdAtUtc"] = Utc("2026-08-27T07:15:00Z"),
+        ["expiresAtUtc"] = Utc("2026-11-25T07:15:00Z"),
+        ["waivedReason"] = new OpenApiString("Late because of a business trip"),
     };
 
     private static OpenApiString Id(Guid id) => new(id.ToString());
