@@ -17,7 +17,7 @@ public sealed class ReportingDatabase : IAsyncLifetime
     public static readonly Guid FinanceStaffId = Guid.NewGuid();
     public static readonly Guid BookId = Guid.NewGuid();
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

@@ -22,6 +22,10 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Created here, before the application starts: its start-up migrations, InitializeAsync and every test then
+        // find the database, so no test host issues its own CREATE DATABASE outside the server-wide creation lock.
+        TestSqlServer.CreateDatabase(_connectionString);
+
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:LibraryDb", _connectionString);
         builder.UseSetting("UseHttpsRedirection", "false");
