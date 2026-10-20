@@ -19,4 +19,17 @@ public sealed class OverdueRule(IClock clock, IOptions<BorrowingOptions> options
         OverdueFromMode.DueTime => atUtc > dueAtUtc,
         _ => throw new InvalidOperationException("Unknown overdue calculation mode."),
     };
+
+    /// <summary>
+    /// The same rule as a bound for a database query: at <paramref name="atUtc"/> a loan is overdue exactly when its
+    /// <c>DueAtUtc</c> is before the returned moment (<c>NextLocalDay</c>: the start of the local day of
+    /// <paramref name="atUtc"/>; <c>DueTime</c>: <paramref name="atUtc"/> itself). Lets the loan history show and filter an
+    /// Active loan past its due date as Overdue before the daily job marks it.
+    /// </summary>
+    public DateTime OverdueIfDueBeforeUtc(DateTime atUtc) => options.Value.Loans.OverdueFrom switch
+    {
+        OverdueFromMode.NextLocalDay => clock.StartOfLocalDayUtc(clock.ToLocalDate(atUtc)),
+        OverdueFromMode.DueTime => atUtc,
+        _ => throw new InvalidOperationException("Unknown overdue calculation mode."),
+    };
 }
