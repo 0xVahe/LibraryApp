@@ -110,6 +110,37 @@ public class LoanHistoryEndpointTests(LoanHistoryEndpointTests.Host factory) : I
         Assert.Equal((1, PageRequest.MaxPageSize, 3), (clamped.Page, clamped.PageSize, clamped.Items.Count));
     }
 
+    [Fact]
+    public async Task The_issue_period_keeps_the_loans_issued_on_its_local_days_both_included()
+    {
+        IClock clock = factory.Services.GetRequiredService<IClock>();
+        string Day(Loan loan) => clock.ToLocalDate(loan.IssuedAtUtc).ToString("yyyy-MM-dd");
+
+        PagedResult<LoanHistoryItemDto> fromOverdue = await GetAsync(StaffRoles.Librarian,
+            $"staffMemberId={Members.TigranMelikyan}&issuedFrom={Day(factory.TigranOverdue)}");
+        Assert.Equal(new[] { factory.TigranNew.Id, factory.TigranOverdue.Id }, fromOverdue.Items.Select(item => item.LoanId));
+
+        PagedResult<LoanHistoryItemDto> toOverdue = await GetAsync(StaffRoles.Librarian,
+            $"staffMemberId={Members.TigranMelikyan}&issuedTo={Day(factory.TigranOverdue)}");
+        Assert.Equal(new[] { factory.TigranOverdue.Id, factory.TigranOld.Id }, toOverdue.Items.Select(item => item.LoanId));
+
+        PagedResult<LoanHistoryItemDto> oneDay = await GetAsync(StaffRoles.Librarian,
+            $"staffMemberId={Members.TigranMelikyan}&issuedFrom={Day(factory.TigranOld)}&issuedTo={Day(factory.TigranOld)}");
+        Assert.Equal(factory.TigranOld.Id, Assert.Single(oneDay.Items).LoanId);
+        Assert.Equal(1, oneDay.TotalCount);
+    }
+
+    [Fact]
+    public async Task An_issue_period_that_ends_before_it_starts_is_refused()
+    {
+        using HttpClient librarian = Client(StaffRoles.Librarian);
+
+        using HttpResponseMessage response = await librarian.GetAsync("/api/loans?issuedFrom=2026-10-10&issuedTo=2026-10-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(BorrowingErrors.HistoryPeriodInvalid.Code, await response.Content.ReadAsStringAsync());
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("staffMemberId=20000000-0000-0000-0003-000000000011")]   // asks for Tigran's loans

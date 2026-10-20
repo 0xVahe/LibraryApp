@@ -2,7 +2,7 @@
 @using LibraryApp.Api.Areas.Borrowing.Components
 @using LibraryApp.Api.Areas.Borrowing.Pages
 @* "Loans and reservations" and "Standing" (Group 3) on Group 2's Staff member page; "Declare lost" per open loan (G3-22),
-   a waiver form per active penalty record (G3-23). *@
+   a waiver form per active penalty record (G3-23), the "Loan history" link (G3-24). *@
 @{
     var back = Context.Request.Path + Context.Request.QueryString;
     var waiveError = WaiveFormError.Take(TempData);
@@ -10,6 +10,7 @@
 <section class="card flush" aria-labelledby="staff-loans-title">
     <div class="card-head">
         <div><h2 id="staff-loans-title">Loans and reservations</h2><p class="small muted">Open loans and reservations of this staff member.</p></div>
+        <a class="btn btn-secondary btn-sm" href="@UiNavigation.Staff/@Model.StaffMemberId/loans">Loan history</a>
     </div>
     @if (Model.Loans.Count + Model.Reservations.Count == 0)
     {

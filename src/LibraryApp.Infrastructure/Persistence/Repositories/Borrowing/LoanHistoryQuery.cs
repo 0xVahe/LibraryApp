@@ -13,6 +13,8 @@ public sealed class LoanHistoryQuery(LibraryDbContext db) : ILoanHistoryQuery
         Guid? staffMemberId,
         IReadOnlyCollection<Guid>? bookCopyIds,
         LoanStatus? status,
+        DateTime? issuedFromUtc,
+        DateTime? issuedToUtc,
         PageRequest page,
         CancellationToken ct = default)
     {
@@ -28,6 +30,12 @@ public sealed class LoanHistoryQuery(LibraryDbContext db) : ILoanHistoryQuery
 
         if (status is { } wanted)
             query = query.Where(loan => loan.Status == wanted);
+
+        if (issuedFromUtc is { } from)
+            query = query.Where(loan => loan.IssuedAtUtc >= from);
+
+        if (issuedToUtc is { } to)
+            query = query.Where(loan => loan.IssuedAtUtc <= to);
 
         int total = await query.CountAsync(ct);
 
