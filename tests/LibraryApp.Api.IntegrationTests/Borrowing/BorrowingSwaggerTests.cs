@@ -26,6 +26,8 @@ public sealed class BorrowingSwaggerTests(ApiHostFactory factory) : IClassFixtur
     [
         "IssueLoanRequest", "ReturnLoanRequest", "CreateReservationRequest", "WaivePenaltyRequest",
         "LoanDto", "ReturnLoanResponse", "DeclareLostResponse", "LoanHistoryItemDto", "ReservationDto", "PenaltyDto",
+        // The pages of GET /api/loans and GET /api/penalties.
+        "LoanHistoryItemDtoPagedResult", "PenaltyDtoPagedResult",
     ];
 
     private async Task<JsonElement> SwaggerAsync()
@@ -62,6 +64,24 @@ public sealed class BorrowingSwaggerTests(ApiHostFactory factory) : IClassFixtur
             if (name.StartsWith("POST", StringComparison.Ordinal))
                 Assert.Contains("404", codes);
         }
+    }
+
+    [Theory]
+    [InlineData("/api/loans", "LoanHistoryItemDtoPagedResult", "loanId")]
+    [InlineData("/api/penalties", "PenaltyDtoPagedResult", "penaltyId")]
+    public async Task The_paged_lists_return_a_page_schema_whose_example_holds_an_item(string path, string schemaName, string itemKey)
+    {
+        JsonElement swagger = await SwaggerAsync();
+
+        string reference = swagger.GetProperty("paths").GetProperty(path).GetProperty("get").GetProperty("responses")
+            .GetProperty("200").GetProperty("content").GetProperty("application/json").GetProperty("schema").GetProperty("$ref").GetString()!;
+        Assert.EndsWith($"/{schemaName}", reference);
+
+        JsonElement example = swagger.GetProperty("components").GetProperty("schemas").GetProperty(schemaName).GetProperty("example");
+        JsonElement item = Assert.Single(example.GetProperty("items").EnumerateArray());
+        Assert.True(item.TryGetProperty(itemKey, out _), $"{schemaName}: the item of the example is not a {itemKey} record");
+        Assert.Equal((1, 1, 20, 1), (example.GetProperty("totalCount").GetInt32(), example.GetProperty("page").GetInt32(),
+            example.GetProperty("pageSize").GetInt32(), example.GetProperty("totalPages").GetInt32()));
     }
 
     [Theory]

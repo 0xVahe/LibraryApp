@@ -1,4 +1,5 @@
 using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Application.Common;
 using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
@@ -74,17 +75,8 @@ public sealed class BorrowingExamples : ISchemaFilter
                 ["status"] = new OpenApiString("Lost"),
                 ["penaltyPointsApplied"] = new OpenApiInteger(10),
             },
-            Type type when type == typeof(LoanHistoryItemDto) => new OpenApiObject
-            {
-                ["loanId"] = Id(Loan),
-                ["bookCopyId"] = Id(CatalogSeedIds.Copy(1, 1)),
-                ["staffMemberId"] = Id(Anna),
-                ["issuedAtUtc"] = Utc("2026-09-01T06:30:00Z"),
-                ["dueAtUtc"] = Utc("2026-09-22T06:30:00Z"),
-                ["returnedAtUtc"] = Utc("2026-09-25T07:15:00Z"),
-                ["renewalCount"] = new OpenApiInteger(1),
-                ["status"] = new OpenApiString("Returned"),
-            },
+            Type type when type == typeof(LoanHistoryItemDto) => HistoryItem(),
+            Type type when type == typeof(PagedResult<LoanHistoryItemDto>) => Page(HistoryItem()),
             Type type when type == typeof(ReservationDto) => new OpenApiObject
             {
                 ["reservationId"] = Id(BorrowingSeedIds.Reservation(1)),
@@ -96,24 +88,49 @@ public sealed class BorrowingExamples : ISchemaFilter
                 ["copyId"] = new OpenApiNull(),
                 ["readyUntilUtc"] = new OpenApiNull(),
             },
-            Type type when type == typeof(PenaltyDto) => new OpenApiObject
-            {
-                ["penaltyId"] = Id(BorrowingSeedIds.Penalty(1)),
-                ["staffMemberId"] = Id(Anna),
-                ["loanId"] = Id(Loan),
-                ["points"] = new OpenApiInteger(3),
-                ["reason"] = new OpenApiString("Late return: 3 overdue working day(s)."),
-                ["status"] = new OpenApiString("Active"),
-                ["createdAtUtc"] = Utc("2026-11-13T07:15:00Z"),
-                ["expiresAtUtc"] = Utc("2027-02-11T07:15:00Z"),
-                ["waivedReason"] = new OpenApiNull(),
-            },
+            Type type when type == typeof(PenaltyDto) => PenaltyRecord(),
+            Type type when type == typeof(PagedResult<PenaltyDto>) => Page(PenaltyRecord()),
             _ => null,
         };
 
         if (example is not null)
             schema.Example = example;
     }
+
+    /// <summary>A page of one item, as every list endpoint returns it (<see cref="PagedResult{T}"/>).</summary>
+    private static OpenApiObject Page(OpenApiObject item) => new()
+    {
+        ["items"] = new OpenApiArray { item },
+        ["totalCount"] = new OpenApiInteger(1),
+        ["page"] = new OpenApiInteger(1),
+        ["pageSize"] = new OpenApiInteger(PageRequest.DefaultPageSize),
+        ["totalPages"] = new OpenApiInteger(1),
+    };
+
+    private static OpenApiObject HistoryItem() => new()
+    {
+        ["loanId"] = Id(Loan),
+        ["bookCopyId"] = Id(CatalogSeedIds.Copy(1, 1)),
+        ["staffMemberId"] = Id(Anna),
+        ["issuedAtUtc"] = Utc("2026-09-01T06:30:00Z"),
+        ["dueAtUtc"] = Utc("2026-09-22T06:30:00Z"),
+        ["returnedAtUtc"] = Utc("2026-09-25T07:15:00Z"),
+        ["renewalCount"] = new OpenApiInteger(1),
+        ["status"] = new OpenApiString("Returned"),
+    };
+
+    private static OpenApiObject PenaltyRecord() => new()
+    {
+        ["penaltyId"] = Id(BorrowingSeedIds.Penalty(1)),
+        ["staffMemberId"] = Id(Anna),
+        ["loanId"] = Id(Loan),
+        ["points"] = new OpenApiInteger(3),
+        ["reason"] = new OpenApiString("Late return: 3 overdue working day(s)."),
+        ["status"] = new OpenApiString("Active"),
+        ["createdAtUtc"] = Utc("2026-11-13T07:15:00Z"),
+        ["expiresAtUtc"] = Utc("2027-02-11T07:15:00Z"),
+        ["waivedReason"] = new OpenApiNull(),
+    };
 
     private static OpenApiString Id(Guid id) => new(id.ToString());
 
