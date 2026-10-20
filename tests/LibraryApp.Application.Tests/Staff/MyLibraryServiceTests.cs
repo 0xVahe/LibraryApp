@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Ports;
@@ -26,7 +27,9 @@ public class MyLibraryServiceTests
     private readonly Borrowing _borrowing = new();
     private readonly Catalog _catalog = new();
 
-    private MyLibraryService Service => new(_user, _members, _borrowing, _catalog, new TestClock(Now),
+    private readonly InlineUnitOfWork _unitOfWork = new();
+
+    private MyLibraryService Service => new(_user, _members, _unitOfWork, _borrowing, _catalog, new TestClock(Now),
         NullLogger<MyLibraryService>.Instance);
 
     public MyLibraryServiceTests()
@@ -112,6 +115,52 @@ public class MyLibraryServiceTests
     }
 
     [Fact]
+    public async Task Update_profile_changes_names_and_preserves_HR_managed_fields()
+    {
+        var memberId = _user.StaffMemberId!.Value;
+        var result = await Service.UpdateProfileAsync(new UpdateMyProfileRequest("  New First  ", "New Last"));
+
+        Assert.Equal(new MyProfileDto(memberId, "New First", "New Last", "anna.petrosyan@ameriabank.am",
+            "Retail Banking", "Analyst", "Employee", "Active"), result);
+        var stored = await _members.GetByIdAsync(memberId, CancellationToken.None);
+        Assert.NotNull(stored);
+        Assert.Equal("EMP-1", stored.EmployeeId);
+        Assert.Equal("anna.petrosyan@ameriabank.am", stored.CorporateEmail);
+        Assert.Equal("Analyst", stored.Position);
+        Assert.Equal(_members.DepartmentId, stored.DepartmentId);
+        Assert.Equal(_members.CategoryId, stored.StaffCategoryId);
+        Assert.Equal(StaffMemberStatus.Active, stored.Status);
+        Assert.Equal(1, _unitOfWork.Transactions);
+    }
+
+    [Fact]
+    public async Task Update_profile_rejects_deactivated_member_with_422_error()
+    {
+        var memberId = _user.StaffMemberId!.Value;
+        _members.Deactivate(memberId);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            Service.UpdateProfileAsync(new UpdateMyProfileRequest("New First", "New Last")));
+
+        Assert.Equal(StaffErrors.DeactivatedProfileLocked, error.Error);
+        Assert.Equal(ErrorKind.BusinessRule, error.Error.Kind);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("unknown-member")]
+    public async Task Update_profile_without_a_profile_returns_not_found(string? member)
+    {
+        _user.StaffMemberId = member is null ? null : Guid.NewGuid();
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            Service.UpdateProfileAsync(new UpdateMyProfileRequest("New First", "New Last")));
+
+        Assert.Equal(StaffErrors.NotFound, error.Error);
+        Assert.Equal(member is null ? 0 : 1, _unitOfWork.Transactions);
+    }
+
+    [Fact]
     public async Task Book_or_copy_unknown_to_Catalog_gives_null_title_and_barcode()
     {
         var me = _user.StaffMemberId!.Value;
@@ -126,15 +175,37 @@ public class MyLibraryServiceTests
     private sealed class Members : IStaffManagementRepository
     {
         private readonly Dictionary<Guid, StaffMemberDto> _items = [];
+        private readonly Dictionary<Guid, StaffMember> _entities = [];
+        public Guid DepartmentId { get; } = Guid.NewGuid();
+        public Guid CategoryId { get; } = Guid.NewGuid();
 
-        public void Add(Guid id) => _items[id] = new StaffMemberDto(id, "EMP-1", "Anna", "Petrosyan",
-            "anna.petrosyan@ameriabank.am", Guid.NewGuid(), "Retail Banking", "Analyst", null, Guid.NewGuid(),
-            "Employee", "Active", Now.AddYears(-1), StaffRoles.StaffMember);
+        public void Add(Guid id)
+        {
+            var entity = new StaffMember(id, Guid.NewGuid(), "EMP-1", "Anna", "Petrosyan",
+                "anna.petrosyan@ameriabank.am", DepartmentId, "Analyst", null, CategoryId, Now.AddYears(-1));
+            _entities[id] = entity;
+            _items[id] = new StaffMemberDto(id, entity.EmployeeId, entity.FirstName, entity.LastName,
+                entity.CorporateEmail, entity.DepartmentId, "Retail Banking", entity.Position, null,
+                entity.StaffCategoryId, "Employee", entity.Status.ToString(), entity.JoinedLibraryAtUtc,
+                StaffRoles.StaffMember);
+        }
+
+        public void Deactivate(Guid id) => _entities[id].Deactivate();
 
         public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) =>
-            Task.FromResult(_items.GetValueOrDefault(id));
+            Task.FromResult(_items.TryGetValue(id, out var item) ? item with
+            {
+                FirstName = _entities[id].FirstName,
+                LastName = _entities[id].LastName,
+                Status = _entities[id].Status.ToString(),
+            } : null);
 
-        public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(_entities.GetValueOrDefault(id));
+        public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(_entities.TryGetValue(id, out var member)
+                ? new StaffMemberProfile(member, "Retail Banking", "Employee")
+                : null);
         public Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct) => throw new NotSupportedException();
         public Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct) => throw new NotSupportedException();
         public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
@@ -154,6 +225,25 @@ public class MyLibraryServiceTests
         public Task<PagedResult<StaffMemberListItemDto>> SearchAsync(StaffMemberSearchFilter filter, PageRequest paging,
             CancellationToken ct) => throw new NotSupportedException();
         public void Add(StaffMember member) => throw new NotSupportedException();
+    }
+
+    private sealed class InlineUnitOfWork : IUnitOfWork
+    {
+        public int Transactions { get; private set; }
+
+        public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation,
+            CancellationToken ct = default)
+        {
+            Transactions++;
+            return await operation(ct);
+        }
+
+        public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation,
+            CancellationToken ct = default)
+        {
+            Transactions++;
+            await operation(ct);
+        }
     }
 
     private sealed class Borrowing : IBorrowingReadService

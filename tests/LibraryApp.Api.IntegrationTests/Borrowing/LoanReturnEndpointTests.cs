@@ -30,29 +30,290 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 /// <summary>
 /// Tests loan returns through the real API and SQL Server database.
 /// Each test case owns its own host and database.
+/// <para>
+/// The tests are split into four classes below this one: xUnit runs the tests of one class one after another and the
+/// classes in parallel, and every test starts its own host, so one class of fifteen tests waited for fifteen host starts
+/// in a row. This class holds the host and the helpers.
+/// </para>
 /// </summary>
-public sealed class LoanReturnEndpointTests : IAsyncLifetime
+public abstract class LoanReturnEndpointTests : IAsyncLifetime
 {
-    private readonly ReturnHost _host = new();
+    protected readonly ReturnHost _host = new();
 
-    private static readonly JsonSerializerOptions Json =
+    protected static readonly JsonSerializerOptions Json =
         new(JsonSerializerDefaults.Web)
         {
             Converters = { new JsonStringEnumConverter() }
         };
 
     // Tuesday, 16:00 in Yerevan.
-    private static readonly DateTime Now =
+    protected static readonly DateTime Now =
         new(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc);
 
-    private static readonly Guid CopyId = CatalogSeedIds.Copy(57, 1);
-    private static readonly Guid BookId = CatalogSeedIds.Book(57);
-    private static readonly Guid StaffId = Members.AnnaPetrosyan;
+    protected static readonly Guid CopyId = CatalogSeedIds.Copy(57, 1);
+    protected static readonly Guid BookId = CatalogSeedIds.Book(57);
+    protected static readonly Guid StaffId = Members.AnnaPetrosyan;
 
     public Task InitializeAsync() => _host.InitializeAsync();
 
     public Task DisposeAsync() => _host.DisposeAsync();
 
+    protected HttpClient Client(string? role = StaffRoles.Librarian)
+    {
+        HttpClient client = _host.CreateClient();
+
+        if (role is not null)
+        {
+            var account = _host.Account(role);
+
+            // The business clock of the host is fixed (Now); the token must be valid at the real time the test
+            // runs, otherwise the API answers 401 on every day except the fixed one.
+            var issuer = new JwtTokenIssuer(
+                _host.Services.GetRequiredService<IOptions<JwtOptions>>(),
+                new ReturnClock(() => DateTime.UtcNow));
+            string token = issuer.Issue(account).Token;
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    protected async Task<T> Db<T>(
+        Func<LibraryDbContext, Task<T>> action)
+    {
+        using var scope = _host.Services.CreateScope();
+
+        var db = scope.ServiceProvider
+            .GetRequiredService<LibraryDbContext>();
+
+        return await action(db);
+    }
+
+    /// <summary>
+    /// Creates the initial database state.
+    /// The return operation itself is always performed through HTTP.
+    /// </summary>
+    protected Task<Guid> SeedAsync(
+        bool late = false,
+        int priorPoints = 0,
+        bool queue = false,
+        bool overdueToday = false) =>
+        Db(async db =>
+        {
+            var staff = await db.StaffMembers
+                .SingleAsync(x => x.Id == StaffId);
+
+            staff.ChangeStatus(
+                priorPoints >= 5
+                    ? StaffMemberStatus.Restricted
+                    : StaffMemberStatus.Active);
+
+            var copy = await db.BookCopies
+                .SingleAsync(x => x.Id == CopyId);
+
+            copy.ChangeStatus(BookCopyStatus.OnLoan);
+
+            // overdueToday: due two hours before Now on the same local day (Tuesday 14:00 Yerevan).
+            DateTime dueAtUtc = late
+                ? new DateTime(
+                    2026, 10, 16, 12, 0, 0, DateTimeKind.Utc)
+                : overdueToday ? Now.AddHours(-2) : Now.AddDays(1);
+
+            Loan loan = Loan.Issue(
+                Guid.NewGuid(),
+                CopyId,
+                StaffId,
+                dueAtUtc.AddDays(-14),
+                14);
+
+            if (overdueToday)
+                loan.MarkOverdue(Now);   // what the daily job may do once the due time has passed
+
+            db.Loans.Add(loan);
+
+            if (priorPoints > 0)
+            {
+                db.PenaltyRecords.Add(
+                    PenaltyRecord.Create(
+                        Guid.NewGuid(),
+                        StaffId,
+                        loan.Id,
+                        priorPoints,
+                        "Existing penalty",
+                        Now.AddDays(-1),
+                        Now.AddDays(89)));
+            }
+
+            if (queue)
+            {
+                db.Reservations.Add(
+                    Reservation.Create(
+                        Guid.NewGuid(),
+                        BookId,
+                        Members.MariamAvetisyan,
+                        Now.AddDays(-2),
+                        1));
+
+                db.Reservations.Add(
+                    Reservation.Create(
+                        Guid.NewGuid(),
+                        BookId,
+                        Members.DavitHakobyan,
+                        Now.AddDays(-1),
+                        2));
+            }
+
+            await db.SaveChangesAsync();
+
+            return loan.Id;
+        });
+
+    protected static Task<HttpResponseMessage> ReturnAsync(
+        HttpClient client,
+        Guid loanId,
+        bool damaged = false,
+        string? note = null) =>
+        client.PostAsJsonAsync(
+            $"/api/loans/{loanId}/return",
+            new ReturnLoanRequest(damaged, note));
+
+    protected Task<Loan> ReadLoanAsync(Guid loanId) =>
+        Db(db => db.Loans
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == loanId));
+
+    protected Task<BookCopyStatus> CopyStatusAsync() =>
+        Db(db => db.BookCopies
+            .Where(x => x.Id == CopyId)
+            .Select(x => x.Status)
+            .SingleAsync());
+
+    protected Task<StaffMemberStatus> StaffStatusAsync() =>
+        Db(db => db.StaffMembers
+            .Where(x => x.Id == StaffId)
+            .Select(x => x.Status)
+            .SingleAsync());
+
+    protected Task<List<Reservation>> ReadQueueAsync() =>
+        Db(db => db.Reservations
+            .AsNoTracking()
+            .Where(x => x.BookId == BookId)
+            .OrderBy(x => x.QueuePosition)
+            .ToListAsync());
+
+    protected Task<List<T>> EventsAsync<T>()
+        where T : class, IDomainEvent =>
+        Db(async db =>
+        {
+            List<OutboxMessage> messages = await db.OutboxMessages
+                .AsNoTracking()
+                .Where(x => x.Type == typeof(T).Name)
+                .ToListAsync();
+
+            return messages
+                .Select(x =>
+                    JsonSerializer.Deserialize<T>(x.Payload, Json)!)
+                .ToList();
+        });
+
+    /// <summary>
+    /// Uses the existing real API fixture, with a fixed clock,
+    /// no Borrowing seed, and an optional failure-injection event bus.
+    /// </summary>
+    protected sealed class ReturnHost : ApiHostFactory
+    {
+        public bool FailAfterSave { get; set; }
+
+        public bool SavedBeforeFailure { get; set; }
+
+        protected override void ConfigureTestServices(
+            IServiceCollection services)
+        {
+            ServiceDescriptor borrowingSeed = services.Single(
+                descriptor =>
+                    descriptor.ServiceType == typeof(IModuleSeeder) &&
+                    descriptor.ImplementationType ==
+                    typeof(BorrowingSeeder));
+
+            services.Remove(borrowingSeed);
+
+            services.RemoveAll<IClock>();
+            services.AddSingleton<IClock>(new ReturnClock(() => Now));
+
+            services.RemoveAll<IEventBus>();
+
+            services.AddScoped<IEventBus>(provider =>
+                new TestOutboxBus(
+                    provider.GetRequiredService<LibraryDbContext>(),
+                    provider.GetRequiredService<EventTypeRegistry>(),
+                    this));
+        }
+    }
+
+    /// <summary>
+    /// Uses the real outbox implementation.
+    /// Only the rollback test enables the deliberate failure.
+    /// </summary>
+    protected sealed class TestOutboxBus(
+        LibraryDbContext db,
+        EventTypeRegistry registry,
+        ReturnHost host) : IEventBus
+    {
+        private readonly OutboxEventBus _inner = new(db, registry);
+
+        public async Task PublishAsync<TEvent>(
+            TEvent domainEvent,
+            CancellationToken ct = default)
+            where TEvent : class, IDomainEvent
+        {
+            await _inner.PublishAsync(domainEvent, ct);
+
+            if (host.FailAfterSave && domainEvent is LoanReturned)
+            {
+                // Test only: flush all staged changes to SQL Server.
+                // The caller's transaction remains open and uncommitted.
+                await db.SaveChangesAsync(ct);
+
+                host.SavedBeforeFailure = true;
+
+                throw new InvalidOperationException(
+                    "Deliberate return integration-test failure.");
+            }
+        }
+    }
+
+    protected sealed class ReturnClock(Func<DateTime> now) : IClock
+    {
+        private static readonly TimeZoneInfo Zone =
+            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan");
+
+        public DateTime UtcNow => now();
+
+        public DateOnly LocalToday => ToLocalDate(now());
+
+        public DateTime ToLocal(DateTime utc) =>
+            TimeZoneInfo.ConvertTimeFromUtc(utc, Zone);
+
+        public DateOnly ToLocalDate(DateTime utc) =>
+            DateOnly.FromDateTime(ToLocal(utc));
+
+        public DateTime StartOfLocalDayUtc(DateOnly localDate) =>
+            TimeZoneInfo.ConvertTimeToUtc(
+                DateTime.SpecifyKind(
+                    localDate.ToDateTime(TimeOnly.MinValue),
+                    DateTimeKind.Unspecified),
+                Zone);
+
+        public DateTime EndOfLocalDayUtc(DateOnly localDate) =>
+            StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
+    }
+}
+
+/// <summary>On-time returns, the return note and unknown loans.</summary>
+public sealed class LoanReturnOnTimeTests : LoanReturnEndpointTests
+{
     [Theory]
     [InlineData(StaffRoles.Librarian)]
     [InlineData(StaffRoles.LibraryAdministrator)]
@@ -106,6 +367,146 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
             x => x.LoanId == loanId);
     }
 
+    [Fact]
+    public async Task Long_note_is_400_without_changing_the_loan()
+    {
+        Guid loanId = await SeedAsync();
+
+        using var client = Client();
+        using var response = await ReturnAsync(
+            client,
+            loanId,
+            note: new string('a', Loan.ReturnNoteMaxLength + 1));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        JsonElement body =
+            await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.True(
+            body.GetProperty("errors").TryGetProperty("Note", out _));
+
+        Loan loan = await ReadLoanAsync(loanId);
+
+        Assert.Equal(LoanStatus.Active, loan.Status);
+        Assert.Null(loan.ReturnedAtUtc);
+        Assert.Null(loan.ReturnNote);
+
+        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
+    }
+
+    [Fact]
+    public async Task Unknown_loan_is_404()
+    {
+        using var client = Client();
+        using var response = await ReturnAsync(
+            client,
+            Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        JsonElement body =
+            await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            BorrowingErrors.LoanNotFound.Code,
+            body.GetProperty("code").GetString());
+    }
+}
+
+/// <summary>Who may return a loan, and a loan returned twice or at the same time.</summary>
+public sealed class LoanReturnAccessAndConcurrencyTests : LoanReturnEndpointTests
+{
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
+    public async Task Return_requires_librarian_or_administrator(
+        string? role,
+        HttpStatusCode expectedStatus)
+    {
+        Guid loanId = await SeedAsync();
+
+        using var client = Client(role);
+        using var response = await ReturnAsync(client, loanId);
+
+        Assert.Equal(expectedStatus, response.StatusCode);
+
+        Assert.Equal(
+            LoanStatus.Active,
+            (await ReadLoanAsync(loanId)).Status);
+
+        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
+    }
+
+    [Fact]
+    public async Task Two_simultaneous_returns_close_the_loan_once()
+    {
+        Guid loanId = await SeedAsync(late: true);
+
+        using var first = Client();
+        using var second = Client();
+        HttpResponseMessage[] responses = await Task.WhenAll(
+            ReturnAsync(first, loanId),
+            ReturnAsync(second, loanId));
+
+        Assert.Equal(
+            new[] { HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity },
+            responses.Select(r => r.StatusCode).OrderBy(c => (int)c));
+        foreach (var response in responses)
+            response.Dispose();
+
+        Assert.Equal(1, await Db(db => db.PenaltyRecords.CountAsync(x => x.LoanId == loanId)));
+        Assert.Single(await EventsAsync<LoanReturned>(), x => x.LoanId == loanId);
+    }
+
+    [Fact]
+    public async Task Duplicate_return_is_422_without_duplicate_records_or_events()
+    {
+        Guid loanId = await SeedAsync();
+
+        using var client = Client();
+
+        using var first = await ReturnAsync(
+            client,
+            loanId,
+            damaged: true);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+        int eventsBefore = await Db(db =>
+            db.OutboxMessages.CountAsync());
+
+        using var second = await ReturnAsync(
+            client,
+            loanId,
+            damaged: true);
+
+        Assert.Equal(
+            HttpStatusCode.UnprocessableEntity,
+            second.StatusCode);
+
+        JsonElement body =
+            await second.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(
+            BorrowingErrors.LoanAlreadyClosed.Code,
+            body.GetProperty("code").GetString());
+
+        Assert.Equal(
+            1,
+            await Db(db =>
+                db.PenaltyRecords.CountAsync(
+                    x => x.LoanId == loanId)));
+
+        Assert.Equal(
+            eventsBefore,
+            await Db(db => db.OutboxMessages.CountAsync()));
+    }
+}
+
+/// <summary>The reservation queue after a return, and a failed return rolled back.</summary>
+public sealed class LoanReturnQueueTests : LoanReturnEndpointTests
+{
     [Fact]
     public async Task Undamaged_return_assigns_first_reservation_and_renumbers_queue()
     {
@@ -161,6 +562,111 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Equal(first.ReadyUntilUtc, ready.ReadyUntilUtc);
     }
 
+    [Fact]
+    public async Task Damaged_return_keeps_the_queue_waiting()
+    {
+        Guid loanId = await SeedAsync(queue: true);
+
+        using var client = Client();
+        using var response = await ReturnAsync(client, loanId, damaged: true);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(BookCopyStatus.UnderRepair, await CopyStatusAsync());
+
+        int[] positions = await Db(db =>
+            db.Reservations
+                .Where(x => x.BookId == BookId && x.Status == ReservationStatus.Waiting)
+                .OrderBy(x => x.QueuePosition)
+                .Select(x => x.QueuePosition)
+                .ToArrayAsync());
+        Assert.Equal(new[] { 1, 2 }, positions);
+        Assert.DoesNotContain(
+            (await EventsAsync<ReservationReady>()),
+            x => x.BookId == BookId);
+    }
+
+    /// <summary>
+    /// Two librarians return the same loan at the same moment (BR-BOR-4, NFR-08): the staff lock serialises them, one
+    /// return succeeds, the other is refused, and the penalties and events exist once.
+
+    [Fact]
+    public async Task Failure_after_database_save_rolls_back_every_return_change()
+    {
+        // Existing 3 points + 2 late points would change Active to Restricted.
+        // The returned copy would also become reserved.
+        Guid loanId = await SeedAsync(
+            late: true,
+            priorPoints: 3,
+            queue: true);
+
+        int outboxBefore = await Db(db =>
+            db.OutboxMessages.CountAsync());
+
+        _host.FailAfterSave = true;
+
+        using var client = Client();
+        using var response = await ReturnAsync(
+            client,
+            loanId,
+            note: "Must roll back");
+
+        Assert.Equal(
+            HttpStatusCode.InternalServerError,
+            response.StatusCode);
+
+        // Proves the failure occurred after SQL writes, not during setup.
+        Assert.True(_host.SavedBeforeFailure);
+
+        // Every read uses a fresh scope/context.
+        Loan loan = await ReadLoanAsync(loanId);
+
+        Assert.Equal(LoanStatus.Active, loan.Status);
+        Assert.Null(loan.ReturnedAtUtc);
+        Assert.Null(loan.ReturnNote);
+
+        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
+
+        Assert.Equal(
+            StaffMemberStatus.Active,
+            await StaffStatusAsync());
+
+        int[] points = await Db(db =>
+            db.PenaltyRecords
+                .Where(x => x.LoanId == loanId)
+                .Select(x => x.Points)
+                .ToArrayAsync());
+
+        // Only the penalty that existed before the return remains.
+        Assert.Equal(new[] { 3 }, points);
+
+        List<Reservation> reservations = await ReadQueueAsync();
+
+        Assert.Equal(
+            new[] { 1, 2 },
+            reservations.Select(x => x.QueuePosition).ToArray());
+
+        Assert.All(reservations, reservation =>
+        {
+            Assert.Equal(
+                ReservationStatus.Waiting,
+                reservation.Status);
+
+            Assert.Null(reservation.CopyId);
+            Assert.Null(reservation.ReadyUntilUtc);
+        });
+
+        Assert.Equal(
+            outboxBefore,
+            await Db(db => db.OutboxMessages.CountAsync()));
+    }
+
+    /// <summary>
+    /// Policy table: a damaged copy goes UnderRepair. The queue keeps waiting — nobody gets a copy that cannot be lent.
+}
+
+/// <summary>Penalty points and staff status after late and damaged returns.</summary>
+public sealed class LoanReturnPenaltyTests : LoanReturnEndpointTests
+{
     [Theory]
     [InlineData(0, StaffMemberStatus.Restricted)]
     [InlineData(5, StaffMemberStatus.Suspended)]
@@ -253,7 +759,7 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
     /// <summary>
     /// A loan already marked Overdue is returned on its due-date local day: with NextLocalDay the dates say "not late",
     /// but the stored status makes it late — one 0-point record, no PenaltyApplied, no status change (BQ-BA-03).
-    /// </summary>
+
     [Fact]
     public async Task Returning_an_overdue_loan_on_its_due_date_records_zero_points()
     {
@@ -331,495 +837,5 @@ public sealed class LoanReturnEndpointTests : IAsyncLifetime
         Assert.Single(
             (await EventsAsync<StaffStatusChanged>()),
             x => x.StaffMemberId == StaffId);
-    }
-
-    [Fact]
-    public async Task Failure_after_database_save_rolls_back_every_return_change()
-    {
-        // Existing 3 points + 2 late points would change Active to Restricted.
-        // The returned copy would also become reserved.
-        Guid loanId = await SeedAsync(
-            late: true,
-            priorPoints: 3,
-            queue: true);
-
-        int outboxBefore = await Db(db =>
-            db.OutboxMessages.CountAsync());
-
-        _host.FailAfterSave = true;
-
-        using var client = Client();
-        using var response = await ReturnAsync(
-            client,
-            loanId,
-            note: "Must roll back");
-
-        Assert.Equal(
-            HttpStatusCode.InternalServerError,
-            response.StatusCode);
-
-        // Proves the failure occurred after SQL writes, not during setup.
-        Assert.True(_host.SavedBeforeFailure);
-
-        // Every read uses a fresh scope/context.
-        Loan loan = await ReadLoanAsync(loanId);
-
-        Assert.Equal(LoanStatus.Active, loan.Status);
-        Assert.Null(loan.ReturnedAtUtc);
-        Assert.Null(loan.ReturnNote);
-
-        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
-
-        Assert.Equal(
-            StaffMemberStatus.Active,
-            await StaffStatusAsync());
-
-        int[] points = await Db(db =>
-            db.PenaltyRecords
-                .Where(x => x.LoanId == loanId)
-                .Select(x => x.Points)
-                .ToArrayAsync());
-
-        // Only the penalty that existed before the return remains.
-        Assert.Equal(new[] { 3 }, points);
-
-        List<Reservation> reservations = await ReadQueueAsync();
-
-        Assert.Equal(
-            new[] { 1, 2 },
-            reservations.Select(x => x.QueuePosition).ToArray());
-
-        Assert.All(reservations, reservation =>
-        {
-            Assert.Equal(
-                ReservationStatus.Waiting,
-                reservation.Status);
-
-            Assert.Null(reservation.CopyId);
-            Assert.Null(reservation.ReadyUntilUtc);
-        });
-
-        Assert.Equal(
-            outboxBefore,
-            await Db(db => db.OutboxMessages.CountAsync()));
-    }
-
-    /// <summary>
-    /// Policy table: a damaged copy goes UnderRepair. The queue keeps waiting — nobody gets a copy that cannot be lent.
-    /// </summary>
-    [Fact]
-    public async Task Damaged_return_keeps_the_queue_waiting()
-    {
-        Guid loanId = await SeedAsync(queue: true);
-
-        using var client = Client();
-        using var response = await ReturnAsync(client, loanId, damaged: true);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(BookCopyStatus.UnderRepair, await CopyStatusAsync());
-
-        int[] positions = await Db(db =>
-            db.Reservations
-                .Where(x => x.BookId == BookId && x.Status == ReservationStatus.Waiting)
-                .OrderBy(x => x.QueuePosition)
-                .Select(x => x.QueuePosition)
-                .ToArrayAsync());
-        Assert.Equal(new[] { 1, 2 }, positions);
-        Assert.DoesNotContain(
-            (await EventsAsync<ReservationReady>()),
-            x => x.BookId == BookId);
-    }
-
-    /// <summary>
-    /// Two librarians return the same loan at the same moment (BR-BOR-4, NFR-08): the staff lock serialises them, one
-    /// return succeeds, the other is refused, and the penalties and events exist once.
-    /// </summary>
-    [Fact]
-    public async Task Two_simultaneous_returns_close_the_loan_once()
-    {
-        Guid loanId = await SeedAsync(late: true);
-
-        using var first = Client();
-        using var second = Client();
-        HttpResponseMessage[] responses = await Task.WhenAll(
-            ReturnAsync(first, loanId),
-            ReturnAsync(second, loanId));
-
-        Assert.Equal(
-            new[] { HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity },
-            responses.Select(r => r.StatusCode).OrderBy(c => (int)c));
-        foreach (var response in responses)
-            response.Dispose();
-
-        Assert.Equal(1, await Db(db => db.PenaltyRecords.CountAsync(x => x.LoanId == loanId)));
-        Assert.Single(await EventsAsync<LoanReturned>(), x => x.LoanId == loanId);
-    }
-
-    [Fact]
-    public async Task Duplicate_return_is_422_without_duplicate_records_or_events()
-    {
-        Guid loanId = await SeedAsync();
-
-        using var client = Client();
-
-        using var first = await ReturnAsync(
-            client,
-            loanId,
-            damaged: true);
-
-        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-
-        int eventsBefore = await Db(db =>
-            db.OutboxMessages.CountAsync());
-
-        using var second = await ReturnAsync(
-            client,
-            loanId,
-            damaged: true);
-
-        Assert.Equal(
-            HttpStatusCode.UnprocessableEntity,
-            second.StatusCode);
-
-        JsonElement body =
-            await second.Content.ReadFromJsonAsync<JsonElement>();
-
-        Assert.Equal(
-            BorrowingErrors.LoanAlreadyClosed.Code,
-            body.GetProperty("code").GetString());
-
-        Assert.Equal(
-            1,
-            await Db(db =>
-                db.PenaltyRecords.CountAsync(
-                    x => x.LoanId == loanId)));
-
-        Assert.Equal(
-            eventsBefore,
-            await Db(db => db.OutboxMessages.CountAsync()));
-    }
-
-    [Theory]
-    [InlineData(null, HttpStatusCode.Unauthorized)]
-    [InlineData(StaffRoles.StaffMember, HttpStatusCode.Forbidden)]
-    public async Task Return_requires_librarian_or_administrator(
-        string? role,
-        HttpStatusCode expectedStatus)
-    {
-        Guid loanId = await SeedAsync();
-
-        using var client = Client(role);
-        using var response = await ReturnAsync(client, loanId);
-
-        Assert.Equal(expectedStatus, response.StatusCode);
-
-        Assert.Equal(
-            LoanStatus.Active,
-            (await ReadLoanAsync(loanId)).Status);
-
-        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
-    }
-
-    [Fact]
-    public async Task Long_note_is_400_without_changing_the_loan()
-    {
-        Guid loanId = await SeedAsync();
-
-        using var client = Client();
-        using var response = await ReturnAsync(
-            client,
-            loanId,
-            note: new string('a', Loan.ReturnNoteMaxLength + 1));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        JsonElement body =
-            await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        Assert.True(
-            body.GetProperty("errors").TryGetProperty("Note", out _));
-
-        Loan loan = await ReadLoanAsync(loanId);
-
-        Assert.Equal(LoanStatus.Active, loan.Status);
-        Assert.Null(loan.ReturnedAtUtc);
-        Assert.Null(loan.ReturnNote);
-
-        Assert.Equal(BookCopyStatus.OnLoan, await CopyStatusAsync());
-    }
-
-    [Fact]
-    public async Task Unknown_loan_is_404()
-    {
-        using var client = Client();
-        using var response = await ReturnAsync(
-            client,
-            Guid.NewGuid());
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-
-        JsonElement body =
-            await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        Assert.Equal(
-            BorrowingErrors.LoanNotFound.Code,
-            body.GetProperty("code").GetString());
-    }
-
-    private HttpClient Client(string? role = StaffRoles.Librarian)
-    {
-        HttpClient client = _host.CreateClient();
-
-        if (role is not null)
-        {
-            var account = new LoginAccount(
-                Guid.NewGuid(),
-                "return-test@ameriabank.am",
-                Guid.NewGuid(),
-                StaffMemberStatus.Active,
-                [role]);
-
-            // The business clock of the host is fixed (Now); the token must be valid at the real time the test
-            // runs, otherwise the API answers 401 on every day except the fixed one.
-            var issuer = new JwtTokenIssuer(
-                _host.Services.GetRequiredService<IOptions<JwtOptions>>(),
-                new ReturnClock(() => DateTime.UtcNow));
-            string token = issuer.Issue(account).Token;
-
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-        }
-
-        return client;
-    }
-
-    private async Task<T> Db<T>(
-        Func<LibraryDbContext, Task<T>> action)
-    {
-        using var scope = _host.Services.CreateScope();
-
-        var db = scope.ServiceProvider
-            .GetRequiredService<LibraryDbContext>();
-
-        return await action(db);
-    }
-
-    /// <summary>
-    /// Creates the initial database state.
-    /// The return operation itself is always performed through HTTP.
-    /// </summary>
-    private Task<Guid> SeedAsync(
-        bool late = false,
-        int priorPoints = 0,
-        bool queue = false,
-        bool overdueToday = false) =>
-        Db(async db =>
-        {
-            var staff = await db.StaffMembers
-                .SingleAsync(x => x.Id == StaffId);
-
-            staff.ChangeStatus(
-                priorPoints >= 5
-                    ? StaffMemberStatus.Restricted
-                    : StaffMemberStatus.Active);
-
-            var copy = await db.BookCopies
-                .SingleAsync(x => x.Id == CopyId);
-
-            copy.ChangeStatus(BookCopyStatus.OnLoan);
-
-            // overdueToday: due two hours before Now on the same local day (Tuesday 14:00 Yerevan).
-            DateTime dueAtUtc = late
-                ? new DateTime(
-                    2026, 10, 16, 12, 0, 0, DateTimeKind.Utc)
-                : overdueToday ? Now.AddHours(-2) : Now.AddDays(1);
-
-            Loan loan = Loan.Issue(
-                Guid.NewGuid(),
-                CopyId,
-                StaffId,
-                dueAtUtc.AddDays(-14),
-                14);
-
-            if (overdueToday)
-                loan.MarkOverdue(Now);   // what the daily job may do once the due time has passed
-
-            db.Loans.Add(loan);
-
-            if (priorPoints > 0)
-            {
-                db.PenaltyRecords.Add(
-                    PenaltyRecord.Create(
-                        Guid.NewGuid(),
-                        StaffId,
-                        loan.Id,
-                        priorPoints,
-                        "Existing penalty",
-                        Now.AddDays(-1),
-                        Now.AddDays(89)));
-            }
-
-            if (queue)
-            {
-                db.Reservations.Add(
-                    Reservation.Create(
-                        Guid.NewGuid(),
-                        BookId,
-                        Members.MariamAvetisyan,
-                        Now.AddDays(-2),
-                        1));
-
-                db.Reservations.Add(
-                    Reservation.Create(
-                        Guid.NewGuid(),
-                        BookId,
-                        Members.DavitHakobyan,
-                        Now.AddDays(-1),
-                        2));
-            }
-
-            await db.SaveChangesAsync();
-
-            return loan.Id;
-        });
-
-    private static Task<HttpResponseMessage> ReturnAsync(
-        HttpClient client,
-        Guid loanId,
-        bool damaged = false,
-        string? note = null) =>
-        client.PostAsJsonAsync(
-            $"/api/loans/{loanId}/return",
-            new ReturnLoanRequest(damaged, note));
-
-    private Task<Loan> ReadLoanAsync(Guid loanId) =>
-        Db(db => db.Loans
-            .AsNoTracking()
-            .SingleAsync(x => x.Id == loanId));
-
-    private Task<BookCopyStatus> CopyStatusAsync() =>
-        Db(db => db.BookCopies
-            .Where(x => x.Id == CopyId)
-            .Select(x => x.Status)
-            .SingleAsync());
-
-    private Task<StaffMemberStatus> StaffStatusAsync() =>
-        Db(db => db.StaffMembers
-            .Where(x => x.Id == StaffId)
-            .Select(x => x.Status)
-            .SingleAsync());
-
-    private Task<List<Reservation>> ReadQueueAsync() =>
-        Db(db => db.Reservations
-            .AsNoTracking()
-            .Where(x => x.BookId == BookId)
-            .OrderBy(x => x.QueuePosition)
-            .ToListAsync());
-
-    private Task<List<T>> EventsAsync<T>()
-        where T : class, IDomainEvent =>
-        Db(async db =>
-        {
-            List<OutboxMessage> messages = await db.OutboxMessages
-                .AsNoTracking()
-                .Where(x => x.Type == typeof(T).Name)
-                .ToListAsync();
-
-            return messages
-                .Select(x =>
-                    JsonSerializer.Deserialize<T>(x.Payload, Json)!)
-                .ToList();
-        });
-
-    /// <summary>
-    /// Uses the existing real API fixture, with a fixed clock,
-    /// no Borrowing seed, and an optional failure-injection event bus.
-    /// </summary>
-    private sealed class ReturnHost : ApiHostFactory
-    {
-        public bool FailAfterSave { get; set; }
-
-        public bool SavedBeforeFailure { get; set; }
-
-        protected override void ConfigureTestServices(
-            IServiceCollection services)
-        {
-            ServiceDescriptor borrowingSeed = services.Single(
-                descriptor =>
-                    descriptor.ServiceType == typeof(IModuleSeeder) &&
-                    descriptor.ImplementationType ==
-                    typeof(BorrowingSeeder));
-
-            services.Remove(borrowingSeed);
-
-            services.RemoveAll<IClock>();
-            services.AddSingleton<IClock>(new ReturnClock(() => Now));
-
-            services.RemoveAll<IEventBus>();
-
-            services.AddScoped<IEventBus>(provider =>
-                new TestOutboxBus(
-                    provider.GetRequiredService<LibraryDbContext>(),
-                    provider.GetRequiredService<EventTypeRegistry>(),
-                    this));
-        }
-    }
-
-    /// <summary>
-    /// Uses the real outbox implementation.
-    /// Only the rollback test enables the deliberate failure.
-    /// </summary>
-    private sealed class TestOutboxBus(
-        LibraryDbContext db,
-        EventTypeRegistry registry,
-        ReturnHost host) : IEventBus
-    {
-        private readonly OutboxEventBus _inner = new(db, registry);
-
-        public async Task PublishAsync<TEvent>(
-            TEvent domainEvent,
-            CancellationToken ct = default)
-            where TEvent : class, IDomainEvent
-        {
-            await _inner.PublishAsync(domainEvent, ct);
-
-            if (host.FailAfterSave && domainEvent is LoanReturned)
-            {
-                // Test only: flush all staged changes to SQL Server.
-                // The caller's transaction remains open and uncommitted.
-                await db.SaveChangesAsync(ct);
-
-                host.SavedBeforeFailure = true;
-
-                throw new InvalidOperationException(
-                    "Deliberate return integration-test failure.");
-            }
-        }
-    }
-
-    private sealed class ReturnClock(Func<DateTime> now) : IClock
-    {
-        private static readonly TimeZoneInfo Zone =
-            TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan");
-
-        public DateTime UtcNow => now();
-
-        public DateOnly LocalToday => ToLocalDate(now());
-
-        public DateTime ToLocal(DateTime utc) =>
-            TimeZoneInfo.ConvertTimeFromUtc(utc, Zone);
-
-        public DateOnly ToLocalDate(DateTime utc) =>
-            DateOnly.FromDateTime(ToLocal(utc));
-
-        public DateTime StartOfLocalDayUtc(DateOnly localDate) =>
-            TimeZoneInfo.ConvertTimeToUtc(
-                DateTime.SpecifyKind(
-                    localDate.ToDateTime(TimeOnly.MinValue),
-                    DateTimeKind.Unspecified),
-                Zone);
-
-        public DateTime EndOfLocalDayUtc(DateOnly localDate) =>
-            StartOfLocalDayUtc(localDate.AddDays(1)).AddTicks(-1);
     }
 }

@@ -13,7 +13,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 
 public sealed class CatalogReferenceFixture : IAsyncLifetime
 {
-    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly string _connectionString = TestDatabase.NewDatabase();
     public LibraryDbContext Open()
     {
         var options = new DbContextOptionsBuilder<LibraryDbContext>();
@@ -54,11 +54,11 @@ public class CatalogReferenceTests(CatalogReferenceFixture fixture) : IClassFixt
         await using var check = fixture.Open();
         var ids = CatalogSeedData.Categories.Select(x => x.Id).ToArray();
         var rows = await check.Categories.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
-        Assert.Equal(8, rows.Count);
-        foreach (var (id, name) in CatalogSeedData.Categories)
+        Assert.Equal(14, rows.Count);
+        foreach (var (id, name, parentId) in CatalogSeedData.Categories)
         {
             Assert.Equal(name, rows[id].Name);
-            Assert.Null(rows[id].ParentCategoryId);
+            Assert.Equal(parentId, rows[id].ParentCategoryId);
         }
 
         await new UnitOfWork(check).ExecuteInTransactionAsync(_ =>
@@ -69,7 +69,7 @@ public class CatalogReferenceTests(CatalogReferenceFixture fixture) : IClassFixt
         await new UnitOfWork(check).ExecuteInTransactionAsync(ct => new CatalogSeeder(check).SeedAsync(ct));
         check.ChangeTracker.Clear();
         Assert.Equal("Edited category", (await check.Categories.SingleAsync(x => x.Id == ids[0])).Name);
-        Assert.Equal(8, await check.Categories.CountAsync(x => ids.Contains(x.Id)));
+        Assert.Equal(14, await check.Categories.CountAsync(x => ids.Contains(x.Id)));
     }
 
     [Fact]

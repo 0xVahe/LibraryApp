@@ -15,7 +15,7 @@ public sealed class StaffSeederFixture : IAsyncLifetime
 {
     public static readonly DateTime Now = new(2026, 10, 7, 9, 0, 0, DateTimeKind.Utc);
 
-    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewConnectionString());
+    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewDatabase());
 
     private static ServiceProvider BuildServices(string connectionString)
     {

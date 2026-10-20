@@ -16,7 +16,7 @@ public sealed class BookDetailsDatabase : IAsyncLifetime
     public static readonly Guid BareBookId = new("b2000000-0000-0000-0000-000000000002");     // no publisher, no copies
     public static readonly Guid DeletedBookId = new("b2000000-0000-0000-0000-000000000003");  // soft-deleted
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

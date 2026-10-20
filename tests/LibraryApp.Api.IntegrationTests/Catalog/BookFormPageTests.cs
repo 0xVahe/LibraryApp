@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
+using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
@@ -26,7 +27,8 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
     }
 
     /// <summary>A category, an author and (optionally) a book of them, with names no other test uses.</summary>
-    private async Task<(Guid CategoryId, Guid AuthorId, Guid BookId, string Isbn)> SeedAsync(bool withOnLoanCopy = false)
+    private async Task<(Guid CategoryId, Guid AuthorId, Guid BookId, string Isbn)> SeedAsync(bool withOnLoanCopy = false,
+        string? coverImagePath = null, string language = "en")
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
@@ -34,7 +36,7 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         var category = new Category(Guid.NewGuid(), $"Page category {suffix}");
         var author = new Author(Guid.NewGuid(), $"Page author {suffix}");
         var isbn = NewIsbn();
-        var book = new Book(Guid.NewGuid(), $"Page book {suffix}", isbn, 2020, "en", null, category.Id, null);
+        var book = new Book(Guid.NewGuid(), $"Page book {suffix}", isbn, 2020, language, null, category.Id, null, coverImagePath);
         db.AddRange(category, author, book, new BookAuthor(book.Id, author.Id));
         if (withOnLoanCopy)
         {
@@ -170,6 +172,86 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
     }
 
     [Fact]
+    public async Task A_language_the_form_does_not_offer_stays_selected_on_the_Edit_page()
+    {
+        // The API accepts any ISO 639-1 code; without its own option the select would fall back to its first choice.
+        var (_, _, bookId, _) = await SeedAsync(language: "fr");
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync($"/catalog/books/{bookId}/edit");
+
+        var select = Regex.Match(html, "<select[^>]*name=\"Input.Language\"[^>]*>(.*?)</select>", RegexOptions.Singleline).Value;
+        var selected = Regex.Matches(select, "<option(?=[^>]*selected)[^>]*value=\"([^\"]*)\"").Cast<Match>()
+            .Select(match => match.Groups[1].Value);
+        Assert.Equal(new[] { "fr" }, selected);
+    }
+
+    [Fact]
+    public async Task Saving_the_Edit_form_keeps_the_cover()
+    {
+        const string cover = "library-covers/02.png";
+        var (categoryId, _, bookId, isbn) = await SeedAsync(coverImagePath: cover);
+        var path = $"/catalog/books/{bookId}/edit";
+
+        using (var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password))
+            Assert.Contains($"value=\"{cover}\"", await client.GetStringAsync(path));
+
+        var response = await PostFormAsync(Librarian, path, null,
+            BookFields(categoryId, isbn, "Renamed Book With Cover").Append(new("Input.CoverImagePath", cover)));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        var book = await FindBookAsync(bookId);
+        Assert.Equal("Renamed Book With Cover", book.Title);
+        Assert.Equal(cover, book.CoverImagePath);
+    }
+
+    [Fact]
+    public async Task Clearing_the_cover_field_removes_the_cover()
+    {
+        var (categoryId, _, bookId, isbn) = await SeedAsync(coverImagePath: "library-covers/02.png");
+
+        var response = await PostFormAsync(Librarian, $"/catalog/books/{bookId}/edit", null,
+            BookFields(categoryId, isbn).Append(new("Input.CoverImagePath", "")));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Null((await FindBookAsync(bookId)).CoverImagePath);
+    }
+
+    [Fact]
+    public async Task An_invalid_cover_path_is_shown_next_to_the_field_and_the_book_is_not_changed()
+    {
+        const string cover = "library-covers/02.png";
+        var (categoryId, _, bookId, isbn) = await SeedAsync(coverImagePath: cover);
+
+        var response = await PostFormAsync(Librarian, $"/catalog/books/{bookId}/edit", null,
+            BookFields(categoryId, isbn, "Not Saved").Append(new("Input.CoverImagePath", "https://example.com/cover.png")));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains(HtmlEncoder.Default.Encode(CoverImagePathRules.Message), html);
+        Assert.Matches("<input[^>]*aria-invalid=\"true\"[^>]*id=\"Input_CoverImagePath\"|<input[^>]*id=\"Input_CoverImagePath\"[^>]*aria-invalid=\"true\"", html);
+        var book = await FindBookAsync(bookId);
+        Assert.NotEqual("Not Saved", book.Title);
+        Assert.Equal(cover, book.CoverImagePath);
+    }
+
+    [Fact]
+    public async Task A_new_book_is_added_with_its_cover()
+    {
+        var (categoryId, authorId, _, _) = await SeedAsync();
+        var isbn = NewIsbn();
+
+        var response = await PostFormAsync(Librarian, "/catalog/books/new", null, BookFields(categoryId, isbn)
+            .Append(new("Input.AuthorIds", authorId.ToString()))
+            .Append(new("Input.CoverImagePath", " library-covers/03.png ")));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        Assert.Equal("library-covers/03.png", (await db.Books.SingleAsync(x => x.Isbn == isbn)).CoverImagePath);
+    }
+
+    [Fact]
     public async Task An_unknown_book_shows_the_Not_found_page()
     {
         using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
@@ -215,5 +297,11 @@ public class BookFormPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFa
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
         Assert.True((await db.Books.SingleAsync(x => x.Id == bookId)).IsDeleted);
+    }
+
+    private async Task<Book> FindBookAsync(Guid bookId)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().Books.AsNoTracking().SingleAsync(x => x.Id == bookId);
     }
 }

@@ -12,6 +12,14 @@ public sealed class StaffManagementRepository(LibraryDbContext db) : IStaffManag
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.StaffMembers.SingleOrDefaultAsync(x => x.Id == id, ct);
 
+    public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) =>
+        (from member in db.StaffMembers
+            join department in db.Departments on member.DepartmentId equals department.Id
+            join category in db.StaffCategories on member.StaffCategoryId equals category.Id
+            where member.Id == id
+            select new StaffMemberProfile(member, department.Name, category.Name))
+        .SingleOrDefaultAsync(ct);
+
     public async Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct)
     {
         var profile = await (from member in db.StaffMembers.AsNoTracking()

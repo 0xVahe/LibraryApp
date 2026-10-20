@@ -30,7 +30,7 @@ public class ReservationEndpointTests(ApiHostWithoutBorrowingSeed factory) : ICl
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "reader@ameriabank.am", staffMemberId ?? Guid.NewGuid(), StaffMemberStatus.Active, [role])).Token;
+                factory.Account(role) with { StaffMemberId = staffMemberId ?? Guid.NewGuid() }).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;
@@ -43,6 +43,9 @@ public class ReservationEndpointTests(ApiHostWithoutBorrowingSeed factory) : ICl
     private static Task<HttpResponseMessage> Reserve(HttpClient client, int book, Guid? staffMemberId = null) =>
         client.PostAsJsonAsync("/api/reservations", new CreateReservationRequest(CatalogSeedIds.Book(book), staffMemberId));
 
+    private static async Task<ReservationDto> Read(HttpClient client, Guid reservationId) =>
+        (await client.GetFromJsonAsync<ReservationDto>($"/api/reservations/{reservationId}", Json))!;
+
     private static async Task<ReservationDto> Created(HttpResponseMessage response)
     {
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -53,6 +56,12 @@ public class ReservationEndpointTests(ApiHostWithoutBorrowingSeed factory) : ICl
     {
         Assert.Equal(status, response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
+    }
+
+    private async Task<T> Db<T>(Func<LibraryDbContext, Task<T>> operation)
+    {
+        using var scope = factory.Services.CreateScope();
+        return await operation(scope.ServiceProvider.GetRequiredService<LibraryDbContext>());
     }
 
     /// <summary>All copies of the book go on loan, so it can be reserved (BR-BOR-3).</summary>
@@ -167,5 +176,105 @@ public class ReservationEndpointTests(ApiHostWithoutBorrowingSeed factory) : ICl
         foreach (var response in responses)
             positions.Add((await Created(response)).QueuePosition);
         Assert.Equal([1, 2, 3], positions.Order());
+    }
+
+    [Fact]
+    public async Task Cancellation_enforces_ownership_compacts_queue_and_transfers_held_copy()
+    {
+        const int book = 57;
+        Guid copyId = CatalogSeedIds.Copy(book, 1);
+        Guid loanId = await Db(async db =>
+        {
+            var copy = await db.BookCopies.SingleAsync(item => item.Id == copyId);
+            copy.ChangeStatus(BookCopyStatus.OnLoan);
+
+            Loan loan = Loan.Issue(
+                Guid.NewGuid(), copyId, Members.LilitGrigoryan,
+                DateTime.UtcNow.AddDays(-1), 14);
+            db.Loans.Add(loan);
+            await db.SaveChangesAsync();
+            return loan.Id;
+        });
+
+        using var librarian = Librarian();
+        var first = await Created(await Reserve(librarian, book, Members.MariamAvetisyan));
+        var second = await Created(await Reserve(librarian, book, Members.DavitHakobyan));
+        var third = await Created(await Reserve(librarian, book, Members.AnnaPetrosyan));
+
+        await AssertProblem(
+            await Reader(Members.GorMkrtchyan).PostAsync($"/api/reservations/{second.ReservationId}/cancel", null),
+            HttpStatusCode.NotFound,
+            "borrowing.reservation_not_found");
+
+        using (var owner = Reader(Members.DavitHakobyan))
+        using (var response = await owner.PostAsync($"/api/reservations/{second.ReservationId}/cancel", null))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var cancelled = (await response.Content.ReadFromJsonAsync<ReservationDto>(Json))!;
+            Assert.Equal(ReservationStatus.Cancelled, cancelled.Status);
+            Assert.Equal(0, cancelled.QueuePosition);
+        }
+
+        await AssertProblem(
+            await librarian.PostAsync($"/api/reservations/{second.ReservationId}/cancel", null),
+            HttpStatusCode.UnprocessableEntity,
+            BorrowingErrors.ReservationCannotBeCancelled.Code);
+
+        Assert.Equal(1, (await Read(librarian, first.ReservationId)).QueuePosition);
+        Assert.Equal(2, (await Read(librarian, third.ReservationId)).QueuePosition);
+
+        // A librarian may cancel another person's reservation; the remaining queue is compacted again.
+        using (var response = await librarian.PostAsync($"/api/reservations/{first.ReservationId}/cancel", null))
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, (await Read(librarian, third.ReservationId)).QueuePosition);
+
+        var fourth = await Created(await Reserve(librarian, book, Members.AramSargsyan));
+        var fifth = await Created(await Reserve(librarian, book, Members.MariamAvetisyan));
+
+        using (var returned = await librarian.PostAsJsonAsync(
+                   $"/api/loans/{loanId}/return", new ReturnLoanRequest(Damaged: false), Json))
+            Assert.Equal(HttpStatusCode.OK, returned.StatusCode);
+
+        ReservationDto held = await Read(librarian, third.ReservationId);
+        Assert.Equal(ReservationStatus.ReadyForPickup, held.Status);
+        Assert.Equal(copyId, held.CopyId);
+        var fourthState = await Read(librarian, fourth.ReservationId);
+        Assert.Equal((ReservationStatus.Waiting, 1), (fourthState.Status, fourthState.QueuePosition));
+
+        using (var response = await librarian.PostAsync($"/api/reservations/{held.ReservationId}/cancel", null))
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var transferred = await Read(librarian, fourth.ReservationId);
+        Assert.Equal(ReservationStatus.ReadyForPickup, transferred.Status);
+        Assert.Equal(copyId, transferred.CopyId);
+        var fifthState = await Read(librarian, fifth.ReservationId);
+        Assert.Equal((ReservationStatus.Waiting, 1), (fifthState.Status, fifthState.QueuePosition));
+        Assert.Equal(BookCopyStatus.Reserved, await Db(db => db.BookCopies
+            .Where(item => item.Id == copyId).Select(item => item.Status).SingleAsync()));
+
+        using (var response = await librarian.PostAsync($"/api/reservations/{transferred.ReservationId}/cancel", null))
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var finalHolder = await Read(librarian, fifth.ReservationId);
+        Assert.Equal(ReservationStatus.ReadyForPickup, finalHolder.Status);
+        Assert.Equal(copyId, finalHolder.CopyId);
+
+        using var otherLibrarian = Librarian();
+        var cancellationResponses = await Task.WhenAll(
+            librarian.PostAsync($"/api/reservations/{finalHolder.ReservationId}/cancel", null),
+            otherLibrarian.PostAsync($"/api/reservations/{finalHolder.ReservationId}/cancel", null));
+        try
+        {
+            Assert.Equal(
+                new[] { HttpStatusCode.OK, HttpStatusCode.UnprocessableEntity },
+                cancellationResponses.Select(response => response.StatusCode).OrderBy(status => (int)status));
+        }
+        finally
+        {
+            foreach (HttpResponseMessage response in cancellationResponses)
+                response.Dispose();
+        }
+        Assert.Equal(BookCopyStatus.Available, await Db(db => db.BookCopies
+            .Where(item => item.Id == copyId).Select(item => item.Status).SingleAsync()));
     }
 }

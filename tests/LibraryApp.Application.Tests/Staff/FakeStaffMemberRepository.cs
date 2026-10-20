@@ -56,4 +56,15 @@ internal sealed class FakeStaffMemberRepository : IStaffMemberRepository
             .ToDictionary(id => id, id => $"{_members[id].FirstName} {_members[id].LastName}");
         return Task.FromResult(names);
     }
+    
+    public Task<StaffMemberLookup?> FindByEmployeeIdAsync(string employeeId, CancellationToken ct) =>
+        Task.FromResult(Lookup(_members.Values.SingleOrDefault(
+            x => string.Equals(x.EmployeeId, employeeId, StringComparison.OrdinalIgnoreCase))));
+
+    // Exact match: the service must pass the email in lower case.
+    public Task<StaffMemberLookup?> FindByCorporateEmailAsync(string corporateEmail, CancellationToken ct) =>
+        Task.FromResult(Lookup(_members.Values.SingleOrDefault(x => x.CorporateEmail == corporateEmail)));
+
+    private static StaffMemberLookup? Lookup(StaffMember? x) =>
+        x is null ? null : new StaffMemberLookup(x.Id, x.EmployeeId, $"{x.FirstName} {x.LastName}", x.CorporateEmail, x.Status);
 }

@@ -1,0 +1,36 @@
+@model DetailsModel
+<section class="card" aria-labelledby="deactivate-title">
+    <div class="card-head"><h2 id="deactivate-title">@(Model.IsDeactivated ? "Account deactivated" : "Deactivate")</h2></div>
+    @if (Model.IsDeactivated)
+    {
+        <p class="muted">This staff member can no longer sign in. Their library history is preserved.</p>
+    }
+    else
+    {
+        <p class="small mb-16">For people who left the bank. They can no longer sign in. Their history stays.</p>
+        <form class="form" method="post" asp-page="./Details" asp-route-id="@Model.Member.Id" novalidate>
+            @if (ViewData.ModelState.TryGetValue(string.Empty, out var entry) && entry.Errors.Count > 0)
+            {
+                <div class="alert alert-red" role="alert">
+                    <div asp-validation-summary="ModelOnly"></div>
+                    @if (Model.OutstandingBooks.Count > 0)
+                    {
+                        <ul class="mt-12" aria-label="Outstanding books">
+                            @foreach (var book in Model.OutstandingBooks)
+                            {
+                                <li class="text-wrap"><strong>@book.Title</strong>Copy @book.Barcode</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+            <div class="field">
+                <label asp-for="Input.Reason">Reason</label>
+                <textarea asp-for="Input.Reason" required rows="4" placeholder="For example: the employee left the bank"
+                          aria-invalid="@Model.ReasonInvalid" aria-describedby="reason-error"></textarea>
+                <span asp-validation-for="Input.Reason" class="error-text" id="reason-error"></span>
+            </div>
+            <button class="btn btn-danger" type="submit">Deactivate account</button>
+        </form>
+    }
+</section>

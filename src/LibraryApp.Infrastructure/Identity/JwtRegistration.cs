@@ -20,6 +20,8 @@ public static class JwtRegistration
             .ValidateOnStart();
 
         services.AddSingleton<IAccessTokenIssuer, JwtTokenIssuer>();
+        services.AddMemoryCache();
+        services.AddScoped<JwtAccountValidation>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 
@@ -42,6 +44,11 @@ public static class JwtRegistration
                     RoleClaimType = LibraryClaimTypes.Role
                 };
                 bearer.IncludeErrorDetails = false; // no "invalid_token" reason in WWW-Authenticate
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = context => context.HttpContext.RequestServices
+                        .GetRequiredService<JwtAccountValidation>().ValidateAsync(context)
+                };
             });
 
         return services;

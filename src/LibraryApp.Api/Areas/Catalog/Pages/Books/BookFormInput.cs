@@ -23,6 +23,9 @@ public sealed class BookFormInput
     /// <summary>Null for "No publisher".</summary>
     public Guid? PublisherId { get; set; }
 
+    /// <summary>The path in the cover storage; empty for no cover. Edit book shows the saved one, so saving keeps it.</summary>
+    public string? CoverImagePath { get; set; }
+
     /// <summary>Only the New book form sends authors; Edit book changes them in the authors picker (CAT-02).</summary>
     public List<Guid> AuthorIds { get; set; } = [];
 
@@ -36,6 +39,7 @@ public sealed class BookFormInput
         Description = book.Description,
         CategoryId = book.CategoryId,
         PublisherId = book.PublisherId,
+        CoverImagePath = book.CoverImagePath,
     };
 
     public CreateBookRequest ToCreateRequest() => new(
@@ -46,7 +50,8 @@ public sealed class BookFormInput
         DescriptionOrNull(),
         CategoryId ?? Guid.Empty,
         PublisherId,
-        AuthorIds);
+        AuthorIds,
+        CoverImagePathOrNull());
 
     public UpdateBookRequest ToUpdateRequest() => new(
         Title?.Trim() ?? "",
@@ -55,7 +60,10 @@ public sealed class BookFormInput
         Language?.Trim() ?? "",
         DescriptionOrNull(),
         CategoryId ?? Guid.Empty,
-        PublisherId);
+        PublisherId,
+        CoverImagePathOrNull());
 
     private string? DescriptionOrNull() => string.IsNullOrWhiteSpace(Description) ? null : Description.Trim();
+
+    private string? CoverImagePathOrNull() => string.IsNullOrWhiteSpace(CoverImagePath) ? null : CoverImagePath.Trim();
 }

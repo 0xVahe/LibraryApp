@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace LibraryApp.Api.Controllers.Borrowing;
 
 /// <summary>
-/// Reservations (BOR-07). Librarian and Library Administrator reserve for a named staff member; a Staff Member reserves
-/// and reads only their own (NFR-03).
+/// Reservations (BOR-07, BOR-12). Librarian and Library Administrator reserve for a named staff member and cancel any
+/// reservation; a Staff Member reserves, reads and cancels only their own (NFR-03).
 /// </summary>
 [ApiController]
 [Route("api/reservations")]
@@ -44,4 +44,20 @@ public sealed class ReservationsController(IReservationService reservations) : C
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ReservationDto>> Get(Guid id, CancellationToken ct) =>
         Ok(await reservations.GetAsync(id, ct));
+
+    /// <summary>Cancels a waiting or ready reservation (BOR-12); a Staff Member may cancel only their own.</summary>
+    /// <remarks>
+    /// Waiting: the reservation leaves the queue and the members behind it move up (positions stay 1..n).
+    /// ReadyForPickup: the held copy goes to the first waiting reservation of the book, which becomes ReadyForPickup
+    /// (<c>ReservationReady</c>), or becomes Available when nobody waits. Returns the cancelled reservation.
+    /// Unknown id, or another staff member's reservation for a Staff Member: 404. Already Cancelled, Fulfilled or
+    /// Expired: 422 <c>borrowing.reservation_cannot_be_cancelled</c>. A concurrent change of the same row: 409, retry.
+    /// </remarks>
+    [HttpPost("{id:guid}/cancel")]
+    [ProducesResponseType<ReservationDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<ReservationDto>> Cancel(Guid id, CancellationToken ct) =>
+        Ok(await reservations.CancelAsync(id, ct));
 }
