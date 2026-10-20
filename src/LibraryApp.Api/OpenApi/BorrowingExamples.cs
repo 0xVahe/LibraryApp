@@ -9,12 +9,21 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace LibraryApp.Api.OpenApi;
 
 /// <summary>
-/// Request and response examples of the Borrowing endpoints (NFR-11), built from the seed: a request copied from Swagger
-/// works against the Development database (Anna Petrosyan, the first copy of the first book).
+/// Request and response examples of the Borrowing endpoints (NFR-11), built from the seed so that a request copied from
+/// Swagger works on a freshly seeded Development database: the issue lends the only copy of book 5 (no seed loan uses it)
+/// to Elen Danielyan (no open loan, no points); the reservation queues Sofia Hambardzumyan for book 1, whose three copies
+/// are all on loan (a reservation needs a book without an Available copy, BR-BOR-3) and which she neither holds nor
+/// reserves. <c>BorrowingSwaggerTests</c> posts both examples to the seeded host.
 /// </summary>
 public sealed class BorrowingExamples : ISchemaFilter
 {
     private static readonly Guid Anna = StaffSeedIds.StaffMembers.AnnaPetrosyan;
+
+    /// <summary>The member and the copy of the issue example; the member and the book of the reservation example.</summary>
+    public static readonly Guid IssueStaffMember = StaffSeedIds.StaffMembers.ElenDanielyan;
+    public static readonly string IssueBarcode = CatalogSeedIds.CopyBarcode(5, 1);
+    public static readonly Guid ReservationStaffMember = StaffSeedIds.StaffMembers.SofiaHambardzumyan;
+    public static readonly Guid ReservationBook = CatalogSeedIds.Book(1);
     private static readonly Guid Loan = BorrowingSeedIds.Loan(1);
 
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
@@ -23,8 +32,8 @@ public sealed class BorrowingExamples : ISchemaFilter
         {
             Type type when type == typeof(IssueLoanRequest) => new OpenApiObject
             {
-                ["staffMemberId"] = Id(Anna),
-                ["barcode"] = new OpenApiString(CatalogSeedIds.CopyBarcode(1, 1)),
+                ["staffMemberId"] = Id(IssueStaffMember),
+                ["barcode"] = new OpenApiString(IssueBarcode),
             },
             Type type when type == typeof(ReturnLoanRequest) => new OpenApiObject
             {
@@ -33,8 +42,8 @@ public sealed class BorrowingExamples : ISchemaFilter
             },
             Type type when type == typeof(CreateReservationRequest) => new OpenApiObject
             {
-                ["bookId"] = Id(CatalogSeedIds.Book(1)),
-                ["staffMemberId"] = Id(Anna),
+                ["bookId"] = Id(ReservationBook),
+                ["staffMemberId"] = Id(ReservationStaffMember),
             },
             Type type when type == typeof(WaivePenaltyRequest) => new OpenApiObject
             {

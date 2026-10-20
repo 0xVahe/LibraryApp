@@ -1,12 +1,20 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using LibraryApp.Api.OpenApi;
+using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
 /// NFR-11 and D4 for the Borrowing endpoints: every operation in <c>swagger.json</c> has a summary and remarks, documents
 /// 401 and 403, its success code, 400 when it takes a body, and only status codes the API really returns; every Borrowing
-/// request and response schema has an example and a description for every property.
+/// request and response schema has an example and a description for every property; the request examples work as they
+/// are on the freshly seeded Development data.
 /// </summary>
 public sealed class BorrowingSwaggerTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
@@ -54,6 +62,23 @@ public sealed class BorrowingSwaggerTests(ApiHostFactory factory) : IClassFixtur
             if (name.StartsWith("POST", StringComparison.Ordinal))
                 Assert.Contains("404", codes);
         }
+    }
+
+    [Theory]
+    [InlineData("IssueLoanRequest", "/api/loans")]
+    [InlineData("CreateReservationRequest", "/api/reservations")]
+    public async Task The_request_example_works_on_the_seeded_data(string schema, string endpoint)
+    {
+        JsonElement example = (await SwaggerAsync()).GetProperty("components").GetProperty("schemas").GetProperty(schema).GetProperty("example");
+        using var client = factory.CreateClient();
+        string token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(factory.Account(StaffRoles.Librarian)).Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        using var response = await client.PostAsync(endpoint, new StringContent(example.GetRawText(), Encoding.UTF8, "application/json"));
+
+        Assert.True(response.StatusCode == HttpStatusCode.Created, $"{schema}: {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+        string body = await response.Content.ReadAsStringAsync();
+        Assert.Contains((schema == "IssueLoanRequest" ? BorrowingExamples.IssueStaffMember : BorrowingExamples.ReservationStaffMember).ToString(), body);
     }
 
     [Fact]
