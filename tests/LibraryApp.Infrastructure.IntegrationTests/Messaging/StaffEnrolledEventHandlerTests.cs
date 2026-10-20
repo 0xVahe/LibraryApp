@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using LibraryApp.Application.Abstractions.Messaging;
 using LibraryApp.Application.Notifications.EventHandlers;
+using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
+using LibraryApp.Domain.Notifications;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Extensions;
 using LibraryApp.Infrastructure.Messaging;
@@ -26,6 +28,7 @@ public sealed class StaffEnrolledEventHandlerTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddEventBus(configuration);
+        services.AddScoped<INotificationCreator, NoOpNotificationCreator>();   // these tests are about discovery, not about the notification
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -54,6 +57,7 @@ public sealed class StaffEnrolledEventHandlerTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddEventBus(configuration);
+        services.AddScoped<INotificationCreator, NoOpNotificationCreator>();   // these tests are about discovery, not about the notification
 
         var invocations = new HandlerInvocationRecorder();
         RegisterRecordingHandler<StaffEnrolled, StaffEnrolledEventHandler>(services, invocations);
@@ -128,6 +132,12 @@ public sealed class StaffEnrolledEventHandlerTests
             await inner.HandleAsync(domainEvent, ct);
             invocations.Record(domainEvent.EventId);
         }
+    }
+
+    private sealed class NoOpNotificationCreator : INotificationCreator
+    {
+        public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
+            IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class HandlerInvocationRecorder

@@ -34,7 +34,15 @@ public static class NotificationErrors
     public static readonly Error NotificationNotFound =
         Error.NotFound("notifications.notification_not_found", "The notification does not exist.");
 
+    /// <summary>The staff member a notification is for does not exist (any more). A permanent failure for the event.</summary>
+    public static readonly Error RecipientNotFound =
+        Error.NotFound("notifications.recipient_not_found", "The staff member to notify does not exist.");
+
     // Template
+    /// <summary>No active template of the type exists (NOT-02, G4-08).</summary>
+    public static readonly Error TemplateNotFound =
+        Error.NotFound("notifications.template_not_found", "There is no active template for this notification type.");
+
     public static readonly Error TemplateSubjectRequired =
         Error.Validation("notifications.template_subject_required", "A template subject is required.");
 

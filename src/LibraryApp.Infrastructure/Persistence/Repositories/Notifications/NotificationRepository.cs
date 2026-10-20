@@ -38,4 +38,14 @@ public sealed class NotificationRepository(LibraryDbContext db) : INotificationR
 
     public Task<Notification?> FindOwnedAsync(Guid notificationId, Guid staffMemberId, CancellationToken ct = default) =>
         db.Notifications.SingleOrDefaultAsync(n => n.Id == notificationId && n.StaffMemberId == staffMemberId, ct);
+
+    public Task AddAsync(Notification notification, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        db.Notifications.Add(notification);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> ExistsForEventAsync(Guid eventId, NotificationType type, NotificationChannel channel, CancellationToken ct = default) =>
+        db.Notifications.AsNoTracking().AnyAsync(n => n.EventId == eventId && n.Type == type && n.Channel == channel, ct);
 }
