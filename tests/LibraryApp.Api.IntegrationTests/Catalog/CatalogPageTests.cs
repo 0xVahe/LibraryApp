@@ -36,6 +36,9 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.DoesNotContain("Import CSV", html);
         Assert.DoesNotContain("href=\"/catalog/import\"", html);
         Assert.Contains("href=\"/catalog/suggestions\"", html);
+        Assert.DoesNotContain("href=\"/catalog/categories\"", html);
+        Assert.DoesNotContain("href=\"/catalog/authors\"", html);
+        Assert.DoesNotContain("href=\"/catalog/publishers\"", html);
     }
 
     [Theory]
@@ -52,6 +55,20 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.Contains("href=\"/catalog/import\"", html);
         Assert.Contains("Import CSV", html);
         Assert.Contains("href=\"/catalog/suggestions\"", html);
+    }
+
+    [Theory]
+    [InlineData(Librarian)]
+    [InlineData(Administrator)]
+    public async Task Library_staff_see_links_to_the_categories_authors_and_publishers_pages(string email)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync("/catalog");
+
+        Assert.Contains("href=\"/catalog/categories\"", html);
+        Assert.Contains("href=\"/catalog/authors\"", html);
+        Assert.Contains("href=\"/catalog/publishers\"", html);
     }
 
     [Fact]
