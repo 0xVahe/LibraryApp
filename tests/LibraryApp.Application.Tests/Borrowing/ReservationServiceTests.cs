@@ -421,6 +421,7 @@ public sealed class ReservationServiceTests
         }
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
             Task.FromResult(Saved.SingleOrDefault(r => r.Id == reservationId));
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) => FindAsync(reservationId, ct);
         public void Commit()
         {
             Saved.AddRange(_pending);
