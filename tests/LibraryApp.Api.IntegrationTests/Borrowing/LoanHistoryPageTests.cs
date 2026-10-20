@@ -124,6 +124,28 @@ public class LoanHistoryPageTests(BorrowingUiHost factory) : IClassFixture<Borro
     }
 
     [Fact]
+    public async Task A_loan_past_its_due_date_before_the_daily_job_is_found_by_the_overdue_filter_not_by_on_loan()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+            // Issued 17 days ago for 14: due 3 days ago, still Active (the daily job has not run).
+            db.Loans.Add(Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(11, 1), Members.ArturMinasyan, Clock.UtcNow.AddDays(-17), 14));
+            await db.SaveChangesAsync();
+        }
+        var browser = await LibrarianAsync();
+        string title = await TitleAsync(11);
+
+        var (_, overdue, _) = await browser.GetAsync(History(Members.ArturMinasyan, "?status=Overdue"));
+        Assert.Contains("1 loan</p>", overdue);
+        Assert.Contains("<span class=\"badge badge-red\">Overdue</span>", RowOf(overdue, title));
+
+        var (_, onLoan, _) = await browser.GetAsync(History(Members.ArturMinasyan, "?status=Active"));
+        Assert.Contains("0 loans</p>", onLoan);
+        Assert.DoesNotContain($"<td data-label=\"Book\">{title}</td>", onLoan);
+    }
+
+    [Fact]
     public async Task The_issue_period_filter_keeps_the_loans_issued_in_it_and_says_the_period()
     {
         var (_, lost, overdue, _) = await HistoryAsync(Members.ElenDanielyan, 5);

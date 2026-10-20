@@ -2,7 +2,11 @@ using LibraryApp.Domain.Borrowing;
 
 namespace LibraryApp.Application.Borrowing.Dto;
 
-/// <summary>One loan in the history (BOR-10): every status, with the return or lost date when there is one.</summary>
+/// <summary>
+/// One loan in the history (BOR-10): every status, with the return or lost date when there is one. <c>Status</c> is the
+/// effective one: an Active loan past the overdue rule (<c>Borrowing:Loans:OverdueFrom</c>) is Overdue before the daily job
+/// marks it, so the status filter and the status shown always agree.
+/// </summary>
 public sealed record LoanHistoryItemDto(
     Guid LoanId,
     Guid BookCopyId,

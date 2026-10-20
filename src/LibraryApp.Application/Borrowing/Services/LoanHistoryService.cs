@@ -29,7 +29,8 @@ public sealed class LoanHistoryService(
     ILoanHistoryQuery history,
     ICatalogService catalog,
     ICurrentUser currentUser,
-    IClock clock) : ILoanHistoryService
+    IClock clock,
+    OverdueRule overdueRule) : ILoanHistoryService
 {
     public async Task<PagedResult<LoanHistoryItemDto>> ListAsync(
         LoanHistoryFilter filter,
@@ -54,6 +55,10 @@ public sealed class LoanHistoryService(
         DateTime? issuedFromUtc = filter.IssuedFrom is { } start ? clock.StartOfLocalDayUtc(start) : null;
         DateTime? issuedToUtc = filter.IssuedTo is { } end ? clock.EndOfLocalDayUtc(end) : null;
 
-        return await history.PageAsync(staffMemberId, copyIds, filter.Status, issuedFromUtc, issuedToUtc, page, ct);
+        // The status is the effective one: an Active loan past the overdue rule is Overdue, as on every Borrowing page.
+        DateTime overdueIfDueBeforeUtc = overdueRule.OverdueIfDueBeforeUtc(clock.UtcNow);
+
+        return await history.PageAsync(staffMemberId, copyIds, filter.Status, issuedFromUtc, issuedToUtc,
+            overdueIfDueBeforeUtc, page, ct);
     }
 }

@@ -16,7 +16,8 @@ namespace LibraryApp.Api.Areas.Borrowing.Pages;
 
 /// <summary>
 /// Loan history of one staff member (BOR-10, G3-24; UI guide Part 2 "Loan history", demo <c>staff-loans.html</c>): every
-/// loan, also Returned and Lost, newest issue first, filtered by status and by issue period through the query string, with
+/// loan, also Returned and Lost, newest issue first, filtered by status (the effective one: an Active loan past the overdue
+/// rule is Overdue, in the badge and in the filter) and by issue period through the query string, with
 /// the shared pager. Library staff only; an unknown staff member is the Not found page. Data from the G3-09 service, titles
 /// and barcodes from Catalog, the name from Staff and the points of each loan from the penalty records (waived ones left
 /// out: they no longer count).
@@ -27,7 +28,6 @@ public sealed class LoanHistoryModel(
     IPenaltyAdministrationService penalties,
     ICatalogService catalog,
     IStaffMemberService staffMembers,
-    OverdueRule overdueRule,
     IClock clock) : PageModel
 {
     /// <summary>The statuses of the filter, in the order of the demo; the text is the badge text ("On loan").</summary>
@@ -101,20 +101,17 @@ public sealed class LoanHistoryModel(
             titles[bookId] = (await catalog.GetBookAsync(bookId, ct))?.Title ?? "Unknown book";
 
         Dictionary<Guid, int> points = loans.Items.Count == 0 ? [] : await PointsByLoanAsync(staffMemberId, ct);
-        DateTime now = clock.UtcNow;
 
         var rows = loans.Items.Select(loan =>
         {
             BookCopyDto? copy = copyById.GetValueOrDefault(loan.BookCopyId);
-            // An Active loan past the overdue rule is Overdue before the daily job marks it, as in the Borrowing blocks.
-            LoanStatus status = loan.Status == LoanStatus.Active && overdueRule.IsOverdue(loan.DueAtUtc, now) ? LoanStatus.Overdue : loan.Status;
             return new HistoryRow(
                 copy is null ? "Unknown book" : titles[copy.BookId],
                 copy?.Barcode,
                 clock.ToLocalDate(loan.IssuedAtUtc),
                 clock.ToLocalDate(loan.DueAtUtc),
                 loan.Status == LoanStatus.Returned && loan.ReturnedAtUtc is { } returned ? clock.ToLocalDate(returned) : null,
-                status,
+                loan.Status,   // effective: the history gives an Active loan past the overdue rule as Overdue
                 points.GetValueOrDefault(loan.LoanId));
         }).ToList();
         return new PagedResult<HistoryRow>(rows, loans.TotalCount, loans.Page, loans.PageSize);

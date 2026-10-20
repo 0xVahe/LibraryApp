@@ -40,6 +40,9 @@ public class LoanHistoryEndpointTests(LoanHistoryEndpointTests.Host factory) : I
         public Loan TigranNew { get; private set; } = null!;
         public Loan Anna { get; private set; } = null!;
 
+        /// <summary>Davit: one Active loan due 3 days ago that the daily job has not marked Overdue yet.</summary>
+        public Loan DavitPastDue { get; private set; } = null!;
+
         // The class owns every loan: no Borrowing seed.
         protected override void ConfigureTestServices(IServiceCollection services) =>
             services.Remove(services.Single(d => d.ServiceType == typeof(IModuleSeeder) && d.ImplementationType == typeof(BorrowingSeeder)));
@@ -57,10 +60,11 @@ public class LoanHistoryEndpointTests(LoanHistoryEndpointTests.Host factory) : I
             TigranOverdue.MarkOverdue(now);
             TigranNew = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(41, 2), Members.TigranMelikyan, now.AddDays(-2), 14);
             Anna = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(42, 2), Members.AnnaPetrosyan, now.AddDays(-1), 21);
+            DavitPastDue = Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(43, 1), Members.DavitHakobyan, now.AddDays(-17), 14);
 
             using var scope = Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
-            db.Loans.AddRange(TigranOld, TigranOverdue, TigranNew, Anna);
+            db.Loans.AddRange(TigranOld, TigranOverdue, TigranNew, Anna, DavitPastDue);
             await db.SaveChangesAsync();
         }
     }
@@ -108,6 +112,27 @@ public class LoanHistoryEndpointTests(LoanHistoryEndpointTests.Host factory) : I
         PagedResult<LoanHistoryItemDto> clamped = await GetAsync(
             StaffRoles.Librarian, $"staffMemberId={Members.TigranMelikyan}&page=0&pageSize=1000");
         Assert.Equal((1, PageRequest.MaxPageSize, 3), (clamped.Page, clamped.PageSize, clamped.Items.Count));
+    }
+
+    [Fact]
+    public async Task An_active_loan_past_its_due_date_is_overdue_in_the_filter_and_the_result_before_the_daily_job()
+    {
+        string davit = $"staffMemberId={Members.DavitHakobyan}";
+
+        PagedResult<LoanHistoryItemDto> overdue = await GetAsync(StaffRoles.Librarian, $"{davit}&status=Overdue");
+        LoanHistoryItemDto item = Assert.Single(overdue.Items);
+        Assert.Equal((factory.DavitPastDue.Id, LoanStatus.Overdue), (item.LoanId, item.Status));
+
+        PagedResult<LoanHistoryItemDto> active = await GetAsync(StaffRoles.Librarian, $"{davit}&status=Active");
+        Assert.Empty(active.Items);
+        Assert.Equal(0, active.TotalCount);
+
+        PagedResult<LoanHistoryItemDto> all = await GetAsync(StaffRoles.Librarian, davit);
+        Assert.Equal(LoanStatus.Overdue, Assert.Single(all.Items).Status);
+
+        // An Active loan that is not due yet stays Active in both.
+        PagedResult<LoanHistoryItemDto> tigranActive = await GetAsync(StaffRoles.Librarian, $"staffMemberId={Members.TigranMelikyan}&status=Active");
+        Assert.Equal((factory.TigranNew.Id, LoanStatus.Active), (Assert.Single(tigranActive.Items).LoanId, tigranActive.Items[0].Status));
     }
 
     [Fact]
