@@ -14,10 +14,11 @@ using Microsoft.Extensions.Options;
 namespace LibraryApp.Application.Borrowing.Services;
 
 /// <summary>
-/// Reservations (BOR-07). Creating one runs in one transaction under the staff lock and the book's queue lock
+/// Reservations (BOR-07, BOR-12). Creating one runs in one transaction under the staff lock and the book's queue lock
 /// (<see cref="BorrowingLocks"/>, in that order), so the limits of the employee and the queue positions of the book are
 /// decided one request at a time; the unique index on active reservations is the last line of defence (409).
 /// The input is validated by <c>CreateReservationRequestValidator</c> before the endpoint is reached (SD-15).
+/// Cancelling takes the same locks in the same order (<see cref="CancelAsync"/>).
 /// </summary>
 public sealed class ReservationService(
     IStaffMemberService staffMembers,
@@ -105,65 +106,56 @@ public sealed class ReservationService(
         return ToDto(reservation);
     }
 
+    /// <summary>
+    /// BOR-12, NFR-03: cancels a Waiting or ReadyForPickup reservation in one transaction under the staff lock and the
+    /// book's queue lock (<see cref="BorrowingLocks"/>, in that order, as in issue, return and reserve). A Waiting one
+    /// leaves the queue and the members behind it move up (positions stay 1..n); a ReadyForPickup one releases its held
+    /// copy to the first Waiting reservation (<c>ReservationReady</c>) or makes it Available when nobody waits.
+    /// </summary>
     public async Task<ReservationDto> CancelAsync(Guid reservationId, CancellationToken ct = default)
     {
         Reservation cancelled = await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            // Resolve the book and enforce NFR-03 before waiting on its queue lock.
+            // Read only to find whose and which locks are needed; NFR-03 is checked before waiting on them.
             Reservation initial = await reservations.FindAsync(reservationId, token)
                 ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
 
             EnsureCanManage(initial);
 
+            await applicationLock.AcquireAsync(BorrowingLocks.Staff(initial.StaffMemberId), token);
             await applicationLock.AcquireAsync(BorrowingLocks.Book(initial.BookId), token);
 
-            // Reload after the lock: another request may have cancelled or transferred this reservation while we waited.
+            // Read again under the locks: a parallel cancel, issue or expiry may have closed this reservation meanwhile.
             Reservation reservation = await reservations.GetForUpdateAsync(reservationId, token)
                 ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
 
-            EnsureCanManage(reservation);
-
-            int removedQueuePosition = reservation.QueuePosition;
-            Guid? heldCopyId = null;
-            if (reservation.Status == ReservationStatus.ReadyForPickup)
-                heldCopyId = reservation.CopyId
-                    ?? throw new InvalidOperationException("A ready reservation must have a held copy.");
+            Guid? heldCopyId = reservation.Status == ReservationStatus.ReadyForPickup
+                ? reservation.CopyId ?? throw new InvalidOperationException("A ready reservation must have a held copy.")
+                : null;
 
             reservation.Cancel();
-            // Make the state transition visible to the subsequent queue query, which filters on persisted Waiting rows.
-            // This also frees the filtered unique index before a ReadyForPickup copy is assigned to its next holder.
+
+            // Written now, inside the transaction: the queue query below reads only persisted Waiting rows, and the copy
+            // may be held for the next member only after this reservation has left ReadyForPickup
+            // (UX_Reservations_ReadyForPickup_CopyId; see IReservationRepository.FlushAsync).
             await reservations.FlushAsync(token);
 
             if (heldCopyId is { } copyId)
             {
                 bool offered = await reservationQueue.TryOfferCopyUnderBookLockAsync(
-                    copyId,
-                    reservation.BookId,
-                    BookCopyStatus.Reserved,
-                    token);
+                    copyId, reservation.BookId, BookCopyStatus.Reserved, token);
 
                 if (!offered)
                     await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Available, token);
             }
             else
             {
-                IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(
-                    reservation.BookId,
-                    token);
-
-                int nextPosition = 1;
-                foreach (Reservation waitingReservation in waiting)
+                // The members behind the cancelled one move up: positions 1..n without gaps, in queue order.
+                IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(reservation.BookId, token);
+                for (int index = 0; index < waiting.Count; index++)
                 {
-                    // Decrement the positions after the removed row, then normalize the whole queue so it remains 1..n.
-                    int positionAfterRemoval = waitingReservation.QueuePosition > removedQueuePosition
-                        ? waitingReservation.QueuePosition - 1
-                        : waitingReservation.QueuePosition;
-                    int normalizedPosition = Math.Min(positionAfterRemoval, nextPosition);
-
-                    if (waitingReservation.QueuePosition != normalizedPosition)
-                        waitingReservation.SetQueuePosition(normalizedPosition);
-
-                    nextPosition++;
+                    if (waiting[index].QueuePosition != index + 1)
+                        waiting[index].SetQueuePosition(index + 1);
                 }
             }
 

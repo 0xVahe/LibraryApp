@@ -271,7 +271,21 @@ public sealed class ReservationServiceTests
         Assert.Equal(0, cancelled.QueuePosition);
         Assert.Equal(2, third.QueuePosition);
         Assert.Equal(1, fixture.UnitOfWork.CommitCount);
-        Assert.Equal(new[] { BorrowingLocks.Book(BookId) }, fixture.Lock.Resources);
+        // Staff, then book: the order of issue, return and reserve, so the operations cannot deadlock (SD-10).
+        Assert.Equal(new[] { BorrowingLocks.Staff(cancelled.StaffMemberId), BorrowingLocks.Book(BookId) }, fixture.Lock.Resources);
+    }
+
+    [Fact]
+    public async Task CancelAsync_renumbers_a_queue_with_gaps_to_one_to_n()
+    {
+        var fixture = new Fixture();
+        var first = fixture.AddWaiting(2);
+        var cancelled = fixture.AddWaiting(4);
+        var third = fixture.AddWaiting(7);
+
+        await fixture.Service.CancelAsync(cancelled.Id);
+
+        Assert.Equal((1, 2), (first.QueuePosition, third.QueuePosition));
     }
 
     [Fact]
