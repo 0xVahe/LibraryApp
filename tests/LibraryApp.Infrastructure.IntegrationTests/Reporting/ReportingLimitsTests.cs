@@ -47,6 +47,7 @@ public sealed class ReportingLimitsTests : IClassFixture<ReportingDatabase>
             db,
             Options.Create(new ReportingOptions
             {
+                DashboardCacheMinutes = 5,
                 TopBooksLimit = 1,
                 TopCategoriesLimit = 1
             }));

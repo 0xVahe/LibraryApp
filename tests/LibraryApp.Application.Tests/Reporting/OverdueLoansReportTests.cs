@@ -36,7 +36,12 @@ public sealed class OverdueLoansReportTests
             LifetimeDays: 90,
             RestrictedFromPoints: 5,
             SuspendedFromPoints: 10)),
-        Options.Create(new ReportingOptions()));
+        Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
     [Fact]
     public async Task Empty_report_returns_no_items()

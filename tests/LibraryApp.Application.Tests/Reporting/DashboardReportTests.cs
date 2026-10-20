@@ -33,7 +33,12 @@ public sealed class DashboardReportTests
             LifetimeDays: 90,
             RestrictedFromPoints: 5,
             SuspendedFromPoints: 10)),
-        Options.Create(new ReportingOptions()));
+        Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
     [Fact]
     public async Task Uses_configured_dashboard_cache_expiration()
@@ -48,7 +53,9 @@ public sealed class DashboardReportTests
 
         var options = Options.Create(new ReportingOptions
         {
-            DashboardCacheMinutes = 2
+            DashboardCacheMinutes = 2,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
         });
 
         var service = new ReportingService(

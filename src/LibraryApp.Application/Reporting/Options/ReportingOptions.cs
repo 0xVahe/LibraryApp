@@ -4,9 +4,9 @@ public sealed class ReportingOptions
 {
     public const string SectionName = "Reporting";
 
-    public int DashboardCacheMinutes { get; set; } = 5;
+    public int DashboardCacheMinutes { get; set; }
 
-    public int TopBooksLimit { get; set; } = 10;
+    public int TopBooksLimit { get; set; }
 
-    public int TopCategoriesLimit { get; set; } = 5;
+    public int TopCategoriesLimit { get; set; }
 }

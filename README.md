@@ -88,11 +88,13 @@ Point values are at most 10 per record (database constraint). The Development se
 
 Configure reporting in `src/LibraryApp.Api/appsettings.json`.
 
-- `DashboardCacheMinutes` (default: 5): Dashboard cache lifetime in minutes.
-- `TopBooksLimit` (default: 10): Maximum number of top books returned.
-- `TopCategoriesLimit` (default: 5): Maximum number of top categories returned.
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `DashboardCacheMinutes` | 5 | Dashboard cache lifetime in minutes (1–60) | REP-02 / REP-F4 |
+| `TopBooksLimit` | 10 | Maximum top books returned (1–100) | REP-03 |
+| `TopCategoriesLimit` | 5 | Maximum top categories returned (1–100) | REP-03 |
 
-All values must be positive integers. Invalid configuration prevents application startup.
+All three settings are required. Missing or out-of-range values prevent application startup.
 
 ### Notifications (`Notifications`)
 

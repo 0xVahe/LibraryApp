@@ -4,10 +4,21 @@ namespace LibraryApp.Application.Tests.Reporting;
 
 public sealed class ReportingOptionsValidatorTests
 {
-    [Fact]
-    public void Accepts_valid_options()
+    [Theory]
+    [InlineData(5, 10, 5)]
+    [InlineData(1, 1, 1)]
+    [InlineData(60, 100, 100)]
+    public void Accepts_valid_options(
+        int cacheMinutes,
+        int booksLimit,
+        int categoriesLimit)
     {
-        var options = new ReportingOptions();
+        var options = new ReportingOptions
+        {
+            DashboardCacheMinutes = cacheMinutes,
+            TopBooksLimit = booksLimit,
+            TopCategoriesLimit = categoriesLimit
+        };
 
         var result = new ReportingOptionsValidator()
             .Validate(null, options);
@@ -16,10 +27,16 @@ public sealed class ReportingOptionsValidatorTests
     }
 
     [Theory]
+    [InlineData(0, 0, 0)]
     [InlineData(0, 10, 5)]
     [InlineData(-1, 10, 5)]
+    [InlineData(61, 10, 5)]
     [InlineData(5, 0, 5)]
+    [InlineData(5, -1, 5)]
+    [InlineData(5, 101, 5)]
+    [InlineData(5, 10, 0)]
     [InlineData(5, 10, -1)]
+    [InlineData(5, 10, 101)]
     public void Rejects_invalid_options(
         int cacheMinutes,
         int booksLimit,
