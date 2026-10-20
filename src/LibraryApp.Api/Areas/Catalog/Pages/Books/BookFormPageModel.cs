@@ -18,6 +18,13 @@ public abstract class BookFormPageModel(ICategoryService categories, IPublisherS
 
     public IReadOnlyList<CatalogLanguage> Languages => CatalogLanguages.All;
 
+    /// <summary>
+    /// The book's language when it is not one of <see cref="Languages"/> (the API accepts any ISO 639-1 code), so the
+    /// select offers and keeps it instead of falling back to its first choice; null for a language the form offers.
+    /// </summary>
+    public string? OtherLanguage =>
+        !string.IsNullOrWhiteSpace(Input.Language) && !CatalogLanguages.IsKnown(Input.Language) ? Input.Language : null;
+
     public IReadOnlyList<PublisherDto> Publishers { get; private set; } = [];
 
     /// <summary>"Parent / Child" choices, each top-level category followed by its subcategories.</summary>

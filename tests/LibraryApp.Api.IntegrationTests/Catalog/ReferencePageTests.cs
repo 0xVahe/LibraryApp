@@ -174,6 +174,23 @@ public class ReferencePageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
     }
 
     [Fact]
+    public async Task A_subcategory_is_listed_right_under_its_parent()
+    {
+        // By name alone, "Aa…" would be near the top of the list and "Zz…" near the bottom.
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var parent = await CreateCategoryAsync($"Zz order parent {suffix}");
+        var child = await CreateCategoryAsync($"Aa order child {suffix}", parent.Id);
+        using var client = await SignedIn(StaffSeedIds.StaffMembers.AramSargsyan);
+
+        var html = WebUtility.HtmlDecode(await client.GetStringAsync(Path("categories")));
+        var names = Regex.Matches(html, "<td data-label=\"Name\">(.*?)</td>").Cast<Match>()
+            .Select(match => match.Groups[1].Value).ToList();
+
+        Assert.Contains(parent.Name, names);
+        Assert.Equal(names.IndexOf(parent.Name) + 1, names.IndexOf($"{parent.Name} / {child.Name}"));
+    }
+
+    [Fact]
     public async Task A_category_can_be_created_under_a_parent_and_edited_back_to_no_parent()
     {
         var parent = await CreateCategoryAsync("Optional parent");
