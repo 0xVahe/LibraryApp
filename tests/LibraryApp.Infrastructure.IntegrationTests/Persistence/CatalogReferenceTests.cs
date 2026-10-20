@@ -13,7 +13,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 
 public sealed class CatalogReferenceFixture : IAsyncLifetime
 {
-    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly string _connectionString = TestDatabase.NewDatabase();
     public LibraryDbContext Open()
     {
         var options = new DbContextOptionsBuilder<LibraryDbContext>();
