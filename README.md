@@ -2,6 +2,27 @@
 
 ASP.NET Core Web API (.NET 8), EF Core 8, SQL Server.
 
+## Architecture
+
+One layered monolith, one database, one repository. Requests flow top-down; Domain references nothing and only Infrastructure talks to the database or the mail server.
+
+| Project | Holds |
+|---|---|
+| `LibraryApp.Api` | Controllers (`Controllers/<Module>/`), authentication, error handling, Swagger, `Program.cs` |
+| `LibraryApp.Application` | Use cases (`<Module>/Services`), DTOs, validators, options; contracts between modules in `Abstractions/` |
+| `LibraryApp.Domain` | Entities, business rules, domain events |
+| `LibraryApp.Infrastructure` | EF Core (`LibraryDbContext`, configurations, migrations, repositories, seed), mail, event bus, daily jobs |
+
+A module is a vertical slice through the four projects (the same module folder in each). Modules talk only through the interfaces in `Application/Abstractions/<Provider>` and through events (`IEventBus`, transactional outbox); they never write to another module's tables. Swagger (`/swagger`, Development) shows every endpoint under "All modules" and one definition per module in "Select a definition". Traceability of every requirement: [docs/traceability.md](docs/traceability.md).
+
+| Module | Owner | Provides to other modules |
+|---|---|---|
+| Catalog | Group 1 | `ICatalogService` |
+| Staff Members | Group 2 | `IStaffMemberService`, login and roles |
+| Borrowing & Return | Group 3 | `IBorrowingReadService`, `ILoanQueryService`, `IReservationQueueService`; loan, reservation and penalty events |
+| Notifications & Reporting | Group 4 | `IOutlookNotificationSender` (MailKit → smtp4dev in development); reports under `/api/reports` |
+| Platform | Integration Owner | `IEventBus`, `IUnitOfWork`, `IClock`, `IWorkingDayCalendar`, `IApplicationLock`, `IDailyJob`, error handling, audit log, migrations, CI |
+
 ## Run it
 
 Requirements: Docker Desktop (running).
