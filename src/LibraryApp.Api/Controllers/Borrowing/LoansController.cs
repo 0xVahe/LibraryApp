@@ -90,8 +90,9 @@ public sealed class LoansController(
     /// <summary>Loan history with filters and paging (BOR-10), newest first.</summary>
     /// <remarks>
     /// Filters: <c>staffMemberId</c>, <c>bookId</c> (every copy of the book, retired copies included), <c>status</c>
-    /// (Active, Overdue, Returned, Lost). Page size 20 by default, at most 100. A Staff Member always gets their own
-    /// loans only, whatever <c>staffMemberId</c> says (NFR-03).
+    /// (Active, Overdue, Returned, Lost), <c>issuedFrom</c> and <c>issuedTo</c> (local dates, yyyy-MM-dd, both days
+    /// included; a period that ends before it starts: 400 <c>borrowing.history_period_invalid</c>). Page size 20 by default,
+    /// at most 100. A Staff Member always gets their own loans only, whatever <c>staffMemberId</c> says (NFR-03).
     /// </remarks>
     [HttpGet]
     [Authorize(Roles = Callers)]
@@ -101,11 +102,13 @@ public sealed class LoansController(
         [FromQuery] Guid? staffMemberId,
         [FromQuery] Guid? bookId,
         [FromQuery] LoanStatus? status,
+        [FromQuery] DateOnly? issuedFrom,
+        [FromQuery] DateOnly? issuedTo,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = PageRequest.DefaultPageSize,
         CancellationToken ct = default) =>
         Ok(await history.ListAsync(
-            new LoanHistoryFilter(staffMemberId, bookId, status),
+            new LoanHistoryFilter(staffMemberId, bookId, status, issuedFrom, issuedTo),
             new PageRequest(page, pageSize),
             ct));
 
