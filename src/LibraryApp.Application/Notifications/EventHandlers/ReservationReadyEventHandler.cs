@@ -34,6 +34,6 @@ public sealed class ReservationReadyEventHandler(
         };
 
         await creator.CreateAsync(
-            NotificationType.ReservationReady, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values, ct);
+            NotificationType.ReservationReady, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values, ct: ct);
     }
 }

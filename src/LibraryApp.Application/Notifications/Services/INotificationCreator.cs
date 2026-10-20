@@ -13,6 +13,8 @@ public interface INotificationCreator
     /// row (NOT-08); an in-app row has nothing to send, so it is stored as Sent. The channel of each type comes from the
     /// notification catalogue (requirements, section 9).
     /// Must run inside the caller's unit of work (event handlers do). An event that already created this type is ignored (G4-09).
+    /// <paramref name="loanId"/> is stored when the notification is about a loan; then a channel that already has this
+    /// type for this loan on the same Yerevan day is skipped (NOT-06, G4-02).
     /// {{EmployeeName}} is added from the recipient; <paramref name="values"/> carries the other placeholders.
     /// </summary>
     /// <exception cref="Domain.Common.DomainException">The recipient or the active template does not exist.</exception>
@@ -25,5 +27,6 @@ public interface INotificationCreator
         Guid eventId,
         IReadOnlyCollection<NotificationChannel> channels,
         IReadOnlyDictionary<string, string> values,
+        Guid? loanId = null,
         CancellationToken ct = default);
 }

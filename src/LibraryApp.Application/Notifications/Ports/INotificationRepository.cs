@@ -30,4 +30,11 @@ public interface INotificationRepository
     /// ignored; the same triple is unique in the database).
     /// </summary>
     Task<bool> ExistsForEventAsync(Guid eventId, NotificationType type, NotificationChannel channel, CancellationToken ct = default);
+
+    /// <summary>
+    /// True when a notification of this type already exists for this loan on this channel on this Yerevan day
+    /// (NOT-06, G4-02; the same four values are unique in the database).
+    /// </summary>
+    Task<bool> ExistsForLoanAsync(
+        Guid loanId, NotificationType type, NotificationChannel channel, DateOnly localDate, CancellationToken ct = default);
 }

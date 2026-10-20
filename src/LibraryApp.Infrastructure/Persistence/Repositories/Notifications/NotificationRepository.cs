@@ -48,4 +48,9 @@ public sealed class NotificationRepository(LibraryDbContext db) : INotificationR
 
     public Task<bool> ExistsForEventAsync(Guid eventId, NotificationType type, NotificationChannel channel, CancellationToken ct = default) =>
         db.Notifications.AsNoTracking().AnyAsync(n => n.EventId == eventId && n.Type == type && n.Channel == channel, ct);
+
+    public Task<bool> ExistsForLoanAsync(
+        Guid loanId, NotificationType type, NotificationChannel channel, DateOnly localDate, CancellationToken ct = default) =>
+        db.Notifications.AsNoTracking().AnyAsync(
+            n => n.LoanId == loanId && n.Type == type && n.Channel == channel && n.LocalDate == localDate, ct);
 }

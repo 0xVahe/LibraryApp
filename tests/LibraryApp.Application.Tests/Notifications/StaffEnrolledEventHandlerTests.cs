@@ -106,6 +106,21 @@ public sealed class StaffEnrolledEventHandlerTests
     }
 
     [Fact]
+    public async Task A_loan_notification_stores_the_loan_and_a_second_event_for_it_on_the_same_day_is_skipped()
+    {
+        var fixture = new Fixture();
+        var loanId = Guid.NewGuid();
+        var none = new Dictionary<string, string>();
+
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, Guid.NewGuid(), [NotificationChannel.InApp], none, loanId);
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, Guid.NewGuid(), [NotificationChannel.InApp], none, loanId);
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, Guid.NewGuid(), [NotificationChannel.InApp], none, Guid.NewGuid());
+
+        Assert.Equal(2, fixture.Notifications.Items.Count);   // the second call for the same loan and day is ignored (NOT-06)
+        Assert.Equal(loanId, fixture.Notifications.Items[0].LoanId);
+    }
+
+    [Fact]
     public async Task A_different_event_for_the_same_member_creates_its_own_notifications()
     {
         var fixture = new Fixture();
@@ -201,6 +216,9 @@ public sealed class StaffEnrolledEventHandlerTests
 
         public Task<bool> ExistsForEventAsync(Guid eventId, NotificationType type, NotificationChannel channel, CancellationToken ct = default) =>
             Task.FromResult(Items.Any(n => n.EventId == eventId && n.Type == type && n.Channel == channel));
+
+        public Task<bool> ExistsForLoanAsync(Guid loanId, NotificationType type, NotificationChannel channel, DateOnly localDate, CancellationToken ct = default) =>
+            Task.FromResult(Items.Any(n => n.LoanId == loanId && n.Type == type && n.Channel == channel && n.LocalDate == localDate));
 
         public Task<PagedResult<Notification>> SearchInAppAsync(Guid staffMemberId, bool unreadOnly, PageRequest paging, CancellationToken ct = default) =>
             throw new NotSupportedException();

@@ -19,6 +19,6 @@ public sealed class StaffEnrolledEventHandler(INotificationCreator creator) : IE
         ct.ThrowIfCancellationRequested();
 
         // The Welcome template only uses {{EmployeeName}}, which the creator fills from the recipient.
-        return creator.CreateAsync(NotificationType.Welcome, domainEvent.StaffMemberId, domainEvent.EventId, Channels, NoValues, ct);
+        return creator.CreateAsync(NotificationType.Welcome, domainEvent.StaffMemberId, domainEvent.EventId, Channels, NoValues, ct: ct);
     }
 }
