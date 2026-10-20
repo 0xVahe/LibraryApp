@@ -53,7 +53,7 @@ public class SmtpOutlookNotificationSenderTests
 
         Assert.Contains($"127.0.0.1:{port}", ex.Message);
         AssertNoAddresses(ex.Message);
-        AssertNoAddresses(Assert.Single(_logger.Messages));
+        Assert.Empty(_logger.Messages);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class SmtpOutlookNotificationSenderTests
 
         Assert.Contains("SMTP 550", ex.Message);
         AssertNoAddresses(ex.Message);
-        AssertNoAddresses(Assert.Single(_logger.Messages));
+        Assert.Empty(_logger.Messages);
     }
 
     [Fact]
