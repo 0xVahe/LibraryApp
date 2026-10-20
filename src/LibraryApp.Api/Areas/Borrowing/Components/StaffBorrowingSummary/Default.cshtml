@@ -1,6 +1,9 @@
 @model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
 @using LibraryApp.Api.Areas.Borrowing.Components
-@* "Loans and reservations" and "Standing" (Group 3) on Group 2's Staff member page. *@
+@* "Loans and reservations" and "Standing" (Group 3) on Group 2's Staff member page; "Declare lost" per open loan (G3-22). *@
+@{
+    var back = Context.Request.Path + Context.Request.QueryString;
+}
 <section class="card flush" aria-labelledby="staff-loans-title">
     <div class="card-head">
         <div><h2 id="staff-loans-title">Loans and reservations</h2><p class="small muted">Open loans and reservations of this staff member.</p></div>
@@ -13,7 +16,7 @@
     {
         <table class="table">
             <thead>
-                <tr><th scope="col">Book</th><th scope="col">Copy</th><th scope="col">Due / hold until</th><th scope="col">Status</th></tr>
+                <tr><th scope="col">Book</th><th scope="col">Copy</th><th scope="col">Due / hold until</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
             </thead>
             <tbody>
                 @foreach (var loan in Model.Loans)
@@ -23,6 +26,13 @@
                         <td class="nowrap" data-label="Copy">@(loan.Barcode ?? "—")</td>
                         <td data-label="Due">@Texts.Date(loan.Due)</td>
                         <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="loan.Status" /></td>
+                        <td class="actions">
+                            <form method="post" asp-area="Borrowing" asp-page="/DeclareLost">
+                                <input type="hidden" name="LoanId" value="@loan.LoanId" />
+                                <input type="hidden" name="ReturnUrl" value="@back" />
+                                <button class="btn btn-danger btn-sm" type="submit" aria-label="Declare @loan.Book.Title lost">Declare lost</button>
+                            </form>
+                        </td>
                     </tr>
                 }
                 @foreach (var reservation in Model.Reservations)
@@ -32,6 +42,7 @@
                         <td class="nowrap" data-label="Copy">—</td>
                         <td data-label="Hold until">@(reservation.ReadyUntil is { } until ? Texts.Date(until) : $"{Texts.Ordinal(reservation.QueuePosition)} in the queue")</td>
                         <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="reservation.Status" /></td>
+                        <td class="actions"></td>
                     </tr>
                 }
             </tbody>
