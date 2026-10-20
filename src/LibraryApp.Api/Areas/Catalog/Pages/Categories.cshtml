@@ -3,6 +3,9 @@
 @{
     ViewData["Title"] = "Categories";
     var tree = new CategoryTree(Model.Items);
+    // The rows in tree order (CAT-03): each top-level category, then its subcategories, as in the book form.
+    var byId = Model.Items.ToDictionary(item => item.Id);
+    var rows = tree.Options.Select(option => byId[option.Id]).ToList();
 }
 <partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Categories", "Manage catalog categories.", Crumbs: [new("Catalog", "/catalog")])' />
 @if (!ViewData.ModelState.IsValid)
@@ -38,7 +41,7 @@
             <tr><th scope="col">Name</th><th scope="col">Edit</th><th scope="col">Delete</th></tr>
         </thead>
         <tbody>
-            @foreach (var item in Model.Items)
+            @foreach (var item in rows)
             {
                 var input = Model.EditId == item.Id ? Model.EditInput : new CategoryRequest(item.Name, item.ParentCategoryId);
                 <tr>

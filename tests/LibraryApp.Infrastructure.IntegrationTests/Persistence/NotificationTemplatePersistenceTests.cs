@@ -18,7 +18,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 /// </summary>
 public sealed class NotificationTemplatePersistenceFixture : IAsyncLifetime
 {
-    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewConnectionString());
+    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewDatabase());
 
     private static ServiceProvider BuildServices(string connectionString)
     {

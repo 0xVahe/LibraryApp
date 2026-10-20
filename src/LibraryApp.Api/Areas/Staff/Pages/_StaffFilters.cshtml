@@ -1,0 +1,42 @@
+@using LibraryApp.Domain.Staff
+@model IndexModel
+<form class="card mb-24" method="get" action="/staff" role="search" aria-label="Staff filters">
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-red mb-16" role="alert" id="filter-errors">
+            <div asp-validation-summary="All"></div>
+        </div>
+    }
+    <div class="row filters">
+        <div class="search">
+            <label class="visually-hidden" for="staff-search">Search</label>
+            <input id="staff-search" name="search" type="search" value="@Model.Search" placeholder="Name or employee ID"
+                   aria-invalid="@Model.Invalid(nameof(Model.Search))">
+        </div>
+        <div class="min-w-200">
+            <label class="visually-hidden" for="staff-department">Department</label>
+            <select id="staff-department" name="departmentId" aria-invalid="@Model.Invalid(nameof(Model.DepartmentId))">
+                <option value="">All departments</option>
+                @foreach (var department in Model.Departments)
+                {
+                    <option value="@department.Id" selected="@(Model.DepartmentId == department.Id)">@department.Name</option>
+                }
+            </select>
+        </div>
+        <div class="min-w-160">
+            <label class="visually-hidden" for="staff-status">Status</label>
+            <select id="staff-status" name="status" aria-invalid="@Model.Invalid(nameof(Model.Status))">
+                <option value="">Any status</option>
+                @foreach (var status in Enum.GetValues<StaffMemberStatus>())
+                {
+                    <option value="@status" selected="@(string.Equals(Model.Status?.Trim(), status.ToString(), StringComparison.OrdinalIgnoreCase))">@StatusBadge.Label(status)</option>
+                }
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Filter</button>
+        @if (Model.HasFilters || !ViewData.ModelState.IsValid)
+        {
+            <a class="btn btn-secondary" href="/staff">Clear filters</a>
+        }
+    </div>
+</form>

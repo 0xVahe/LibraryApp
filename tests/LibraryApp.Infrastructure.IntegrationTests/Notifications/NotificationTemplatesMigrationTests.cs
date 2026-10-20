@@ -16,7 +16,7 @@ public sealed class NotificationTemplatesMigrationTests : IAsyncLifetime
 {
     private const string Migration = "AddDefaultNotificationTemplates";
 
-    private readonly string _connectionString = TestDatabase.NewConnectionString();
+    private readonly string _connectionString = TestDatabase.NewDatabase();
 
     private LibraryDbContext Open()
     {

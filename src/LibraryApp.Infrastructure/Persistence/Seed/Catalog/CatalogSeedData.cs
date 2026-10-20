@@ -3,27 +3,37 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 /// <summary>Synthetic catalog seed: categories, authors, publishers, books and copies (D3).</summary>
 public static class CatalogSeedData
 {
-    public static readonly IReadOnlyList<(Guid Id, string Name)> Categories =
+    /// <summary>
+    /// Categories in two levels (CAT-03): the 8 top-level categories, then the subcategories with their parent. A parent comes
+    /// before its subcategories, so the seeder links them in one pass.
+    /// </summary>
+    public static readonly IReadOnlyList<(Guid Id, string Name, Guid? ParentId)> Categories =
     [
-        (CatalogSeedIds.Category(1), "Banking & Finance"),
-        (CatalogSeedIds.Category(2), "Risk, Compliance & AML"),
-        (CatalogSeedIds.Category(3), "IT & Software Engineering"),
-        (CatalogSeedIds.Category(4), "Data & Analytics"),
-        (CatalogSeedIds.Category(5), "Leadership & Management"),
-        (CatalogSeedIds.Category(6), "Soft Skills & Communication"),
-        (CatalogSeedIds.Category(7), "Customer Experience"),
-        (CatalogSeedIds.Category(8), "General Reading"),
+        (CatalogSeedIds.Category(1), "Banking & Finance", null),
+        (CatalogSeedIds.Category(2), "Risk, Compliance & AML", null),
+        (CatalogSeedIds.Category(3), "IT & Software Engineering", null),
+        (CatalogSeedIds.Category(4), "Data & Analytics", null),
+        (CatalogSeedIds.Category(5), "Leadership & Management", null),
+        (CatalogSeedIds.Category(6), "Soft Skills & Communication", null),
+        (CatalogSeedIds.Category(7), "Customer Experience", null),
+        (CatalogSeedIds.Category(8), "General Reading", null),
+        (CatalogSeedIds.Category(9), "Investing & Markets", CatalogSeedIds.Category(1)),
+        (CatalogSeedIds.Category(10), "Banking & Financial History", CatalogSeedIds.Category(1)),
+        (CatalogSeedIds.Category(11), "Software Craftsmanship", CatalogSeedIds.Category(3)),
+        (CatalogSeedIds.Category(12), "Software Architecture & Design", CatalogSeedIds.Category(3)),
+        (CatalogSeedIds.Category(13), "Armenian Literature", CatalogSeedIds.Category(8)),
+        (CatalogSeedIds.Category(14), "Popular Non-fiction", CatalogSeedIds.Category(8)),
     ];
 
     public static readonly IReadOnlyList<SeedBook> Books =
     [
-        new(1, "The Intelligent Investor", ["Benjamin Graham"], "Harper Business", 2003, "en", "9781000000016", 1),
+        new(1, "The Intelligent Investor", ["Benjamin Graham"], "Harper Business", 2003, "en", "9781000000016", 9),
         new(2, "Principles of Corporate Finance", ["Richard A. Brealey", "Stewart C. Myers", "Franklin Allen"], "McGraw Hill", 2019, "en", "9781000000023", 1),
-        new(3, "Options, Futures, and Other Derivatives", ["John C. Hull"], "Pearson", 2017, "en", "9781000000030", 1),
-        new(4, "The Ascent of Money", ["Niall Ferguson"], "Penguin Press", 2008, "en", "9781000000047", 1),
-        new(5, "Lords of Finance", ["Liaquat Ahamed"], "Penguin Press", 2009, "en", "9781000000054", 1),
-        new(6, "The Bankers' New Clothes", ["Anat Admati", "Martin Hellwig"], "Princeton University Press", 2013, "en", "9781000000061", 1),
-        new(7, "The Big Short", ["Michael Lewis"], "W. W. Norton & Company", 2010, "en", "9781000000078", 1),
+        new(3, "Options, Futures, and Other Derivatives", ["John C. Hull"], "Pearson", 2017, "en", "9781000000030", 9),
+        new(4, "The Ascent of Money", ["Niall Ferguson"], "Penguin Press", 2008, "en", "9781000000047", 10),
+        new(5, "Lords of Finance", ["Liaquat Ahamed"], "Penguin Press", 2009, "en", "9781000000054", 10),
+        new(6, "The Bankers' New Clothes", ["Anat Admati", "Martin Hellwig"], "Princeton University Press", 2013, "en", "9781000000061", 10),
+        new(7, "The Big Short", ["Michael Lewis"], "W. W. Norton & Company", 2010, "en", "9781000000078", 9),
         new(8, "Risk Management and Financial Institutions", ["John C. Hull"], "Wiley", 2018, "en", "9781000000085", 2),
         new(9, "Against the Gods: The Remarkable Story of Risk", ["Peter L. Bernstein"], "Wiley", 1996, "en", "9781000000092", 2),
         new(10, "The Black Swan", ["Nassim Nicholas Taleb"], "Random House", 2007, "en", "9781000000108", 2),
@@ -31,13 +41,13 @@ public static class CatalogSeedData
         new(12, "When Genius Failed", ["Roger Lowenstein"], "Random House", 2000, "en", "9781000000122", 2),
         new(13, "Kleptopia", ["Tom Burgis"], "Harper", 2020, "en", "9781000000139", 2),
         new(14, "Moneyland", ["Oliver Bullough"], "Profile Books", 2018, "en", "9781000000146", 2),
-        new(15, "Clean Code", ["Robert C. Martin"], "Prentice Hall", 2008, "en", "9781000000153", 3),
-        new(16, "Clean Architecture", ["Robert C. Martin"], "Prentice Hall", 2017, "en", "9781000000160", 3),
-        new(17, "The Pragmatic Programmer, 20th Anniversary Edition", ["David Thomas", "Andrew Hunt"], "Addison-Wesley", 2019, "en", "9781000000177", 3),
-        new(18, "Design Patterns: Elements of Reusable Object-Oriented Software", ["Erich Gamma", "Richard Helm", "Ralph Johnson", "John Vlissides"], "Addison-Wesley", 1994, "en", "9781000000184", 3),
-        new(19, "Refactoring, 2nd Edition", ["Martin Fowler"], "Addison-Wesley", 2018, "en", "9781000000191", 3),
-        new(20, "Domain-Driven Design", ["Eric Evans"], "Addison-Wesley", 2003, "en", "9781000000207", 3),
-        new(21, "C# in Depth, 4th Edition", ["Jon Skeet"], "Manning", 2019, "en", "9781000000214", 3),
+        new(15, "Clean Code", ["Robert C. Martin"], "Prentice Hall", 2008, "en", "9781000000153", 11),
+        new(16, "Clean Architecture", ["Robert C. Martin"], "Prentice Hall", 2017, "en", "9781000000160", 12),
+        new(17, "The Pragmatic Programmer, 20th Anniversary Edition", ["David Thomas", "Andrew Hunt"], "Addison-Wesley", 2019, "en", "9781000000177", 11),
+        new(18, "Design Patterns: Elements of Reusable Object-Oriented Software", ["Erich Gamma", "Richard Helm", "Ralph Johnson", "John Vlissides"], "Addison-Wesley", 1994, "en", "9781000000184", 12),
+        new(19, "Refactoring, 2nd Edition", ["Martin Fowler"], "Addison-Wesley", 2018, "en", "9781000000191", 11),
+        new(20, "Domain-Driven Design", ["Eric Evans"], "Addison-Wesley", 2003, "en", "9781000000207", 12),
+        new(21, "C# in Depth, 4th Edition", ["Jon Skeet"], "Manning", 2019, "en", "9781000000214", 11),
         new(22, "Designing Data-Intensive Applications", ["Martin Kleppmann"], "O'Reilly Media", 2017, "en", "9781000000221", 4),
         new(23, "Storytelling with Data", ["Cole Nussbaumer Knaflic"], "Wiley", 2015, "en", "9781000000238", 4),
         new(24, "Python for Data Analysis, 3rd Edition", ["Wes McKinney"], "O'Reilly Media", 2022, "en", "9781000000245", 4),
@@ -66,14 +76,14 @@ public static class CatalogSeedData
         new(47, "Hug Your Haters", ["Jay Baer"], "Portfolio", 2016, "en", "9781000000474", 7),
         new(48, "Outside In", ["Harley Manning", "Kerry Bodine"], "New Harvest", 2012, "en", "9781000000481", 7),
         new(49, "The Experience Economy, Updated Edition", ["B. Joseph Pine II", "James H. Gilmore"], "Harvard Business Review Press", 2011, "en", "9781000000498", 7),
-        new(50, "Sapiens: A Brief History of Humankind", ["Yuval Noah Harari"], "Harper", 2015, "en", "9781000000504", 8),
-        new(51, "Thinking, Fast and Slow", ["Daniel Kahneman"], "Farrar, Straus and Giroux", 2011, "en", "9781000000511", 8),
-        new(52, "Atomic Habits", ["James Clear"], "Avery", 2018, "en", "9781000000528", 8),
+        new(50, "Sapiens: A Brief History of Humankind", ["Yuval Noah Harari"], "Harper", 2015, "en", "9781000000504", 14),
+        new(51, "Thinking, Fast and Slow", ["Daniel Kahneman"], "Farrar, Straus and Giroux", 2011, "en", "9781000000511", 14),
+        new(52, "Atomic Habits", ["James Clear"], "Avery", 2018, "en", "9781000000528", 14),
         new(53, "Мастер и Маргарита", ["Михаил Булгаков"], null, 1967, "ru", "9781000000535", 8),
-        new(54, "Սամվել", ["Րաֆֆի"], null, 1886, "hy", "9781000000542", 8),
-        new(55, "Անուշ", ["Հովհաննես Թումանյան"], null, 1892, "hy", "9781000000559", 8),
-        new(56, "Երկիր Նաիրի", ["Եղիշե Չարենց"], null, 1926, "hy", "9781000000566", 8),
-        new(57, "Մենք ենք, մեր սարերը", ["Հրանտ Մաթևոսյան"], null, 1962, "hy", "9781000000573", 8),
+        new(54, "Սամվել", ["Րաֆֆի"], null, 1886, "hy", "9781000000542", 13),
+        new(55, "Անուշ", ["Հովհաննես Թումանյան"], null, 1892, "hy", "9781000000559", 13),
+        new(56, "Երկիր Նաիրի", ["Եղիշե Չարենց"], null, 1926, "hy", "9781000000566", 13),
+        new(57, "Մենք ենք, մեր սարերը", ["Հրանտ Մաթևոսյան"], null, 1962, "hy", "9781000000573", 13),
     ];
 
     /// <summary>
@@ -100,7 +110,7 @@ public static class CatalogSeedData
         [50] = 3, [51] = 3, [52] = 4, [53] = 2, [54] = 2, [55] = 1, [56] = 1, [57] = 1,
     };
 
-    // Keep these name-to-ID mappings stable: downstream book seeds reference them.
+    // Fixed IDs: the seed books above and the tests find authors and publishers by them, so a name never changes its ID.
     public static readonly IReadOnlyList<(Guid Id, string Name)> Authors =
     [
         (new("10000000-0000-0000-0002-000000000001"), "Benjamin Graham"),

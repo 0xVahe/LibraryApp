@@ -108,9 +108,76 @@ public sealed class BorrowingDailyJobTests
         Assert.Empty(state.WorkerInstances);
 
         Assert.Contains("Overdue loans: 0", summary);
+        Assert.Contains("expired pickups: 0", summary);
         Assert.Contains("expired penalties: 0", summary);
         Assert.Contains("changed statuses: 0", summary);
+        Assert.Contains("cancelled reservations: 0", summary);
         Assert.Contains("failures: 0", summary);
+    }
+
+    [Fact]
+    public async Task Unservable_reservations_are_checked_per_book_and_per_member_after_the_pickups()
+    {
+        Guid deletedBook = Guid.NewGuid();
+        Guid liveBook = Guid.NewGuid();
+        Guid deactivatedMember = Guid.NewGuid();
+        Guid activeMember = Guid.NewGuid();
+
+        var state = new TestState();
+        state.ReservationIds.Add(Guid.NewGuid());
+        state.QueuedBookIds.AddRange(new[] { deletedBook, liveBook });
+        state.ReservingStaffIds.AddRange(new[] { deactivatedMember, activeMember });
+        state.CancelledForBook[deletedBook] = 3;
+        state.CancelledForMember[deactivatedMember] = 2;
+
+        using var services = BuildServices(state);
+
+        string summary = await CreateJob(services).RunAsync(
+            RunContext(),
+            CancellationToken.None);
+
+        Assert.Equal(state.QueuedBookIds.ToArray(), state.BookCalls.ToArray());
+        Assert.Equal(state.ReservingStaffIds.ToArray(), state.MemberCalls.ToArray());
+
+        // G3-26 runs after the pickup expiry: a held copy of an expired pickup is first offered to the queue.
+        Assert.Equal(
+            new[] { "pickup", "book", "book", "member", "member" },
+            state.Steps.ToArray());
+
+        // One fresh worker per candidate: 1 pickup + 2 books + 2 members.
+        Assert.Equal(5, state.WorkerInstances.Distinct().Count());
+        Assert.Equal(state.WorkerInstances.ToArray(), state.DisposedWorkers.ToArray());
+
+        Assert.Contains("cancelled reservations: 5", summary);
+        Assert.Contains("failures: 0", summary);
+    }
+
+    [Fact]
+    public async Task A_failing_queue_cleanup_does_not_stop_the_others_and_fails_the_run_for_a_retry()
+    {
+        Guid failingBook = Guid.NewGuid();
+        Guid deletedBook = Guid.NewGuid();
+        Guid deactivatedMember = Guid.NewGuid();
+
+        var state = new TestState();
+        state.QueuedBookIds.AddRange(new[] { failingBook, deletedBook });
+        state.ReservingStaffIds.Add(deactivatedMember);
+        state.FailingBooks.Add(failingBook);
+        state.CancelledForBook[deletedBook] = 1;
+        state.CancelledForMember[deactivatedMember] = 1;
+
+        using var services = BuildServices(state);
+
+        InvalidOperationException exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => CreateJob(services).RunAsync(
+                    RunContext(),
+                    CancellationToken.None));
+
+        Assert.Equal(state.QueuedBookIds.ToArray(), state.BookCalls.ToArray());
+        Assert.Equal(deactivatedMember, Assert.Single(state.MemberCalls));
+        Assert.Contains("cancelled reservations: 2", exception.Message);
+        Assert.Contains("failures: 1", exception.Message);
     }
 
     [Fact]
@@ -209,6 +276,66 @@ public sealed class BorrowingDailyJobTests
     }
 
     [Fact]
+    public async Task Pickups_past_deadline_at_the_run_time_each_get_a_fresh_disposed_worker()
+    {
+        var state = new TestState();
+
+        state.ReservationIds.Add(Guid.NewGuid());
+        state.ReservationIds.Add(Guid.NewGuid());
+
+        using var services = BuildServices(state);
+
+        string summary = await CreateJob(services).RunAsync(
+            RunContext(),
+            CancellationToken.None);
+
+        // BOR-11: the deadline is compared with the run time, not with the scheduled local date.
+        Assert.Equal(NowUtc, state.RequestedPickupNowUtc);
+        Assert.Equal(1, state.ReservationQueryCalls);
+        Assert.Equal(
+            state.ReservationIds.ToArray(),
+            state.ReservationCalls.ToArray());
+
+        Assert.Equal(2, state.WorkerInstances.Distinct().Count());
+        Assert.Equal(
+            state.WorkerInstances.ToArray(),
+            state.DisposedWorkers.ToArray());
+
+        Assert.Contains("expired pickups: 2", summary);
+        Assert.Contains("failures: 0", summary);
+    }
+
+    [Fact]
+    public async Task A_failing_pickup_does_not_stop_the_next_one_and_fails_the_run_for_a_retry()
+    {
+        Guid failingReservation = Guid.NewGuid();
+        Guid successfulReservation = Guid.NewGuid();
+
+        var state = new TestState();
+
+        state.ReservationIds.AddRange(
+            new[] { failingReservation, successfulReservation });
+
+        state.FailingReservations.Add(failingReservation);
+
+        using var services = BuildServices(state);
+
+        InvalidOperationException exception =
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => CreateJob(services).RunAsync(
+                    RunContext(),
+                    CancellationToken.None));
+
+        Assert.Equal(
+            state.ReservationIds.ToArray(),
+            state.ReservationCalls.ToArray());
+
+        Assert.Contains("expired pickups: 1", exception.Message);
+        Assert.Contains("failures: 1", exception.Message);
+        Assert.Equal(2, state.DisposedWorkers.Count);
+    }
+
+    [Fact]
     public async Task Cancellation_stops_before_processing_the_next_item()
     {
         Guid firstLoan = Guid.NewGuid();
@@ -273,6 +400,20 @@ public sealed class BorrowingDailyJobTests
         public HashSet<Guid> FailingLoans { get; } = new();
         public HashSet<Guid> FailingStaff { get; } = new();
 
+        public List<Guid> ReservationIds { get; } = new();
+        public List<Guid> ReservationCalls { get; } = new();
+        public HashSet<Guid> FailingReservations { get; } = new();
+        public DateTime? RequestedPickupNowUtc { get; set; }
+
+        public List<Guid> QueuedBookIds { get; } = new();
+        public List<Guid> ReservingStaffIds { get; } = new();
+        public List<Guid> BookCalls { get; } = new();
+        public List<Guid> MemberCalls { get; } = new();
+        public HashSet<Guid> FailingBooks { get; } = new();
+        public Dictionary<Guid, int> CancelledForBook { get; } = new();
+        public Dictionary<Guid, int> CancelledForMember { get; } = new();
+        public List<string> Steps { get; } = new();
+
         public Dictionary<Guid, PenaltyRecalculationResult>
             StaffResults { get; } = new();
 
@@ -280,6 +421,7 @@ public sealed class BorrowingDailyJobTests
 
         public int LoanQueryCalls { get; set; }
         public int StaffQueryCalls { get; set; }
+        public int ReservationQueryCalls { get; set; }
 
         public Action? AfterLoan { get; set; }
     }
@@ -309,6 +451,33 @@ public sealed class BorrowingDailyJobTests
 
             return Task.FromResult<IReadOnlyList<Guid>>(
                 state.StaffIds.ToArray());
+        }
+
+        public Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
+            DateTime nowUtc,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            state.ReservationQueryCalls++;
+            state.RequestedPickupNowUtc = nowUtc;
+            return Task.FromResult<IReadOnlyList<Guid>>(
+                state.ReservationIds.ToArray());
+        }
+
+        public Task<IReadOnlyList<Guid>> GetBookIdsWithWaitingReservationsAsync(
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<Guid>>(
+                state.QueuedBookIds.ToArray());
+        }
+
+        public Task<IReadOnlyList<Guid>> GetStaffIdsWithActiveReservationsAsync(
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<Guid>>(
+                state.ReservingStaffIds.ToArray());
         }
     }
 
@@ -365,6 +534,56 @@ public sealed class BorrowingDailyJobTests
                     : new PenaltyRecalculationResult(0, 0, false);
 
             return Task.FromResult(result);
+        }
+
+        public Task<bool> ExpirePickupAsync(
+            Guid reservationId,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            _state.ReservationCalls.Add(reservationId);
+            _state.Steps.Add("pickup");
+
+            if (_state.FailingReservations.Contains(reservationId))
+            {
+                throw new InvalidOperationException(
+                    "Simulated pickup failure.");
+            }
+
+            return Task.FromResult(true);
+        }
+
+        public Task<int> CancelWaitingReservationsOfDeletedBookAsync(
+            Guid bookId,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            _state.BookCalls.Add(bookId);
+            _state.Steps.Add("book");
+
+            if (_state.FailingBooks.Contains(bookId))
+            {
+                throw new InvalidOperationException(
+                    "Simulated queue failure.");
+            }
+
+            return Task.FromResult(
+                _state.CancelledForBook.GetValueOrDefault(bookId));
+        }
+
+        public Task<int> CancelReservationsOfDeactivatedMemberAsync(
+            Guid staffMemberId,
+            CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            _state.MemberCalls.Add(staffMemberId);
+            _state.Steps.Add("member");
+
+            return Task.FromResult(
+                _state.CancelledForMember.GetValueOrDefault(staffMemberId));
         }
 
         public void Dispose()

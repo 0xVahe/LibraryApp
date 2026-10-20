@@ -350,10 +350,12 @@ public sealed class LoanServiceTests
             Task.FromResult(_items.SingleOrDefault(r => r.StaffMemberId == staffMemberId && r.BookId == bookId
                 && r.Status is ReservationStatus.Waiting or ReservationStatus.ReadyForPickup));
         public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Reservation>> FindActiveForStaffAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class TestCalendar : IWorkingDayCalendar

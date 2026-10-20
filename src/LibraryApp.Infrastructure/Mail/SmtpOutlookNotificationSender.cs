@@ -39,8 +39,8 @@ public sealed class SmtpOutlookNotificationSender(
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             // Server and error kind only: MailKit messages can contain the recipient address (NFR-06).
+            // Not logged here: the caller logs the failure once, with the notification id.
             var reason = $"Mail server {settings.Host}:{settings.Port} did not accept the message ({Describe(ex)}).";
-            logger.LogWarning("Notification email not delivered: {Reason}", reason);
             throw new NotificationDeliveryException(reason, ex);
         }
 

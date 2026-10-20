@@ -73,6 +73,7 @@ Account state is cached per user and token stamp, with absolute expiration on ea
 | `Penalties:SuspensionDays` | 30 | Calendar days a suspension lasts once the points cross the Suspended threshold | BR-BOR-6, BQ-BA-01 |
 | `Penalties:LateAndDamaged` | Sum | Late and damaged on one return: `Sum` — two records, points add up; `Highest` — one record with the higher points | BQ-BA-02 |
 | `Loans:OverdueFrom` | NextLocalDay | When a loan counts as late: `NextLocalDay` — from the day after the local due date; `DueTime` — from the exact due time | BOR-05, BQ-BA-05 |
+| `Loans:SuspendedMayRenew` | false | A Suspended employee may renew a loan; a Restricted one never may | BR-BOR-1, BQ-BA-11 |
 | `Loans:AllowLostBeforeDue` | true | An Active loan may be declared lost before it is overdue; false: only a loan past the overdue rule (`Loans:OverdueFrom`) may be declared lost | BOR-09, BQ-BA-06 |
 | `Reservations:MaxActive` | 3 | Active reservations per employee | BR-BOR-2 |
 | `Reservations:PickupWorkingDays` | 3 | Working days a copy is held for the first person in the queue | BOR-07 |
@@ -83,7 +84,6 @@ Account state is cached per user and token stamp, with absolute expiration on ea
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
 
-
 ### Reporting (`Reporting`)
 
 Configure reporting in `src/LibraryApp.Api/appsettings.json`.
@@ -93,6 +93,16 @@ Configure reporting in `src/LibraryApp.Api/appsettings.json`.
 - `TopCategoriesLimit` (default: 5): Maximum number of top categories returned.
 
 All values must be positive integers. Invalid configuration prevents application startup.
+
+### Notifications (`Notifications`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
+| `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
+| `Delivery:Lease` | 00:15:00 | How long a claimed email is reserved for one API instance; must be longer than sending one batch | NOT-03 |
+
+Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
 
 ## Daily jobs
 
@@ -128,7 +138,7 @@ Scheduled jobs:
 
 | Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
 |---|---|---|---|---|
-| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints` | BOR-06, policy table, BQ-BA-01, BQ-G2-03 |
+| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself; Waiting reservations of a book deleted in Catalog → Cancelled; Waiting and ReadyForPickup reservations of a Deactivated staff member → Cancelled, a held copy goes to the next Waiting reservation or becomes Available | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G1-09, BQ-G2-03, BR-MEM-4 |
 
 ## Tests
 
@@ -190,6 +200,10 @@ Razor Pages live in the API host (UI guide in the team docs): the shared shell i
 - **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
 - **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
 - **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
+
+Staff pages (MEM-01, MEM-07): `/staff` provides search, department/status filters and pagination; `/staff/{id}` shows the profile and deactivation form. Both routes require a Librarian or Library Administrator.
+
+The profile invokes Group 3's `StaffBorrowingSummary` View Component with `staffMemberId` when available; otherwise it displays an unavailable message. Borrowing actions remain owned by Group 3.
 
 ## Test accounts
 

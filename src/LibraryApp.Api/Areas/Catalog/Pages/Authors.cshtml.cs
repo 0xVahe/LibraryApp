@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LibraryApp.Api.Areas.Catalog.Pages;
 
+/// <summary>Authors page (CAT-02) for library staff: create, rename and delete authors.</summary>
 [Authorize(Policy = UiPolicies.LibraryStaff)]
 public sealed class AuthorsModel(IAuthorService service) : PageModel
 {

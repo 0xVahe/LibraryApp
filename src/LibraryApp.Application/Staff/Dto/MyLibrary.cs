@@ -1,5 +1,8 @@
 namespace LibraryApp.Application.Staff.Dto;
 
+/// <summary>Only the caller's first and last name can be changed through the self-profile endpoint.</summary>
+public sealed record UpdateMyProfileRequest(string FirstName, string LastName);
+
 /// <summary>MEM-08 "My library": the caller's own loans, reservations and active penalty points (NFR-03).</summary>
 /// <param name="ActiveLoans">Active and Overdue loans, earliest due date first.</param>
 /// <param name="Reservations">Waiting and ReadyForPickup reservations, oldest first.</param>

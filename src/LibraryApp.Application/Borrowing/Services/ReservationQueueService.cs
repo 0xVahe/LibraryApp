@@ -95,4 +95,44 @@ public sealed class ReservationQueueService(
 
         return true;
     }
+    /// <summary>
+    /// BOR-12, G3-26: cancels a Waiting or ReadyForPickup reservation. A ReadyForPickup one releases its held copy to
+    /// the first Waiting reservation (<c>ReservationReady</c>) or makes it Available when nobody waits; after a Waiting
+    /// one the members behind it move up (positions stay 1..n). The caller holds the book lock (and the staff lock
+    /// first, where it takes both), has loaded the reservation for update after taking the locks, and runs inside the
+    /// unit of work that saves the change.
+    /// </summary>
+    internal async Task CancelUnderLocksAsync(Reservation reservation, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(reservation);
+
+        Guid? heldCopyId = reservation.Status == ReservationStatus.ReadyForPickup
+            ? reservation.CopyId ?? throw new InvalidOperationException("A ready reservation must have a held copy.")
+            : null;
+
+        reservation.Cancel();
+
+        // Written now, inside the transaction: the queue query below reads only persisted Waiting rows, and the copy
+        // may be held for the next member only after this reservation has left ReadyForPickup
+        // (UX_Reservations_ReadyForPickup_CopyId; see IReservationRepository.FlushAsync).
+        await reservations.FlushAsync(ct);
+
+        if (heldCopyId is { } copyId)
+        {
+            bool offered = await TryOfferCopyUnderBookLockAsync(copyId, reservation.BookId, BookCopyStatus.Reserved, ct);
+
+            if (!offered)
+                await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Available, ct);
+
+            return;
+        }
+
+        // The members behind the cancelled one move up: positions 1..n without gaps, in queue order.
+        IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(reservation.BookId, ct);
+        for (int index = 0; index < waiting.Count; index++)
+        {
+            if (waiting[index].QueuePosition != index + 1)
+                waiting[index].SetQueuePosition(index + 1);
+        }
+    }
 }

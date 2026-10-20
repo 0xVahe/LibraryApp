@@ -53,7 +53,10 @@ public sealed class Notification : Entity
     /// <summary>Number of failed send attempts (NOT-08, G4-03).</summary>
     public int Attempts { get; private set; }
 
-    /// <summary>When the next retry is due; null = no more retries (NOT-08, G4-03).</summary>
+    /// <summary>
+    /// Earliest time of the next delivery attempt: the lease of a Pending email being sent (NOT-03), or the retry time
+    /// of a Failed one (NOT-08, G4-03). Null: a Pending email is due now; a Failed one is not retried.
+    /// </summary>
     public DateTime? NextAttemptAtUtc { get; private set; }
 
     public string? LastError { get; private set; }

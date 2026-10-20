@@ -10,7 +10,8 @@ namespace LibraryApp.Infrastructure.Jobs.Borrowing;
 
 /// <summary>
 /// Daily Borrowing maintenance:
-/// marks overdue loans, expires penalties, and recalculates staff standing.
+/// marks overdue loans, expires held reservations and penalties, recalculates staff standing, and cancels reservations
+/// that can never be served: those of a deleted book and those of a deactivated member (G3-26).
 /// Scheduling and run tracking belong to the shared daily-job runner.
 /// </summary>
 public sealed class BorrowingDailyJob(
@@ -43,7 +44,10 @@ public sealed class BorrowingDailyJob(
         };
 
         IReadOnlyList<Guid> loanIds;
+        IReadOnlyList<Guid> reservationIds;
         IReadOnlyList<Guid> staffIds;
+        IReadOnlyList<Guid> queuedBookIds;
+        IReadOnlyList<Guid> reservingStaffIds;
 
         // Candidate selection gets its own short-lived scope.
         // No tracked entities are carried into the processing scopes.
@@ -56,21 +60,35 @@ public sealed class BorrowingDailyJob(
                 cutoffUtc,
                 ct);
 
+            reservationIds = await query.GetReadyReservationIdsPastDeadlineAsync(
+                selectionTimeUtc,
+                ct);
+
             staffIds = await query.GetStaffIdsWithActivePenaltiesAsync(
+                ct);
+
+            queuedBookIds = await query.GetBookIdsWithWaitingReservationsAsync(
+                ct);
+
+            reservingStaffIds = await query.GetStaffIdsWithActiveReservationsAsync(
                 ct);
         }
 
         logger.LogInformation(
             "Borrowing maintenance for {LocalDate}: "
             + "{LoanCandidates} loan candidates and "
+            + "{PickupCandidates} pickup candidates and "
             + "{StaffCandidates} staff candidates",
             run.LocalDate,
             loanIds.Count,
+            reservationIds.Count,
             staffIds.Count);
 
         int overdueLoans = 0;
+        int expiredPickups = 0;
         int expiredPenalties = 0;
         int changedStatuses = 0;
+        int cancelledReservations = 0;
         int failures = 0;
 
         foreach (Guid loanId in loanIds)
@@ -150,12 +168,134 @@ public sealed class BorrowingDailyJob(
             }
         }
 
+        foreach (Guid reservationId in reservationIds)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+
+                var service = scope.ServiceProvider
+                    .GetRequiredService<IBorrowingDailyJobService>();
+
+                bool changed = await service.ExpirePickupAsync(
+                    reservationId,
+                    ct);
+
+                if (changed)
+                {
+                    expiredPickups++;
+                }
+            }
+            catch (OperationCanceledException)
+                when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failures++;
+
+                logger.LogError(
+                    ex,
+                    "Borrowing maintenance failed for reservation {ReservationId}",
+                    reservationId);
+            }
+        }
+
+        // G3-26, after the pickup expiry: a book deleted in Catalog (BQ-G1-09) can never serve its queue.
+        foreach (Guid bookId in queuedBookIds)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+
+                var service = scope.ServiceProvider
+                    .GetRequiredService<IBorrowingDailyJobService>();
+
+                int cancelled = await service.CancelWaitingReservationsOfDeletedBookAsync(
+                    bookId,
+                    ct);
+
+                if (cancelled > 0)
+                {
+                    cancelledReservations += cancelled;
+
+                    logger.LogInformation(
+                        "Cancelled {Count} waiting reservations of deleted book {BookId}",
+                        cancelled,
+                        bookId);
+                }
+            }
+            catch (OperationCanceledException)
+                when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failures++;
+
+                logger.LogError(
+                    ex,
+                    "Borrowing maintenance failed for the queue of book {BookId}",
+                    bookId);
+            }
+        }
+
+        // G3-26: a deactivated member never collects a copy; their place and any held copy go to the others.
+        foreach (Guid staffMemberId in reservingStaffIds)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                await using var scope = scopes.CreateAsyncScope();
+
+                var service = scope.ServiceProvider
+                    .GetRequiredService<IBorrowingDailyJobService>();
+
+                int cancelled = await service.CancelReservationsOfDeactivatedMemberAsync(
+                    staffMemberId,
+                    ct);
+
+                if (cancelled > 0)
+                {
+                    cancelledReservations += cancelled;
+
+                    logger.LogInformation(
+                        "Cancelled {Count} reservations of deactivated staff member {StaffMemberId}",
+                        cancelled,
+                        staffMemberId);
+                }
+            }
+            catch (OperationCanceledException)
+                when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failures++;
+
+                logger.LogError(
+                    ex,
+                    "Borrowing maintenance failed for the reservations of staff member {StaffMemberId}",
+                    staffMemberId);
+            }
+        }
+
         ct.ThrowIfCancellationRequested();
 
         string summary =
             $"Overdue loans: {overdueLoans}; "
+            + $"expired pickups: {expiredPickups}; "
             + $"expired penalties: {expiredPenalties}; "
             + $"changed statuses: {changedStatuses}; "
+            + $"cancelled reservations: {cancelledReservations}; "
             + $"failures: {failures}.";
 
         if (failures > 0)
