@@ -79,6 +79,7 @@ builder.Services.AddUi(builder.Configuration, builder.Environment);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    ModuleDocuments.AddDocuments(options);   // "v1" with every endpoint, plus one document per module (NFR-11)
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Api.xml"));
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Application.xml"));   // DTOs
     options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory, "LibraryApp.Domain.xml"));        // enums used in DTOs
@@ -116,7 +117,7 @@ app.UseErrorAnswers();   // /api: ProblemDetails, also for empty 401/403/404 ans
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(ModuleDocuments.AddEndpoints);
 }
 
 // Inside docker compose the API listens on plain HTTP only; compose sets UseHttpsRedirection=false.
