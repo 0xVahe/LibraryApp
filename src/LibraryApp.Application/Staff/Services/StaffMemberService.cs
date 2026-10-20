@@ -1,11 +1,13 @@
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Staff.Services;
 
-public sealed class StaffMemberService(IStaffMemberRepository staffMembers) : IStaffMemberService
+public sealed class StaffMemberService(IStaffMemberRepository staffMembers, IOptions<StaffOptions> options) : IStaffMemberService
 {
     public async Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default)
     {
@@ -21,7 +23,9 @@ public sealed class StaffMemberService(IStaffMemberRepository staffMembers) : IS
         var info = await staffMembers.GetLendingInfoAsync(staffMemberId, ct)
                    ?? throw new DomainException(StaffErrors.NotFound);
 
-        return BorrowingEligibilityPolicy.ApplyStatus(info.Status, info.CategoryRules);
+        var limits = options.Value.RestrictedLimits;
+        return BorrowingEligibilityPolicy.ApplyStatus(info.Status, info.CategoryRules,
+            limits.MaxLoans, limits.MaxRenewals!.Value);
     }
 
     public async Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default) =>

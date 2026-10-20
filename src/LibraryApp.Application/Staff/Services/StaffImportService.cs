@@ -3,8 +3,10 @@ using FluentValidation;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Staff.Services;
 
@@ -15,15 +17,15 @@ public sealed class StaffImportService(
     CorporateEmailPolicy emailPolicy,
     IStaffManagementRepository members,
     IStaffAccountStore accounts,
-    ICurrentUser currentUser) : IStaffImportService
+    ICurrentUser currentUser,
+    IOptions<StaffOptions> options) : IStaffImportService
 {
-    public const int MaximumRows = StaffImportLimits.MaximumRows;
-
     public async Task<StaffImportResult> ImportAsync(Stream csv, CancellationToken ct = default)
     {
         var rows = await parser.ParseAsync(csv, ct);
-        if (rows.Count > MaximumRows)
-            throw new StaffCsvFormatException(rows[MaximumRows].RowNumber, "File", $"A file may contain at most {MaximumRows} data rows.");
+        var maxRows = options.Value.Import.MaxRows;
+        if (rows.Count > maxRows)
+            throw new StaffCsvFormatException(rows[maxRows].RowNumber, "File", $"A file may contain at most {maxRows} data rows.");
         if (rows.Count == 0)
             throw new StaffCsvFormatException(2, "File", "The CSV must contain at least one staff row.");
 

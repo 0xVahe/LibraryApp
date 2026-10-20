@@ -1,7 +1,9 @@
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Staff;
 
@@ -10,7 +12,8 @@ public class StaffMemberServiceTests
     private readonly FakeStaffMemberRepository _repository = new();
     private readonly StaffMemberService _service;
 
-    public StaffMemberServiceTests() => _service = new StaffMemberService(_repository);
+    public StaffMemberServiceTests() => _service = new StaffMemberService(_repository,
+        Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 1, MaxRenewals = 0 } }));
 
     // ---- CanBorrowAsync (INT-03) ----
 
@@ -84,6 +87,16 @@ public class StaffMemberServiceTests
         var ex = await Assert.ThrowsAsync<DomainException>(() => _service.GetLendingRulesAsync(Guid.NewGuid()));
 
         Assert.Equal(StaffErrors.NotFound, ex.Error);
+    }
+
+    [Fact]
+    public async Task Restricted_limits_follow_configuration_without_changing_the_category_loan_days()
+    {
+        var member = _repository.Add(StaffMemberStatus.Restricted, maxLoans: 5, loanDays: 30, maxRenewals: 2);
+        var service = new StaffMemberService(_repository,
+            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 2, MaxRenewals = 1 } }));
+
+        Assert.Equal(new LendingRules(2, 30, 1), await service.GetLendingRulesAsync(member.Id));
     }
 
     // ---- GetStatusAsync ----

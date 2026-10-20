@@ -46,6 +46,24 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Staff (`Staff`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Import:MaxRows` | 200 | Maximum non-empty staff data rows, excluding the CSV header; positive integer | MEM-09 |
+| `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (in-memory parser bound) | MEM-09 |
+| `RestrictedLimits:MaxLoans` | 1 | Loan limit for Restricted members; positive integer | BR-MEM-3 |
+| `RestrictedLimits:MaxRenewals` | 0 | Renewal limit returned for Restricted members; required, zero or greater | BR-MEM-3 |
+
+All four values are required. Startup validation rejects missing or invalid settings,
+including an omitted `MaxRenewals`; an explicit `0` is valid. Parser, import service,
+API, Razor forms and lending-rule service use the same options. The HTTP request
+and multipart limits allow an additional 100000 bytes for the multipart envelope;
+the file-size rule itself remains `Import:MaxFileBytes`. Configure a reverse proxy's
+upload ceiling separately when increasing this setting. Staff-category limits stay
+in the administrator-managed database. Borrowing's separate status checks (such as
+Restricted members being unable to renew) are unchanged by this Staff refactor.
+
 ### Access tokens (`Jwt`)
 
 | Key | Value | Meaning | Requirement |

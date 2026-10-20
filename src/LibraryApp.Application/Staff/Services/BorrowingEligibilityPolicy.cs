@@ -14,8 +14,9 @@ public static class BorrowingEligibilityPolicy
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
     };
 
-    public static LendingRules ApplyStatus(StaffMemberStatus status, LendingRules categoryRules) =>
+    public static LendingRules ApplyStatus(
+        StaffMemberStatus status, LendingRules categoryRules, int restrictedMaxLoans, int restrictedMaxRenewals) =>
         status == StaffMemberStatus.Restricted
-            ? categoryRules with { MaxLoans = 1, MaxRenewals = 0 }
+            ? categoryRules with { MaxLoans = restrictedMaxLoans, MaxRenewals = restrictedMaxRenewals }
             : categoryRules;
 }
