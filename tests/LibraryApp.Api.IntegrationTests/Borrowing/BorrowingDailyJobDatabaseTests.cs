@@ -1,7 +1,10 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Borrowing.Dto;
+using LibraryApp.Application.Borrowing.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Jobs;
 using LibraryApp.Infrastructure.Jobs.Borrowing;
@@ -128,6 +131,166 @@ public class BorrowingDailyJobDatabaseTests(BorrowingDailyJobHost factory) : ICl
             Assert.Equal(BookCopyStatus.Reserved, savedCopy.Status);
             Assert.Equal(readyEventsBefore + 1, readyEventsAfter);
         }
+    }
+
+    [Fact]
+    public async Task A_failed_pickup_expiry_rolls_back_alone_and_the_run_reports_the_failure()
+    {
+        DateTime now = factory.Services.GetRequiredService<IClock>().UtcNow;
+
+        // Book 2: the hand-over to the next member fails after the expired row is flushed (a waiting reservation
+        // created "in the future" cannot accept a deadline before its creation), so its transaction must roll back.
+        Guid brokenCopy = CatalogSeedIds.Copy(2, 1);
+        Reservation brokenExpired = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(2), Members.TigranMelikyan,
+            now.AddDays(-10), queuePosition: 1);
+        brokenExpired.MarkReady(brokenCopy, now.AddTicks(-1));
+        Reservation brokenWaiter = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(2), Members.EvaHovsepyan,
+            now.AddYears(1), queuePosition: 1);
+
+        // Book 3: an expired pickup with nobody waiting, processed in the same run.
+        Guid freeCopy = CatalogSeedIds.Copy(3, 1);
+        Reservation expired = Reservation.Create(Guid.NewGuid(), CatalogSeedIds.Book(3), Members.LusineKarapetyan,
+            now.AddDays(-10), queuePosition: 1);
+        expired.MarkReady(freeCopy, now.AddTicks(-1));
+
+        await WithDbAsync(async db =>
+        {
+            (await db.BookCopies.SingleAsync(c => c.Id == brokenCopy)).ChangeStatus(BookCopyStatus.Reserved);
+            (await db.BookCopies.SingleAsync(c => c.Id == freeCopy)).ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.AddRange(brokenExpired, brokenWaiter, expired);
+            await db.SaveChangesAsync();
+        });
+
+        int readyEventsBefore = await ReadyEventsAsync();
+
+        try
+        {
+            using var scope = factory.Services.CreateScope();
+            var job = scope.ServiceProvider.GetRequiredService<BorrowingDailyJob>();
+
+            // The run reports the failure, so the shared runner retries it (as for loans and staff).
+            var failure = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                job.RunAsync(new DailyJobRun(BorrowingDailyJob.Name, DateOnly.FromDateTime(now), now), CancellationToken.None));
+            Assert.Contains("failures: 1", failure.Message);
+
+            await WithDbAsync(async db =>
+            {
+                // Book 2: nothing of the failed transaction is saved, the flushed Expired status included.
+                var savedBroken = await db.Reservations.AsNoTracking().SingleAsync(r => r.Id == brokenExpired.Id);
+                Assert.Equal(ReservationStatus.ReadyForPickup, savedBroken.Status);
+                Assert.Equal(brokenCopy, savedBroken.CopyId);
+                var savedWaiter = await db.Reservations.AsNoTracking().SingleAsync(r => r.Id == brokenWaiter.Id);
+                Assert.Equal((ReservationStatus.Waiting, 1), (savedWaiter.Status, savedWaiter.QueuePosition));
+                Assert.Equal(BookCopyStatus.Reserved,
+                    (await db.BookCopies.AsNoTracking().SingleAsync(c => c.Id == brokenCopy)).Status);
+
+                // Book 3: expired in its own transaction despite the failure of book 2; the copy is back on the shelf.
+                Assert.Equal(ReservationStatus.Expired,
+                    (await db.Reservations.AsNoTracking().SingleAsync(r => r.Id == expired.Id)).Status);
+                Assert.Equal(BookCopyStatus.Available,
+                    (await db.BookCopies.AsNoTracking().SingleAsync(c => c.Id == freeCopy)).Status);
+            });
+
+            Assert.Equal(readyEventsBefore, await ReadyEventsAsync());
+        }
+        finally
+        {
+            // Remove the broken waiter: the next run of the shared database expires book 2 normally.
+            await WithDbAsync(async db =>
+            {
+                db.Reservations.Remove(await db.Reservations.SingleAsync(r => r.Id == brokenWaiter.Id));
+                await db.SaveChangesAsync();
+            });
+        }
+    }
+
+    [Fact]
+    public async Task Collecting_and_expiring_the_same_pickup_at_once_gives_the_copy_to_one_side_only()
+    {
+        DateTime now = factory.Services.GetRequiredService<IClock>().UtcNow;
+        Guid bookId = CatalogSeedIds.Book(4);
+        Guid copyId = CatalogSeedIds.Copy(4, 1);
+
+        Reservation held = Reservation.Create(Guid.NewGuid(), bookId, Members.NarekSimonyan, now.AddDays(-10), queuePosition: 1);
+        held.MarkReady(copyId, now.AddTicks(-1));
+        Reservation next = Reservation.Create(Guid.NewGuid(), bookId, Members.AniSahakyan, now.AddDays(-9), queuePosition: 1);
+
+        await WithDbAsync(async db =>
+        {
+            (await db.BookCopies.SingleAsync(c => c.Id == copyId)).ChangeStatus(BookCopyStatus.Reserved);
+            db.Reservations.AddRange(held, next);
+            await db.SaveChangesAsync();
+        });
+
+        int readyEventsBefore = await ReadyEventsAsync();
+
+        // The member collects the held copy at the desk while the job expires the same reservation.
+        Task<bool> expiry = Task.Run(async () =>
+        {
+            using var scope = factory.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<IBorrowingDailyJobService>().ExpirePickupAsync(held.Id);
+        });
+        Task<DomainException?> issue = Task.Run(async () =>
+        {
+            using var scope = factory.Services.CreateScope();
+            try
+            {
+                await scope.ServiceProvider.GetRequiredService<ILoanService>()
+                    .IssueAsync(new IssueLoanRequest(Members.NarekSimonyan, CatalogSeedIds.CopyBarcode(4, 1)));
+                return null;
+            }
+            catch (DomainException exception)
+            {
+                return exception;
+            }
+        });
+
+        bool expired = await expiry;
+        DomainException? issueError = await issue;
+
+        await WithDbAsync(async db =>
+        {
+            var savedHeld = await db.Reservations.AsNoTracking().SingleAsync(r => r.Id == held.Id);
+            var savedNext = await db.Reservations.AsNoTracking().SingleAsync(r => r.Id == next.Id);
+            var copy = await db.BookCopies.AsNoTracking().SingleAsync(c => c.Id == copyId);
+            int loans = await db.Loans.AsNoTracking().CountAsync(l => l.BookCopyId == copyId);
+
+            if (expired)
+            {
+                // The job won the book lock: the copy is held for the next member, the late collection is refused.
+                Assert.Equal(BorrowingErrors.CopyNotAvailable.Code, issueError?.Error.Code);
+                Assert.Equal(ReservationStatus.Expired, savedHeld.Status);
+                Assert.Equal((ReservationStatus.ReadyForPickup, (Guid?)copyId), (savedNext.Status, savedNext.CopyId));
+                Assert.Equal(BookCopyStatus.Reserved, copy.Status);
+                Assert.Equal(0, loans);
+            }
+            else
+            {
+                // The desk won: the loan is issued and the job leaves the fulfilled reservation alone.
+                Assert.Null(issueError);
+                Assert.Equal(ReservationStatus.Fulfilled, savedHeld.Status);
+                Assert.Equal(ReservationStatus.Waiting, savedNext.Status);
+                Assert.Equal(BookCopyStatus.OnLoan, copy.Status);
+                Assert.Equal(1, loans);
+            }
+        });
+
+        Assert.Equal(readyEventsBefore + (expired ? 1 : 0), await ReadyEventsAsync());
+    }
+
+    private async Task WithDbAsync(Func<LibraryDbContext, Task> action)
+    {
+        using var scope = factory.Services.CreateScope();
+        await action(scope.ServiceProvider.GetRequiredService<LibraryDbContext>());
+    }
+
+    // The dispatcher is off in the test host: every published event stays in the outbox.
+    private async Task<int> ReadyEventsAsync()
+    {
+        using var scope = factory.Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().OutboxMessages
+            .AsNoTracking()
+            .CountAsync(message => message.Type.EndsWith("ReservationReady"));
     }
 
     [Fact]
