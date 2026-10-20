@@ -1,4 +1,5 @@
-
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
@@ -26,13 +27,14 @@ public sealed class TopBooksAndCategoriesReportTests
             new UnusedCalendar(),
             new MemoryCache(new MemoryCacheOptions()),
             new PenaltyPolicy(new PenaltyRules(
-    		PointsPerLateWorkingDay: 1,
-    		MaxLatePoints: 10,
-    		DamagedPoints: 5,
-    		LostPoints: 10,
-    		LifetimeDays: 90,
-    		RestrictedFromPoints: 5,
-    		SuspendedFromPoints: 10)));
+            PointsPerLateWorkingDay: 1,
+            MaxLatePoints: 10,
+            DamagedPoints: 5,
+            LostPoints: 10,
+            LifetimeDays: 90,
+            RestrictedFromPoints: 5,
+            SuspendedFromPoints: 10)),
+        Options.Create(new ReportingOptions()));
 
     [Fact]
     public async Task Returns_books_and_categories_from_repository()

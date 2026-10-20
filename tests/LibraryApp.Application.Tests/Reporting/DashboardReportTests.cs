@@ -1,4 +1,5 @@
-
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
@@ -25,13 +26,81 @@ public sealed class DashboardReportTests
             new UnusedCalendar(),
             _cache,
             new PenaltyPolicy(new PenaltyRules(
-    		PointsPerLateWorkingDay: 1,
-    		MaxLatePoints: 10,
-    		DamagedPoints: 5,
-    		LostPoints: 10,
-    		LifetimeDays: 90,
-    		RestrictedFromPoints: 5,
-    		SuspendedFromPoints: 10)));
+            PointsPerLateWorkingDay: 1,
+            MaxLatePoints: 10,
+            DamagedPoints: 5,
+            LostPoints: 10,
+            LifetimeDays: 90,
+            RestrictedFromPoints: 5,
+            SuspendedFromPoints: 10)),
+        Options.Create(new ReportingOptions()));
+
+    [Fact]
+    public async Task Uses_configured_dashboard_cache_expiration()
+    {
+        var timeProvider = new AdjustableTimeProvider();
+
+        using var cache = new MemoryCache(new MemoryCacheOptions
+        {
+            Clock = new TimeProviderClock(timeProvider),
+            ExpirationScanFrequency = TimeSpan.Zero
+        });
+
+        var options = Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 2
+        });
+
+        var service = new ReportingService(
+            _repository,
+            _clock,
+            new UnusedCalendar(),
+            cache,
+            new PenaltyPolicy(new PenaltyRules(
+                PointsPerLateWorkingDay: 1,
+                MaxLatePoints: 10,
+                DamagedPoints: 5,
+                LostPoints: 10,
+                LifetimeDays: 90,
+                RestrictedFromPoints: 5,
+                SuspendedFromPoints: 10)),
+            options);
+
+        DashboardReportDto first = await service.GetDashboardAsync();
+
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        DashboardReportDto beforeExpiration = await service.GetDashboardAsync();
+
+        Assert.Same(first, beforeExpiration);
+
+        timeProvider.Advance(TimeSpan.FromMinutes(2));
+        DashboardReportDto afterExpiration = await service.GetDashboardAsync();
+
+        Assert.NotSame(first, afterExpiration);
+    }
+
+    private sealed class TimeProviderClock : Microsoft.Extensions.Internal.ISystemClock
+    {
+        private readonly TimeProvider _timeProvider;
+
+        public TimeProviderClock(TimeProvider timeProvider)
+        {
+            _timeProvider = timeProvider;
+        }
+
+        public DateTimeOffset UtcNow => _timeProvider.GetUtcNow();
+    }
+
+    private sealed class AdjustableTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 10, 16, 12, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public override long GetTimestamp() => _now.UtcTicks;
+
+        public void Advance(TimeSpan duration) => _now += duration;
+    }
 
     [Fact]
     public async Task Returns_dashboard_counts()

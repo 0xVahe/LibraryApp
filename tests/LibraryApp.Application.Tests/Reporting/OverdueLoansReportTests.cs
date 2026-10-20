@@ -1,3 +1,5 @@
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
@@ -27,13 +29,14 @@ public sealed class OverdueLoansReportTests
             _calendar,
             new MemoryCache(new MemoryCacheOptions()),
             new PenaltyPolicy(new PenaltyRules(
-    		PointsPerLateWorkingDay: 1,
-    		MaxLatePoints: 10,
-    		DamagedPoints: 5,
-    		LostPoints: 10,
-    		LifetimeDays: 90,
-    		RestrictedFromPoints: 5,
-    		SuspendedFromPoints: 10)));
+            PointsPerLateWorkingDay: 1,
+            MaxLatePoints: 10,
+            DamagedPoints: 5,
+            LostPoints: 10,
+            LifetimeDays: 90,
+            RestrictedFromPoints: 5,
+            SuspendedFromPoints: 10)),
+        Options.Create(new ReportingOptions()));
 
     [Fact]
     public async Task Empty_report_returns_no_items()
@@ -266,9 +269,9 @@ public sealed class OverdueLoansReportTests
             LastOverdueCutoffUtc = nowUtc;
             return Task.FromResult<IReadOnlyList<OverdueLoanData>>(
 
-		Loans
-		    .Where(loan => !departmentId.HasValue || loan.DepartmentId == departmentId.Value)
-		    .ToList());
+        Loans
+            .Where(loan => !departmentId.HasValue || loan.DepartmentId == departmentId.Value)
+            .ToList());
         }
 
         public Task<DashboardCountsData> GetDashboardCountsAsync(
