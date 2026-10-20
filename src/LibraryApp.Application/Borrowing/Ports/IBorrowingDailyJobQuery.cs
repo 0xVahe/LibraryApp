@@ -25,4 +25,17 @@ public interface IBorrowingDailyJobQuery
     /// </summary>
     Task<IReadOnlyList<Guid>> GetStaffIdsWithActivePenaltiesAsync(
         CancellationToken ct = default);
+
+    /// <summary>
+    /// G3-26: the books that have Waiting reservations; the job asks Catalog whether each one was deleted.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetBookIdsWithWaitingReservationsAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// G3-26: the staff members with Waiting or ReadyForPickup reservations; the job asks Staff whether each one was
+    /// deactivated.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetStaffIdsWithActiveReservationsAsync(
+        CancellationToken ct = default);
 }

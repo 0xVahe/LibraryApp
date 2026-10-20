@@ -67,13 +67,16 @@
         </nav>
         @if (Model.SelectedTopLevel is { } topLevel && Model.Subcategories.Count > 0)
         {
-            <nav class="chips" aria-label="Subcategories of @topLevel.Name">
-                <a class="chip" href="@Model.CategoryHref(topLevel.Id)" aria-current="@(Model.CategoryId == topLevel.Id ? "true" : null)">All in @topLevel.Name</a>
-                @foreach (var subcategory in Model.Subcategories)
-                {
-                    <a class="chip" href="@Model.CategoryHref(subcategory.Id)" aria-current="@(Model.CategoryId == subcategory.Id ? "true" : null)">@subcategory.Name</a>
-                }
-            </nav>
+            <div class="catalog-subcategory-group">
+                <p class="catalog-subcategory-label">Subcategories</p>
+                <nav class="chips chips-subcategories" aria-label="Subcategories of @topLevel.Name">
+                    <a class="chip chip-subcategory" href="@Model.CategoryHref(topLevel.Id)" aria-current="@(Model.CategoryId == topLevel.Id ? "true" : null)">All in @topLevel.Name</a>
+                    @foreach (var subcategory in Model.Subcategories)
+                    {
+                        <a class="chip chip-subcategory" href="@Model.CategoryHref(subcategory.Id)" aria-current="@(Model.CategoryId == subcategory.Id ? "true" : null)">@subcategory.Name</a>
+                    }
+                </nav>
+            </div>
         }
     </div>
     <p class="catalog-count">@(Model.Result.Items.Count > 0

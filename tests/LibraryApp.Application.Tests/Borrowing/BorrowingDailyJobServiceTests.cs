@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Borrowing.Options;
 using LibraryApp.Application.Borrowing.Ports;
 using LibraryApp.Application.Borrowing.Services;
@@ -9,6 +10,7 @@ using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
+using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
@@ -28,6 +30,7 @@ public sealed class BorrowingDailyJobServiceTests
     private readonly FakeApplicationLock _locks = new();
     private readonly ReservationRepositoryFake _reservations = new();
     private readonly FixedYerevanClock _clock = new(DueUtc);
+    private readonly StaffStatusesFake _staff = new();
 
     private readonly FakeUnitOfWork _unitOfWork;
 
@@ -64,7 +67,143 @@ public sealed class BorrowingDailyJobServiceTests
                 new WeekdayCalendar(),
                 _clock,
                 new FakeIdGenerator(),
-                options));
+                options),
+            _staff);
+    }
+
+    [Fact]
+    public async Task A_deleted_book_cancels_every_waiting_reservation_of_its_queue()
+    {
+        Reservation first = SeedWaitingReservation(1);
+        Reservation second = SeedWaitingReservation(2);
+        Guid otherBook = Guid.NewGuid();
+        Reservation otherQueue = SeedWaitingReservation(1, otherBook);
+        _catalog.SeedBook(_bookId, isDeleted: true);
+
+        int cancelled = await Service().CancelWaitingReservationsOfDeletedBookAsync(_bookId);
+
+        Assert.Equal(2, cancelled);
+        Assert.All(new[] { first, second }, reservation =>
+        {
+            Assert.Equal(ReservationStatus.Cancelled, reservation.Status);
+            Assert.Equal(0, reservation.QueuePosition);
+        });
+        Assert.Equal((ReservationStatus.Waiting, 1), (otherQueue.Status, otherQueue.QueuePosition));
+        Assert.Equal(new[] { $"lock:{BorrowingLocks.Book(_bookId)}" }, _locks.Log);
+        Assert.Empty(_events.Published);
+        Assert.Equal(1, _unitOfWork.CommittedCount);
+    }
+
+    [Fact]
+    public async Task A_book_that_is_not_deleted_keeps_its_queue_and_takes_no_lock()
+    {
+        Reservation waiting = SeedWaitingReservation(1);
+        _catalog.SeedBook(_bookId, isDeleted: false);
+
+        Assert.Equal(0, await Service().CancelWaitingReservationsOfDeletedBookAsync(_bookId));
+
+        Assert.Equal((ReservationStatus.Waiting, 1), (waiting.Status, waiting.QueuePosition));
+        Assert.Empty(_locks.Log);
+    }
+
+    [Fact]
+    public async Task A_book_unknown_to_catalog_is_treated_as_deleted_and_a_second_run_changes_nothing()
+    {
+        Reservation waiting = SeedWaitingReservation(1);
+        _catalog.SeedBook(Guid.NewGuid(), isDeleted: false);   // the catalog knows other books, not this one
+
+        BorrowingDailyJobService service = Service();
+
+        Assert.Equal(1, await service.CancelWaitingReservationsOfDeletedBookAsync(_bookId));
+        Assert.Equal(0, await service.CancelWaitingReservationsOfDeletedBookAsync(_bookId));
+        Assert.Equal(ReservationStatus.Cancelled, waiting.Status);
+    }
+
+    [Fact]
+    public async Task A_deactivated_member_leaves_every_queue_and_their_held_copy_goes_to_the_next_member()
+    {
+        Guid member = Guid.NewGuid();
+        Guid secondBook = Guid.NewGuid();
+
+        // Book A: the member waits first, someone waits behind them.
+        Reservation waiting = SeedWaitingReservation(1, _bookId, member);
+        Reservation behind = SeedWaitingReservation(2, _bookId);
+
+        // Book B: a copy is held for the member, someone waits for it.
+        Guid heldCopy = Guid.NewGuid();
+        Reservation held = SeedReadyReservation(DueUtc.AddDays(2), secondBook, heldCopy, member);
+        Reservation next = SeedWaitingReservation(1, secondBook);
+
+        _staff.Statuses[member] = StaffMemberStatus.Deactivated;
+
+        int cancelled = await Service().CancelReservationsOfDeactivatedMemberAsync(member);
+
+        Assert.Equal(2, cancelled);
+        Assert.Equal(ReservationStatus.Cancelled, waiting.Status);
+        Assert.Equal((ReservationStatus.Waiting, 1), (behind.Status, behind.QueuePosition));
+        Assert.Equal(ReservationStatus.Cancelled, held.Status);
+        Assert.Equal((ReservationStatus.ReadyForPickup, (Guid?)heldCopy), (next.Status, next.CopyId));
+        Assert.Equal(BookCopyStatus.Reserved, _catalog.Snapshot()[heldCopy].Status);
+
+        ReservationReady ready = Assert.Single(_events.Published.OfType<ReservationReady>());
+        Assert.Equal((next.Id, secondBook, next.StaffMemberId), (ready.ReservationId, ready.BookId, ready.StaffMemberId));
+
+        // Staff first, then the books in book-id order (the order the repository returns them in).
+        IEnumerable<string> bookLocks = new[] { _bookId, secondBook }
+            .OrderBy(id => id)
+            .Select(book => $"lock:{BorrowingLocks.Book(book)}");
+        Assert.Equal(new[] { $"lock:{BorrowingLocks.Staff(member)}" }.Concat(bookLocks), _locks.Log);
+    }
+
+    [Fact]
+    public async Task A_copy_held_for_a_deactivated_member_becomes_available_when_nobody_waits()
+    {
+        Guid member = Guid.NewGuid();
+        Reservation held = SeedReadyReservation(DueUtc.AddDays(2), staffMemberId: member);
+        _staff.Statuses[member] = StaffMemberStatus.Deactivated;
+
+        BorrowingDailyJobService service = Service();
+
+        Assert.Equal(1, await service.CancelReservationsOfDeactivatedMemberAsync(member));
+        Assert.Equal(0, await service.CancelReservationsOfDeactivatedMemberAsync(member));
+
+        Assert.Equal(ReservationStatus.Cancelled, held.Status);
+        Assert.Equal(BookCopyStatus.Available, _catalog.Snapshot()[_copyId].Status);
+        Assert.Empty(_events.Published.OfType<ReservationReady>());
+    }
+
+    [Theory]
+    [InlineData(StaffMemberStatus.Active)]
+    [InlineData(StaffMemberStatus.Restricted)]
+    [InlineData(StaffMemberStatus.Suspended)]
+    public async Task A_member_who_is_not_deactivated_keeps_their_reservations(StaffMemberStatus status)
+    {
+        Guid member = Guid.NewGuid();
+        Reservation waiting = SeedWaitingReservation(1, _bookId, member);
+        Reservation held = SeedReadyReservation(DueUtc.AddDays(2), Guid.NewGuid(), Guid.NewGuid(), member);
+        _staff.Statuses[member] = status;
+
+        Assert.Equal(0, await Service().CancelReservationsOfDeactivatedMemberAsync(member));
+
+        Assert.Equal(ReservationStatus.Waiting, waiting.Status);
+        Assert.Equal(ReservationStatus.ReadyForPickup, held.Status);
+        Assert.Empty(_locks.Log);
+        Assert.Empty(_events.Published);
+    }
+
+    [Fact]
+    public async Task A_reservation_closed_after_the_member_was_read_is_skipped_under_its_book_lock()
+    {
+        Guid member = Guid.NewGuid();
+        Reservation waiting = SeedWaitingReservation(1, _bookId, member);
+        _staff.Statuses[member] = StaffMemberStatus.Deactivated;
+
+        // The member's list is read before the book lock; a parallel operation closes the reservation meanwhile.
+        _reservations.BeforeGetForUpdate = reservation => reservation.Cancel();
+
+        Assert.Equal(0, await Service().CancelReservationsOfDeactivatedMemberAsync(member));
+        Assert.Equal(ReservationStatus.Cancelled, waiting.Status);
+        Assert.Equal(0, _reservations.FlushCount);
     }
 
     [Fact]
@@ -204,27 +343,37 @@ public sealed class BorrowingDailyJobServiceTests
         Assert.Equal(0, _reservations.FlushCount);
     }
 
-    private Reservation SeedReadyReservation(DateTime readyUntilUtc)
+    private Reservation SeedReadyReservation(
+        DateTime readyUntilUtc,
+        Guid? bookId = null,
+        Guid? copyId = null,
+        Guid? staffMemberId = null)
     {
+        Guid book = bookId ?? _bookId;
+        Guid copy = copyId ?? _copyId;
+
         _catalog.Seed(new BookCopyDto(
-            _copyId,
-            _bookId,
-            "DAILY-001",
+            copy,
+            book,
+            copy == _copyId ? "DAILY-001" : $"DAILY-{copy:N}",
             BookCopyStatus.Reserved,
             BookCopyCondition.Good,
             "A-1"));
 
         Reservation reservation = Reservation.Create(
-            Guid.NewGuid(), _bookId, Guid.NewGuid(), DueUtc.AddDays(-10), 1);
-        reservation.MarkReady(_copyId, readyUntilUtc);
+            Guid.NewGuid(), book, staffMemberId ?? Guid.NewGuid(), DueUtc.AddDays(-10), 1);
+        reservation.MarkReady(copy, readyUntilUtc);
         _reservations.All.Add(reservation);
         return reservation;
     }
 
-    private Reservation SeedWaitingReservation(int position)
+    private Reservation SeedWaitingReservation(
+        int position,
+        Guid? bookId = null,
+        Guid? staffMemberId = null)
     {
         Reservation reservation = Reservation.Create(
-            Guid.NewGuid(), _bookId, Guid.NewGuid(), DueUtc.AddDays(-5), position);
+            Guid.NewGuid(), bookId ?? _bookId, staffMemberId ?? Guid.NewGuid(), DueUtc.AddDays(-5).AddMinutes(position), position);
         _reservations.All.Add(reservation);
         return reservation;
     }
@@ -497,8 +646,23 @@ public sealed class BorrowingDailyJobServiceTests
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) =>
             Task.FromResult(All.SingleOrDefault(r => r.Id == reservationId));
 
-        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) =>
-            Task.FromResult(All.SingleOrDefault(r => r.Id == reservationId));
+        /// <summary>Runs before a reservation is loaded for update: simulates a change made by a parallel operation.</summary>
+        public Action<Reservation>? BeforeGetForUpdate { get; set; }
+
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default)
+        {
+            Reservation? reservation = All.SingleOrDefault(r => r.Id == reservationId);
+            if (reservation is not null)
+                BeforeGetForUpdate?.Invoke(reservation);
+            return Task.FromResult(reservation);
+        }
+
+        public Task<IReadOnlyList<Reservation>> FindActiveForStaffAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<Reservation>>(
+                All.Where(r => r.StaffMemberId == staffMemberId
+                               && r.Status is ReservationStatus.Waiting or ReservationStatus.ReadyForPickup)
+                    .OrderBy(r => r.BookId)
+                    .ToArray());
 
         public Task FlushAsync(CancellationToken ct = default)
         {
@@ -512,6 +676,21 @@ public sealed class BorrowingDailyJobServiceTests
         public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    /// <summary>Staff statuses for the deactivated-member step; a member not listed is Active.</summary>
+    private sealed class StaffStatusesFake : IStaffMemberService
+    {
+        public Dictionary<Guid, StaffMemberStatus> Statuses { get; } = new();
+
+        public Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            Task.FromResult(Statuses.GetValueOrDefault(staffMemberId, StaffMemberStatus.Active));
+
+        public Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<LendingRules> GetLendingRulesAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task SetStatusAsync(Guid staffMemberId, StaffMemberStatus status, string reason, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class WeekdayCalendar : IWorkingDayCalendar
