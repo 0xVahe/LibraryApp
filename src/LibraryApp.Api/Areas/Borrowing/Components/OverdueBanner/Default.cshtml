@@ -1,0 +1,14 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* Overdue banner (Group 3) on My library; nothing when no loan is overdue. Points follow the policy per working day (BOR-05). *@
+@{
+    var overdue = Model.OverdueLoans;
+}
+@if (overdue.Count > 0)
+{
+    <div class="alert alert-red" role="alert">
+        <strong>@(overdue.Count == 1 ? "1 book is overdue" : $"{overdue.Count} books are overdue")</strong>
+        @(overdue.Count == 1 ? $"Return {Texts.Quoted(overdue[0].Book.Title)} to the library desk." : "Return them to the library desk.")
+        Every overdue working day adds penalty points.
+    </div>
+}

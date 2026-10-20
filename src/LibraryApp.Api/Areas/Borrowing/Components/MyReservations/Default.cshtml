@@ -1,0 +1,38 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* "Reservations" (Group 3) on My library; Cancel posts to /reservations/cancel and comes back here (BOR-12). *@
+@{
+    var back = Context.Request.Path + Context.Request.QueryString;
+}
+<section class="card" aria-labelledby="my-reservations-title">
+    <div class="card-head">
+        <div><h2 id="my-reservations-title">Reservations</h2><p class="small muted">We email you when a copy is waiting for you.</p></div>
+    </div>
+    @if (Model.Reservations.Count == 0)
+    {
+        <p class="muted">No reservations.</p>
+    }
+    else
+    {
+        <ul class="list">
+            @foreach (var reservation in Model.Reservations)
+            {
+                <li>
+                    <partial name="/Areas/Catalog/Pages/_BookCover.cshtml" model="reservation.Book.Cover" />
+                    <div class="grow">
+                        <partial name="/Areas/Borrowing/Components/_BookTitle.cshtml" model="reservation.Book" />
+                        <p class="small">@reservation.Text(toMember: true)</p>
+                    </div>
+                    <div class="row">
+                        <partial name="/Pages/Shared/_StatusBadge.cshtml" model="reservation.Status" />
+                        <form method="post" asp-area="Borrowing" asp-page="/CancelReservation">
+                            <input type="hidden" name="ReservationId" value="@reservation.ReservationId" />
+                            <input type="hidden" name="ReturnUrl" value="@back" />
+                            <button class="btn btn-secondary btn-sm" type="submit" aria-label="Cancel the reservation of @reservation.Book.Title">Cancel</button>
+                        </form>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>

@@ -1,0 +1,30 @@
+@model DeskModel
+@* IssueLoanForm (Group 3): the member by employee ID or corporate email (Q-G3-06), the copy by barcode (BOR-01). *@
+<section class="card" aria-labelledby="issue-title">
+    <div class="card-head"><h2 id="issue-title">Issue a book</h2></div>
+    @foreach (var error in Model.ErrorsOf(DeskModel.IssueForm))
+    {
+        <div class="alert alert-red mb-16" role="alert"><strong>The book was not issued.</strong>@error</div>
+    }
+    <form class="form" method="post" asp-page-handler="Issue">
+        <div class="field">
+            <label for="issue-member">Staff member</label>
+            <input id="issue-member" name="Member" value="@Model.Member" placeholder="Employee ID or corporate email" autocomplete="off" aria-invalid="@Model.InvalidOf(nameof(Model.Member))">
+            @foreach (var error in Model.ErrorsOf(nameof(Model.Member)))
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <div class="field">
+            <label for="issue-barcode">Copy barcode</label>
+            <input id="issue-barcode" name="Barcode" value="@Model.Barcode" placeholder="BK-0001-01" autocomplete="off" aria-invalid="@Model.InvalidOf(nameof(Model.Barcode))">
+            @foreach (var error in Model.ErrorsOf(nameof(Model.Barcode)))
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Issue</button>
+        </div>
+    </form>
+</section>
