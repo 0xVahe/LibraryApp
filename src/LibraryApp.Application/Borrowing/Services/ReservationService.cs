@@ -129,35 +129,8 @@ public sealed class ReservationService(
             Reservation reservation = await reservations.GetForUpdateAsync(reservationId, token)
                 ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
 
-            Guid? heldCopyId = reservation.Status == ReservationStatus.ReadyForPickup
-                ? reservation.CopyId ?? throw new InvalidOperationException("A ready reservation must have a held copy.")
-                : null;
-
-            reservation.Cancel();
-
-            // Written now, inside the transaction: the queue query below reads only persisted Waiting rows, and the copy
-            // may be held for the next member only after this reservation has left ReadyForPickup
-            // (UX_Reservations_ReadyForPickup_CopyId; see IReservationRepository.FlushAsync).
-            await reservations.FlushAsync(token);
-
-            if (heldCopyId is { } copyId)
-            {
-                bool offered = await reservationQueue.TryOfferCopyUnderBookLockAsync(
-                    copyId, reservation.BookId, BookCopyStatus.Reserved, token);
-
-                if (!offered)
-                    await catalog.SetCopyStatusAsync(copyId, BookCopyStatus.Available, token);
-            }
-            else
-            {
-                // The members behind the cancelled one move up: positions 1..n without gaps, in queue order.
-                IReadOnlyList<Reservation> waiting = await reservations.GetWaitingForBookAsync(reservation.BookId, token);
-                for (int index = 0; index < waiting.Count; index++)
-                {
-                    if (waiting[index].QueuePosition != index + 1)
-                        waiting[index].SetQueuePosition(index + 1);
-                }
-            }
+            // The same cancellation as the daily job's for reservations that can never be served (G3-26).
+            await reservationQueue.CancelUnderLocksAsync(reservation, token);
 
             return reservation;
         }, ct);

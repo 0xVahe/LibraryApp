@@ -127,7 +127,7 @@ Scheduled jobs:
 
 | Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
 |---|---|---|---|---|
-| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G2-03 |
+| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself; Waiting reservations of a book deleted in Catalog → Cancelled; Waiting and ReadyForPickup reservations of a Deactivated staff member → Cancelled, a held copy goes to the next Waiting reservation or becomes Available | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G1-09, BQ-G2-03, BR-MEM-4 |
 
 ## Tests
 

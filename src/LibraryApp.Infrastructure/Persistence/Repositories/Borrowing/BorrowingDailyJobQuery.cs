@@ -45,6 +45,32 @@ public sealed class BorrowingDailyJobQuery(LibraryDbContext db)
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetBookIdsWithWaitingReservationsAsync(
+        CancellationToken ct = default)
+    {
+        return await db.Reservations
+            .AsNoTracking()
+            .Where(reservation => reservation.Status == ReservationStatus.Waiting)
+            .Select(reservation => reservation.BookId)
+            .Distinct()
+            .OrderBy(bookId => bookId)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetStaffIdsWithActiveReservationsAsync(
+        CancellationToken ct = default)
+    {
+        return await db.Reservations
+            .AsNoTracking()
+            .Where(reservation =>
+                reservation.Status == ReservationStatus.Waiting
+                || reservation.Status == ReservationStatus.ReadyForPickup)
+            .Select(reservation => reservation.StaffMemberId)
+            .Distinct()
+            .OrderBy(staffMemberId => staffMemberId)
+            .ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
         DateTime nowUtc,
         CancellationToken ct = default)

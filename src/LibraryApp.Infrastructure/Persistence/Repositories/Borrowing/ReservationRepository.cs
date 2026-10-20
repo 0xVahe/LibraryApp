@@ -50,6 +50,15 @@ public sealed class ReservationRepository(LibraryDbContext db) : IReservationRep
                                || reservation.Status == ReservationStatus.ReadyForPickup),
             ct);
 
+    public async Task<IReadOnlyList<Reservation>> FindActiveForStaffAsync(Guid staffMemberId, CancellationToken ct = default) =>
+        await db.Reservations
+            .AsNoTracking()
+            .Where(reservation => reservation.StaffMemberId == staffMemberId
+                                  && (reservation.Status == ReservationStatus.Waiting
+                                      || reservation.Status == ReservationStatus.ReadyForPickup))
+            .OrderBy(reservation => reservation.BookId)
+            .ToListAsync(ct);
+
     public Task FlushAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 
     public async Task AddAsync(Reservation reservation, CancellationToken ct = default)
