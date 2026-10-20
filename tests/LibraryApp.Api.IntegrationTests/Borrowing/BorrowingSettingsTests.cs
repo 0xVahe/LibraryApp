@@ -23,5 +23,6 @@ public class BorrowingSettingsTests(ApiHostFactory factory) : IClassFixture<ApiH
         Assert.False(options.Reservations.SuspendedMayReserve);
         Assert.True(options.Reservations.AnyCopyFulfils);
         Assert.True(options.Loans.AllowLostBeforeDue);
+        Assert.False(options.Loans.SuspendedMayRenew);
     }
 }

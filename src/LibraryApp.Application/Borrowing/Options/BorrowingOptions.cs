@@ -103,5 +103,11 @@ public sealed class LoanOptions
     /// </summary>
     public bool AllowLostBeforeDue { get; set; } = true;
 
+    /// <summary>
+    /// Whether a Suspended employee may renew a loan (BR-BOR-1, BQ-BA-11). False by the team decision of 15 Oct; a
+    /// Restricted employee never may (BR-MEM-3), a Deactivated one holds no loans (BR-MEM-4).
+    /// </summary>
+    public bool SuspendedMayRenew { get; set; }
+
     public OverdueFromMode OverdueFrom { get; set; }
 }

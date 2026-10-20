@@ -210,4 +210,35 @@ public static class BorrowingErrors
     public static readonly Error PenaltyNotDueToExpire = Error.BusinessRule(
         "borrowing.penalty_not_due_to_expire",
         "The penalty has not reached its expiry timestamp.");
+
+    /// <summary>No penalty record has this id (BOR-08).</summary>
+    public static readonly Error PenaltyNotFound =
+        Error.NotFound("borrowing.penalty_not_found", "The penalty record does not exist.");
+
+    // Renewal errors (BOR-04, BR-BOR-1), in the order the checks run
+
+    /// <summary>BR-BOR-1: an Overdue loan, or one past the overdue rule before the daily job marked it, is not renewed.</summary>
+    public static readonly Error LoanOverdueCannotBeRenewed = Error.BusinessRule(
+        "borrowing.loan_overdue_cannot_be_renewed",
+        "An overdue loan cannot be renewed.");
+
+    /// <summary>BR-BOR-1, BR-MEM-3: a Restricted employee cannot renew.</summary>
+    public static readonly Error RestrictedRenewalForbidden = Error.BusinessRule(
+        "borrowing.restricted_renewal_forbidden",
+        "A Restricted employee cannot renew a loan.");
+
+    /// <summary>BQ-BA-11: a Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
+    public static readonly Error SuspendedRenewalForbidden = Error.BusinessRule(
+        "borrowing.suspended_renewal_forbidden",
+        "A Suspended employee cannot renew a loan.");
+
+    /// <summary>BR-BOR-1: <c>RenewalCount</c> reached the category's <c>MaxRenewals</c> (text from the acceptance criteria).</summary>
+    public static readonly Error MaxRenewalsReached = Error.BusinessRule(
+        "borrowing.max_renewals_reached",
+        "Maximum renewals reached");
+
+    /// <summary>BR-BOR-1: another employee has a Waiting reservation for the book.</summary>
+    public static readonly Error RenewalBlockedByReservation = Error.BusinessRule(
+        "borrowing.renewal_blocked_by_reservation",
+        "Another employee is waiting for this book, so the loan cannot be renewed.");
 }
