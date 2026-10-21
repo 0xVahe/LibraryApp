@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Borrowing;
 
-/// <summary>AddBorrowingModule binds the "Borrowing" section, checks it and builds the penalty policy from it (SD-21).</summary>
+/// <summary>AddBorrowingModule binds the "Borrowing" section, checks it and builds the penalty policy from it.</summary>
 public class BorrowingRegistrationTests
 {
     private static readonly Dictionary<string, string?> Valid = new()
@@ -26,6 +26,7 @@ public class BorrowingRegistrationTests
         ["Borrowing:Reservations:MaxActive"] = "2",
         ["Borrowing:Reservations:PickupWorkingDays"] = "5",
         ["Borrowing:Reservations:PickupCountsReleaseDay"] = "true",
+        ["Borrowing:Reservations:AnyCopyFulfils"] = "false",
     };
 
     private static ServiceProvider Services(Dictionary<string, string?> settings)
@@ -47,6 +48,7 @@ public class BorrowingRegistrationTests
         Assert.Equal(2, options.Reservations.MaxActive);
         Assert.Equal(5, options.Reservations.PickupWorkingDays);
         Assert.True(options.Reservations.PickupCountsReleaseDay);
+        Assert.False(options.Reservations.AnyCopyFulfils);
         Assert.False(options.Reservations.RestrictedMayReserve);
         Assert.Equal(21, options.Penalties.SuspensionDays);
         Assert.Equal(LateAndDamagedMode.Highest, options.Penalties.LateAndDamaged);
@@ -85,5 +87,29 @@ public class BorrowingRegistrationTests
         using var services = Services(new(Valid) { [key] = value });
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<BorrowingOptions>>().Value);
+    }
+    
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    public void Early_loss_defaults_to_allowed_and_can_be_disabled(
+        string? value,
+        bool expected)
+    {
+        var settings = new Dictionary<string, string?>(Valid);
+
+        if (value is not null)
+        {
+            settings["Borrowing:Loans:AllowLostBeforeDue"] = value;
+        }
+
+        using var services = Services(settings);
+
+        var options = services
+            .GetRequiredService<IOptions<BorrowingOptions>>()
+            .Value;
+
+        Assert.Equal(expected, options.Loans.AllowLostBeforeDue);
     }
 }

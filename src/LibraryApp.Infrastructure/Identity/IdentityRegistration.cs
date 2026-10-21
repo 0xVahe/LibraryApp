@@ -1,6 +1,7 @@
 using LibraryApp.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LibraryApp.Infrastructure.Identity;
 
@@ -24,6 +25,8 @@ public static class IdentityRegistration
             .AddRoles<IdentityRole<Guid>>()
             .AddEntityFrameworkStores<LibraryDbContext>()
             .AddPasswordValidator<LetterPasswordValidator>();
+
+        services.Replace(ServiceDescriptor.Scoped<IUserStore<AppUser>, StaffUserStore>());
 
         return services;
     }

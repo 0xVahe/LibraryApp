@@ -13,7 +13,7 @@ using LibraryApp.Domain.Events;
 namespace LibraryApp.Application.Tests.Borrowing;
 
 /// <summary>
-/// The reservation queue when a copy becomes free outside a loan (BOR-07, BQ-G1-10). The service runs inside the
+/// The reservation queue when a copy becomes free outside a loan (BOR-07). The service runs inside the
 /// caller's unit of work, so the fakes record what it changed instead of committing.
 /// </summary>
 public sealed class ReservationQueueServiceTests
@@ -147,6 +147,7 @@ public sealed class ReservationQueueServiceTests
 
     private sealed class WaitingQueueFake(List<string> log) : IReservationRepository
     {
+        public Task FlushAsync(CancellationToken ct = default) => Task.CompletedTask;
         public List<Reservation> Waiting { get; } = new();
 
         public Task<IReadOnlyList<Reservation>> GetWaitingForBookAsync(Guid bookId, CancellationToken ct = default)
@@ -155,11 +156,16 @@ public sealed class ReservationQueueServiceTests
             return Task.FromResult<IReadOnlyList<Reservation>>(Waiting.Where(r => r.BookId == bookId).ToList());
         }
 
+        public Task<Reservation?> FindReadyForCopyAsync(Guid copyId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> FindActiveForStaffAndBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<int> CountActiveAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Reservation>> FindActiveForStaffAsync(Guid staffMemberId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> HasActiveForBookAsync(Guid staffMemberId, Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CountWaitingForBookAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task AddAsync(Reservation reservation, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Reservation?> FindAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Reservation?> GetForUpdateAsync(Guid reservationId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class CatalogFake : ICatalogService

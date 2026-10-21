@@ -19,9 +19,24 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
 
     private async Task SeedReferenceAsync(CancellationToken ct)
     {
-        var existing = await db.Categories.Select(x => x.Id).ToListAsync(ct);
-        foreach (var (id, name) in CatalogSeedData.Categories.Where(x => !existing.Contains(x.Id)))
-            db.Categories.Add(new Category(id, name));
+        // Existing categories are loaded as entities: a new subcategory may need one of them as its parent.
+        var categories = await db.Categories.ToDictionaryAsync(x => x.Id, ct);
+        foreach (var (id, name, parentId) in CatalogSeedData.Categories)
+        {
+            if (categories.ContainsKey(id))
+                continue;
+
+            var category = new Category(id, name);
+
+            // The parent is listed earlier, so it is already loaded or added. A librarian may have moved it under another
+            // category; the subcategory then stays top-level, because a third level is not allowed (CAT-03) and the seed
+            // never fails on edited data.
+            if (parentId is Guid parentKey && categories[parentKey].ParentCategoryId is null)
+                category.SetParent(categories[parentKey]);
+
+            db.Categories.Add(category);
+            categories.Add(id, category);
+        }
 
         var existingAuthors = await db.Authors.Select(x => x.Id).ToListAsync(ct);
         foreach (var (id, name) in CatalogSeedData.Authors.Where(x => !existingAuthors.Contains(x.Id)))
@@ -56,7 +71,8 @@ public sealed class CatalogSeeder(LibraryDbContext db) : IModuleSeeder
                 seedBook.Language,
                 description: null,
                 categoryId,
-                publisherId);
+                publisherId,
+                CatalogSeedIds.CoverImagePath(seedBook.Number));
 
             db.Books.Add(book);
             foreach (string author in seedBook.Authors)

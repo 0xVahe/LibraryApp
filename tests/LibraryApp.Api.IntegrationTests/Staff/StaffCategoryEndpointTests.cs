@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -24,12 +24,7 @@ public class StaffCategoryEndpointTests(ApiHostFactory factory)
         {
             var token = factory.Services
                 .GetRequiredService<IAccessTokenIssuer>()
-                .Issue(new LoginAccount(
-                    Guid.NewGuid(),
-                    "category-tests@ameriabank.am",
-                    Guid.NewGuid(),
-                    StaffMemberStatus.Active,
-                    [role]))
+                .Issue(factory.Account(role))
                 .Token;
 
             client.DefaultRequestHeaders.Authorization =

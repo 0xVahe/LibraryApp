@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.Ui;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Ui;
 
@@ -157,12 +159,35 @@ public class UiShellTests(UiHostFactory factory) : IClassFixture<UiHostFactory>
     }
 
     [Fact]
+    public async Task Pages_allow_images_from_the_configured_cover_base_url()
+    {
+        var page = await UiTestClient.Anonymous(factory).GetAsync("/notfound");
+        var baseUrl = factory.Services.GetRequiredService<IOptions<CatalogCoversOptions>>().Value.BaseUrl;
+        var csp = page.Headers.GetValues("Content-Security-Policy").Single();
+
+        Assert.Contains($"img-src 'self' data: {baseUrl};", csp, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task The_stylesheet_is_served_without_sign_in()
     {
         var response = await UiTestClient.Anonymous(factory).GetAsync("/css/site.css");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/css", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Status_pages_show_the_illustration_also_on_a_nested_path()
+    {
+        var client = UiTestClient.Anonymous(factory);
+
+        var html = await (await client.GetAsync("/staff/00000000-0000-0000-0000-000000000000/nope")).Content.ReadAsStringAsync();
+        var image = await client.GetAsync("/img/error-fallback.webp");
+
+        Assert.Contains("<img class=\"error-art\" src=\"/img/error-fallback.webp\" alt=\"\"", html);
+        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+        Assert.Equal("image/webp", image.Content.Headers.ContentType?.MediaType);
     }
 
     [Fact]

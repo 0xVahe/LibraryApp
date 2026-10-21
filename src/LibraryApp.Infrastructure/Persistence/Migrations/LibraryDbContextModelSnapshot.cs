@@ -22,6 +22,43 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LibraryApp.Domain.Auditing.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TimestampUtc")
+                        .HasDatabaseName("IX_AuditLogs_TimestampUtc");
+
+                    b.HasIndex("EntityName", "EntityId")
+                        .HasDatabaseName("IX_AuditLogs_EntityName_EntityId");
+
+                    b.ToTable("AuditLogs");
+                });
+
             modelBuilder.Entity("LibraryApp.Domain.Borrowing.Loan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -211,6 +248,10 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CoverImagePath")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("datetime2");
@@ -526,6 +567,96 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasFilter("[IsActive] = 1");
 
                     b.ToTable("NotificationTemplates");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000001"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>You are now registered as a reader of the corporate library. You can search the catalogue, borrow books and reserve titles that are currently on loan.</p>",
+                            IsActive = true,
+                            Subject = "Welcome to the Ameriabank library",
+                            Type = 1
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000002"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>You have borrowed \"{{BookTitle}}\". Please return it by {{DueDate}}.</p>",
+                            IsActive = true,
+                            Subject = "Your loan of \"{{BookTitle}}\"",
+                            Type = 2
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000003"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>\"{{BookTitle}}\" is due on {{DueDate}}. Please return or renew it in time.</p>",
+                            IsActive = true,
+                            Subject = "Reminder: \"{{BookTitle}}\" is due soon",
+                            Type = 3
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000004"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>\"{{BookTitle}}\" was due on {{DueDate}} and is now overdue. Please return it as soon as possible.</p>",
+                            IsActive = true,
+                            Subject = "Overdue: \"{{BookTitle}}\"",
+                            Type = 4
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000005"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>\"{{BookTitle}}\" is ready for pickup. Please collect it by {{ReadyUntil}}.</p>",
+                            IsActive = true,
+                            Subject = "Your reserved book \"{{BookTitle}}\" is ready",
+                            Type = 5
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000006"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>{{Points}} penalty point(s) were added to your account. Reason: {{Reason}}. Your active total is now {{TotalPoints}}.</p>",
+                            IsActive = true,
+                            Subject = "Library penalty points added",
+                            Type = 6
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000007"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>Your library access has been restricted. Reason: {{Reason}}.</p>",
+                            IsActive = true,
+                            Subject = "Your library access is restricted",
+                            Type = 7
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000008"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>Your library access has been suspended until {{EffectiveUntil}}. Reason: {{Reason}}.</p>",
+                            IsActive = true,
+                            Subject = "Your library access is suspended",
+                            Type = 8
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000009"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>Calendar reminder: return \"{{BookTitle}}\" to the library on {{DueDate}}.</p>",
+                            IsActive = true,
+                            Subject = "Return \"{{BookTitle}}\" to the library",
+                            Type = 9
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000010"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>Thank you. \"{{BookTitle}}\" was returned on {{ReturnedDate}}.</p>",
+                            IsActive = true,
+                            Subject = "Return receipt for \"{{BookTitle}}\"",
+                            Type = 10
+                        },
+                        new
+                        {
+                            Id = new Guid("40000000-0000-0000-0001-000000000011"),
+                            BodyTemplate = "<p>Dear {{EmployeeName}},</p><p>The password of your library account was changed. If you made this change, no action is needed.</p><p>If you did not change your password, contact the library administrator immediately.</p>",
+                            IsActive = true,
+                            Subject = "Your library password was changed",
+                            Type = 11
+                        });
                 });
 
             modelBuilder.Entity("LibraryApp.Domain.Staff.Department", b =>

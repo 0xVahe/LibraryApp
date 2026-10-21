@@ -10,10 +10,11 @@ using Microsoft.Extensions.Logging;
 
 namespace LibraryApp.Application.Staff.Services;
 
-/// <summary>MEM-08 "My library". Read only, no transaction.</summary>
+/// <summary>MEM-08 "My library" reads and the S2-01 self-profile update.</summary>
 public sealed class MyLibraryService(
     ICurrentUser currentUser,
     IStaffManagementRepository members,
+    IUnitOfWork unitOfWork,
     IBorrowingReadService borrowing,
     ICatalogService catalog,
     IClock clock,
@@ -49,6 +50,27 @@ public sealed class MyLibraryService(
             member.DepartmentName, member.Position, member.StaffCategoryName, member.Status);
 
         return new MyLibraryDto(profile, loans, reservations, summary.ActivePenaltyPoints, penalties);
+    }
+
+    public async Task<MyProfileDto> UpdateProfileAsync(UpdateMyProfileRequest request, CancellationToken ct = default)
+    {
+        var memberId = currentUser.StaffMemberId ?? throw new DomainException(StaffErrors.NotFound);
+
+        return await unitOfWork.ExecuteInTransactionAsync(async token =>
+        {
+            var profile = await members.GetForProfileUpdateAsync(memberId, token)
+                          ?? throw new DomainException(StaffErrors.NotFound);
+            var member = profile.Member;
+            if (member.Status == StaffMemberStatus.Deactivated)
+                throw new DomainException(StaffErrors.DeactivatedProfileLocked);
+
+            // Reuse the domain profile rule while retaining every HR-managed field as-is.
+            member.UpdateProfile(request.FirstName, request.LastName, member.CorporateEmail, member.Position,
+                member.LineManagerEmail);
+
+            return new MyProfileDto(member.Id, member.FirstName, member.LastName, member.CorporateEmail,
+                profile.DepartmentName, member.Position, profile.StaffCategoryName, member.Status.ToString());
+        }, ct);
     }
 
     /// <summary>One Catalog call per distinct book; a book Catalog cannot resolve gets a null title, not an error.</summary>

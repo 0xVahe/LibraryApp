@@ -87,6 +87,17 @@ internal sealed class FakeBooks : IBookRepository
             x.Isbn == isbn &&
             (!excludeBookId.HasValue || x.Id != excludeBookId.Value)));
 
+    public int ExistingIsbnQueries { get; private set; }
+
+    public Task<IReadOnlyCollection<string>> GetExistingIsbnsAsync(
+        IReadOnlyCollection<string> isbns,
+        CancellationToken ct)
+    {
+        ExistingIsbnQueries++;
+        return Task.FromResult<IReadOnlyCollection<string>>(
+            Books.Where(x => !x.IsDeleted && isbns.Contains(x.Isbn)).Select(x => x.Isbn).Distinct().ToArray());
+    }
+
     public Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(
         Guid bookId,
         CancellationToken ct) =>

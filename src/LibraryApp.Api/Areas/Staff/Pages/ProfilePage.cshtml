@@ -1,0 +1,76 @@
+@page "/profile"
+@model ProfileModel
+@{
+    ViewData["Title"] = "My profile";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("My profile",
+             "Your name and password. Email, department and category are managed by the library administrator."))' />
+
+<div class="grid grid-2">
+    <section class="card" aria-labelledby="details-title">
+        <div class="card-head"><h2 id="details-title">Personal details</h2></div>
+        <form class="form form-2" method="post" novalidate>
+            <div asp-validation-summary="ModelOnly" class="error-text field-wide" role="alert"></div>
+            @if (Model.CanEditName)
+            {
+                <div class="field">
+                    <label asp-for="Input.FirstName">First name</label>
+                    <input asp-for="Input.FirstName" type="text" maxlength="100" autocomplete="given-name"
+                           aria-invalid="@Model.Invalid("FirstName")" aria-describedby="firstname-error">
+                    <span asp-validation-for="Input.FirstName" class="error-text" id="firstname-error"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Input.LastName">Last name</label>
+                    <input asp-for="Input.LastName" type="text" maxlength="100" autocomplete="family-name"
+                           aria-invalid="@Model.Invalid("LastName")" aria-describedby="lastname-error">
+                    <span asp-validation-for="Input.LastName" class="error-text" id="lastname-error"></span>
+                </div>
+            }
+            else
+            {
+                <div class="field"><label for="first">First name</label><input id="first" value="@Model.Profile.FirstName" readonly></div>
+                <div class="field"><label for="last">Last name</label><input id="last" value="@Model.Profile.LastName" readonly></div>
+            }
+            <div class="field field-wide"><label for="email">Corporate email</label><input id="email" value="@Model.Profile.CorporateEmail" readonly></div>
+            <div class="field"><label for="dept">Department</label><input id="dept" value="@Model.Profile.DepartmentName" readonly></div>
+            <div class="field"><label for="pos">Position</label><input id="pos" value="@Model.Profile.Position" readonly></div>
+            @if (Model.CanEditName)
+            {
+                <div class="form-actions field-wide"><button class="btn btn-primary" type="submit">Save changes</button></div>
+            }
+            else
+            {
+                <p class="small muted field-wide">
+                    Library staff change their name on <a href="/staff/@Model.Profile.Id/edit">their Staff member page</a>.
+                </p>
+            }
+        </form>
+    </section>
+
+    <section class="card" aria-labelledby="password-title">
+        <div class="card-head">
+            <div>
+                <h2 id="password-title">Change password</h2>
+                <p class="small muted">At least 8 characters with a letter and a digit. After the change you sign in again.</p>
+            </div>
+        </div>
+        <form class="form" method="post" action="@UiPaths.ChangePassword" asp-antiforgery="true" novalidate>
+            <div class="field">
+                <label for="current">Current password</label>
+                <input id="current" name="Input.CurrentPassword" type="password" autocomplete="current-password">
+            </div>
+            <div class="field">
+                <label for="new">New password</label>
+                <input id="new" name="Input.NewPassword" type="password" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label for="repeat">Repeat new password</label>
+                <input id="repeat" name="RepeatPassword" type="password" autocomplete="new-password">
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Change password</button>
+            </div>
+        </form>
+    </section>
+</div>

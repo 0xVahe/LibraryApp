@@ -34,7 +34,7 @@ public class StaffManagementServiceTests
         Assert.Equal(dto.Id, enrolled.StaffMemberId);
         Assert.NotEqual(Guid.Empty, enrolled.EventId);
         Assert.Equal(_fake.UtcNow, enrolled.OccurredAtUtc);
-        Assert.Single(_fake.Accounts);
+        Assert.True(Assert.Single(_fake.Accounts).Value.RequirePasswordChange);
         Assert.False(_fake.InTransaction);
     }
 
@@ -199,14 +199,14 @@ public class StaffManagementServiceTests
     }
 
     [Fact]
-    public async Task Update_deactivated_member_is_a_conflict_and_does_not_update_account()
+    public async Task Update_deactivated_member_is_a_business_rule_and_does_not_update_account()
     {
         var dto = await Service.EnrolAsync(Request);
         _fake.Members[dto.Id].Deactivate();
         var error = await Assert.ThrowsAsync<DomainException>(() => Service.UpdateAsync(dto.Id,
             new("Demo", "Employee", "new@ameriabank.am", _fake.DepartmentId, "Engineer", null, _fake.CategoryId)));
         Assert.Equal("staff.deactivated_profile_locked", error.Error.Code);
-        Assert.Equal(ErrorKind.Conflict, error.Error.Kind);
+        Assert.Equal(ErrorKind.BusinessRule, error.Error.Kind);
         Assert.Equal(Request.CorporateEmail, Assert.Single(_fake.Accounts).Value.Email);
     }
 
@@ -235,7 +235,7 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     public Guid DepartmentId { get; } = Guid.NewGuid();
     public Guid CategoryId { get; } = Guid.NewGuid();
     public Dictionary<Guid, StaffMember> Members { get; } = [];
-    public Dictionary<Guid, (string Email, string Role)> Accounts { get; } = [];
+    public Dictionary<Guid, (string Email, string Role, bool RequirePasswordChange)> Accounts { get; } = [];
     public List<IDomainEvent> Events { get; } = [];
     public bool InTransaction { get; private set; }
     public int TransactionCalls { get; private set; }
@@ -258,6 +258,11 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
 
     public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(Members.GetValueOrDefault(id));
+
+    public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) =>
+        Task.FromResult<StaffMemberProfile?>(Members.TryGetValue(id, out var member)
+            ? new StaffMemberProfile(member, "IT", "Employee")
+            : null);
 
     public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) => Task.FromResult(
         Members.TryGetValue(id, out var m)
@@ -319,14 +324,14 @@ internal sealed class ManagementFake : IStaffManagementRepository, IStaffAccount
     {
         Assert.True(InTransaction);
         if (FailCreate) throw new DomainException(StaffErrors.AccountWriteFailed);
-        Accounts.Add(userId, (email, role));
+        Accounts.Add(userId, (email, role, requirePasswordChange));
         return Task.CompletedTask;
     }
 
     public Task UpdateEmailAsync(Guid userId, string email, CancellationToken ct)
     {
         Assert.True(InTransaction);
-        Accounts[userId] = (email, Accounts[userId].Role);
+        Accounts[userId] = (email, Accounts[userId].Role, Accounts[userId].RequirePasswordChange);
         return Task.CompletedTask;
     }
 

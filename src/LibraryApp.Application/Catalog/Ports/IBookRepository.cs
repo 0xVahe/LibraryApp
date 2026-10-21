@@ -2,6 +2,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Books and the checks <see cref="Services.BookService"/> makes before a write. Entities are tracked.</summary>
 public interface IBookRepository
 {
     Task<Book?> FindAsync(Guid id, CancellationToken ct);
@@ -13,6 +14,11 @@ public interface IBookRepository
     Task<bool> IsbnExistsAsync(
         string isbn,
         Guid? excludeBookId,
+        CancellationToken ct);
+
+    /// <summary>Which of these ISBNs (13 digits) active books already have; one query for the whole list (CAT-09).</summary>
+    Task<IReadOnlyCollection<string>> GetExistingIsbnsAsync(
+        IReadOnlyCollection<string> isbns,
         CancellationToken ct);
 
     Task<IReadOnlyList<BookCopy>> GetCopiesForUpdateAsync(

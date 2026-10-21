@@ -92,7 +92,7 @@ public static class StaffErrors
         Error.Conflict("staff.has_active_loans", "Return all outstanding books before deactivating the staff member.");
 
     public static readonly Error DeactivatedProfileLocked =
-        Error.Conflict("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
+        Error.BusinessRule("staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
 
     public static readonly Error DeactivatedCannotChangeStatus =
         Error.BusinessRule("staff.deactivated_status_locked",

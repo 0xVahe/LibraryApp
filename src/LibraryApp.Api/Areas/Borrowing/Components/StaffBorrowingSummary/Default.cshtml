@@ -1,0 +1,91 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@using LibraryApp.Api.Areas.Borrowing.Pages
+@* "Loans and reservations" and "Standing" (Group 3) on Group 2's Staff member page; "Declare lost" per open loan,
+   a waiver form per active penalty record, the "Loan history" link. *@
+@{
+    var back = Context.Request.Path + Context.Request.QueryString;
+    var waiveError = WaiveFormError.Take(TempData);
+}
+<section class="card flush" aria-labelledby="staff-loans-title">
+    <div class="card-head">
+        <div><h2 id="staff-loans-title">Loans and reservations</h2><p class="small muted">Open loans and reservations of this staff member.</p></div>
+        <a class="btn btn-secondary btn-sm" href="@UiNavigation.Staff/@Model.StaffMemberId/loans">Loan history</a>
+    </div>
+    @if (Model.Loans.Count + Model.Reservations.Count == 0)
+    {
+        <div class="card-foot"><p class="muted">No open loans or reservations.</p></div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Book</th><th scope="col">Copy</th><th scope="col">Due / hold until</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var loan in Model.Loans)
+                {
+                    <tr>
+                        <td data-label="Book">@loan.Book.Title</td>
+                        <td class="nowrap" data-label="Copy">@(loan.Barcode ?? "—")</td>
+                        <td data-label="Due">@Texts.Date(loan.Due)</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="loan.Status" /></td>
+                        <td class="actions">
+                            <form method="post" asp-area="Borrowing" asp-page="/DeclareLost">
+                                <input type="hidden" name="LoanId" value="@loan.LoanId" />
+                                <input type="hidden" name="ReturnUrl" value="@back" />
+                                <button class="btn btn-danger btn-sm" type="submit" aria-label="Declare @loan.Book.Title lost">Declare lost</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                @foreach (var reservation in Model.Reservations)
+                {
+                    <tr>
+                        <td data-label="Book">@reservation.Book.Title</td>
+                        <td class="nowrap" data-label="Copy">@(reservation.Barcode ?? "—")</td>
+                        <td data-label="Hold until">@(reservation.ReadyUntil is { } until ? Texts.Date(until) : $"{Texts.Ordinal(reservation.QueuePosition)} in the queue")</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="reservation.Status" /></td>
+                        <td class="actions"></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<section class="card" aria-labelledby="staff-standing-title">
+    <div class="card-head"><h2 id="staff-standing-title">Standing</h2></div>
+    <div class="stat"><span class="small muted">Active penalty points</span><span class="stat-value">@Model.ActivePenaltyPoints</span></div>
+    @if (Model.Penalties.Count > 0)
+    {
+        <ul class="list mt-16">
+            @foreach (var penalty in Model.Penalties)
+            {
+                var error = waiveError?.PenaltyId == penalty.PenaltyId ? waiveError : null;
+                var field = $"waive-{penalty.PenaltyId:N}";
+                <li>
+                    <form class="form grow" method="post" asp-area="Borrowing" asp-page="/WaivePenalty">
+                        <div>
+                            <p class="title">@Texts.Count(penalty.Points, "point") · @penalty.Reason</p>
+                            <p class="small muted">@Texts.Quoted(penalty.Book.Title), expires @Texts.Date(penalty.Expires)</p>
+                        </div>
+                        <div class="field">
+                            <label for="@field">Reason for waiving</label>
+                            <input id="@field" name="Input.Reason" value="@error?.Reason" required placeholder="For example: courier delay" aria-invalid="@(error is null ? null : "true")">
+                            @if (error is not null)
+                            {
+                                <span class="error-text">@error.Message</span>
+                            }
+                        </div>
+                        <input type="hidden" name="PenaltyId" value="@penalty.PenaltyId" />
+                        <input type="hidden" name="ReturnUrl" value="@back" />
+                        <div class="form-actions">
+                            <button class="btn btn-secondary btn-sm" type="submit">Waive @Texts.Count(penalty.Points, "point")</button>
+                        </div>
+                    </form>
+                </li>
+            }
+        </ul>
+    }
+</section>

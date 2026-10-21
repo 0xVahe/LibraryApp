@@ -3,7 +3,7 @@ using LibraryApp.Application.Tests.Borrowing.Fakes;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
-/// <summary>The "Borrowing" settings are checked at start (SD-21): a missing or inconsistent value stops the application.</summary>
+/// <summary>The "Borrowing" settings are checked at start: a missing or inconsistent value stops the application.</summary>
 public sealed class BorrowingOptionsValidatorTests
 {
     private static readonly BorrowingOptionsValidator Validator = new();

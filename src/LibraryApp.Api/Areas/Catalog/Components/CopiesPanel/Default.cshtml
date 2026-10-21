@@ -1,0 +1,99 @@
+@model LibraryApp.Api.Areas.Catalog.Components.CopiesPanelModel
+@using LibraryApp.Api.Areas.Catalog
+@using LibraryApp.Domain.Catalog
+@* The copies panel of the Edit book page (CAT-04); every form posts to the Copies page, which comes back here. *@
+@{
+    var conditions = Enum.GetValues<BookCopyCondition>();
+}
+<section class="card flush mt-24" aria-labelledby="copies-title">
+    <div class="card-head">
+        <div>
+            <h2 id="copies-title">Copies</h2>
+            <p class="small muted">Lost and Withdrawn are final. On loan and Reserved copies are changed by the loan desk.</p>
+        </div>
+    </div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Barcode</th><th scope="col">Status</th><th scope="col">Shelf and condition</th><th scope="col">Change status</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var copy in Model.Copies)
+            {
+                var actions = CopyStatusActions.For(copy.Status);
+                <tr id="copy-@copy.Id">
+                    <td data-label="Barcode">@copy.Barcode</td>
+                    <td data-label="Status"><partial name="_StatusBadge" model="copy.Status" /></td>
+                    <td data-label="Shelf and condition">
+                        @if (CopyStatusActions.CanEditDetails(copy.Status))
+                        {
+                            <form method="post" class="row gap-8" asp-area="Catalog" asp-page="/Books/Copies" asp-page-handler="Update" asp-route-bookId="@Model.BookId">
+                                <input type="hidden" name="copyId" value="@copy.Id">
+                                <label class="visually-hidden" for="shelf-@copy.Id">Shelf of @copy.Barcode</label>
+                                <input id="shelf-@copy.Id" class="grow-160" name="ShelfLocation" value="@copy.ShelfLocation" maxlength="@BookCopy.ShelfLocationMaxLength" placeholder="Shelf">
+                                <label class="visually-hidden" for="condition-@copy.Id">Condition of @copy.Barcode</label>
+                                <select id="condition-@copy.Id" class="grow-160" name="Condition">
+                                    @foreach (var condition in conditions)
+                                    {
+                                        <option value="@condition" selected="@(condition == copy.Condition)">@condition</option>
+                                    }
+                                </select>
+                                <button class="btn btn-secondary btn-sm" type="submit" aria-label="Save shelf and condition of @copy.Barcode">Save</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span>@(copy.ShelfLocation ?? "No shelf") · @copy.Condition</span>
+                        }
+                    </td>
+                    <td data-label="Change status">
+                        @if (actions.Count > 0)
+                        {
+                            <form method="post" class="row gap-8" asp-area="Catalog" asp-page="/Books/Copies" asp-page-handler="Status" asp-route-bookId="@Model.BookId">
+                                <input type="hidden" name="copyId" value="@copy.Id">
+                                @foreach (var action in actions)
+                                {
+                                    var final = action.Status is BookCopyStatus.Lost or BookCopyStatus.Withdrawn;
+                                    <button class="btn @(final ? "btn-danger" : "btn-secondary") btn-sm" type="submit" name="status" value="@action.Status" aria-label="@action.Label: @copy.Barcode">@action.Label</button>
+                                }
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="small muted">@CopyStatusActions.NoActionsReason(copy.Status)</span>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Copies.Count == 0)
+            {
+                <tr><td colspan="4">No copies yet. Add the first one below.</td></tr>
+            }
+        </tbody>
+    </table>
+    <div class="card-foot mt-24">
+        <h3 id="add-copy-title" class="mb-12">Add a copy</h3>
+        <form method="post" class="form form-2" aria-labelledby="add-copy-title" asp-area="Catalog" asp-page="/Books/Copies" asp-page-handler="Add" asp-route-bookId="@Model.BookId">
+            <div class="field">
+                <label for="new-barcode">Barcode</label>
+                <input id="new-barcode" name="Barcode" required maxlength="@BookCopy.BarcodeMaxLength" aria-describedby="new-barcode-hint">
+                <span id="new-barcode-hint" class="hint">Letters, digits and -, unique in the library.</span>
+            </div>
+            <div class="field">
+                <label for="new-shelf">Shelf</label>
+                <input id="new-shelf" name="ShelfLocation" maxlength="@BookCopy.ShelfLocationMaxLength">
+            </div>
+            <div class="field">
+                <label for="new-condition">Condition</label>
+                <select id="new-condition" name="Condition">
+                    @foreach (var condition in conditions)
+                    {
+                        <option value="@condition" selected="@(condition == BookCopyCondition.Good)">@condition</option>
+                    }
+                </select>
+            </div>
+            <div class="form-actions field-wide">
+                <button class="btn btn-primary" type="submit">Add copy</button>
+            </div>
+        </form>
+    </div>
+</section>

@@ -15,6 +15,7 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IClock clock) :
 
     public AccessToken Issue(LoginAccount account)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(account.SecurityStamp);
         var now = clock.UtcNow;
         var expiresAtUtc = now.AddMinutes(_options.AccessTokenMinutes);
 
@@ -22,7 +23,8 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IClock clock) :
         {
             new(JwtRegisteredClaimNames.Sub, account.UserId.ToString()),
             new(JwtRegisteredClaimNames.Email, account.Email),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new(LibraryClaimTypes.SecurityStamp, account.SecurityStamp)
         };
         if (account.MustChangePassword)
             claims.Add(new Claim(LibraryClaimTypes.PasswordChangeRequired, bool.TrueString));

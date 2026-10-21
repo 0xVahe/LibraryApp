@@ -34,6 +34,9 @@ public sealed class LoginModel(IAuthService auth, IUiSignIn signIn, IOptions<Ide
     [BindProperty(SupportsGet = true, Name = LoginRateLimiting.TooManyAttemptsParameter)]
     public bool TooManyAttempts { get; set; }
 
+    [BindProperty(SupportsGet = true, Name = ChangePasswordModel.PasswordChangedParameter)]
+    public bool PasswordChanged { get; set; }
+
     public AlertModel? Alert { get; private set; }
 
     public IActionResult OnGet()
@@ -44,6 +47,10 @@ public sealed class LoginModel(IAuthService auth, IUiSignIn signIn, IOptions<Ide
         if (TooManyAttempts)
             Alert = new AlertModel(AlertKind.Red, "Too many attempts",
                 "Too many sign-in attempts from this computer. Try again later.");
+        
+        else if (PasswordChanged)
+            Alert = new AlertModel(AlertKind.Green, "Password changed", "Sign in with your new password.");
+
         return Page();
     }
 

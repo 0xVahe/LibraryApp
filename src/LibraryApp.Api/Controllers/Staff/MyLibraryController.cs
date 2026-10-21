@@ -27,4 +27,20 @@ public sealed class MyLibraryController(IMyLibraryService myLibrary) : Controlle
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MyLibraryDto>> Get(CancellationToken ct) => Ok(await myLibrary.GetAsync(ct));
+
+    /// <summary>Updates the caller's own first and last name (S2-01).</summary>
+    /// <remarks>
+    /// S2-01 extends the read-only MEM-08 "My library" profile. The member is taken from the access token; only users
+    /// with the StaffMember role may use this endpoint. Librarians and Library Administrators use the HR-managed
+    /// staff update endpoint. Email, department, category, position, role, status and EmployeeId are unchanged.
+    /// </remarks>
+    [HttpPut]
+    [ProducesResponseType<MyProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<ActionResult<MyProfileDto>> UpdateProfile(UpdateMyProfileRequest request, CancellationToken ct) =>
+        Ok(await myLibrary.UpdateProfileAsync(request, ct));
 }

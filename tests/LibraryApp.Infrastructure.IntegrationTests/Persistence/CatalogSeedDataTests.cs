@@ -11,7 +11,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 
 public class CatalogSeedDataTests
 {
-    // Independent snapshots lock the reference implementation's mappings for downstream book seeds.
+    // Each list is written out here on purpose: a renamed or renumbered seed row fails a test instead of changing data silently.
     [Fact]
     public void Authors_keep_their_fixed_name_to_id_mapping() => AssertMapping(
         CatalogSeedData.Authors, "0002", """
@@ -126,7 +126,7 @@ public class CatalogSeedDataTests
 
     [Fact]
     public void Categories_keep_their_existing_fixed_mapping() => AssertMapping(
-        CatalogSeedData.Categories, "0001", """
+        CatalogSeedData.Categories.Select(x => (x.Id, x.Name)).ToList(), "0001", """
             Banking & Finance
             Risk, Compliance & AML
             IT & Software Engineering
@@ -135,7 +135,30 @@ public class CatalogSeedDataTests
             Soft Skills & Communication
             Customer Experience
             General Reading
+            Investing & Markets
+            Banking & Financial History
+            Software Craftsmanship
+            Software Architecture & Design
+            Armenian Literature
+            Popular Non-fiction
             """, Category.NameMaxLength);
+
+    [Fact]
+    public void Subcategories_keep_their_top_level_parents_and_hold_seeded_books()
+    {
+        // Two levels at most (CAT-03): categories 1 to 8 are top-level, and a parent is listed before its subcategories.
+        var expectedParents = new Dictionary<int, int> { [9] = 1, [10] = 1, [11] = 3, [12] = 3, [13] = 8, [14] = 8 };
+
+        for (var number = 1; number <= CatalogSeedData.Categories.Count; number++)
+        {
+            Guid? expectedParent = expectedParents.TryGetValue(number, out var parent) ? CatalogSeedIds.Category(parent) : null;
+            Assert.Equal(expectedParent, CatalogSeedData.Categories[number - 1].ParentId);
+        }
+
+        Assert.All(expectedParents.Keys, subcategory =>
+            Assert.Contains(CatalogSeedData.Books, book => book.CategoryNumber == subcategory));
+        Assert.All(CatalogSeedData.Books, book => Assert.InRange(book.CategoryNumber, 1, CatalogSeedData.Categories.Count));
+    }
 
     [Fact]
     public void Book_ids_keep_their_fixed_scheme()
@@ -145,6 +168,18 @@ public class CatalogSeedDataTests
         Assert.Equal(new Guid("b0000000-0000-0000-0000-000000000057"), CatalogSeedIds.Book(57));
         Assert.Equal(Enumerable.Range(1, CatalogSeedData.Books.Count),
             CatalogSeedData.Books.Select(book => book.Number));
+    }
+
+    [Fact]
+    public void Book_cover_paths_keep_their_fixed_scheme()
+    {
+        var paths = CatalogSeedData.Books
+            .Select(book => CatalogSeedIds.CoverImagePath(book.Number))
+            .ToArray();
+
+        Assert.Equal(CatalogSeedData.Books.Count, paths.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal("library-covers/01.png", paths[0]);
+        Assert.Equal("library-covers/57.png", paths[^1]);
     }
 
     [Fact]
@@ -179,8 +214,9 @@ public class CatalogSeedDataTests
     [Fact]
     public void Reference_ids_are_unique_across_all_seed_sets()
     {
-        var ids = CatalogSeedData.Categories.Concat(CatalogSeedData.Authors)
-            .Concat(CatalogSeedData.Publishers).Select(x => x.Id).ToArray();
+        var ids = CatalogSeedData.Categories.Select(x => x.Id)
+            .Concat(CatalogSeedData.Authors.Select(x => x.Id))
+            .Concat(CatalogSeedData.Publishers.Select(x => x.Id)).ToArray();
 
         Assert.Equal(ids.Length, ids.Distinct().Count());
         Assert.DoesNotContain(Guid.Empty, ids);

@@ -9,7 +9,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-
+using LibraryApp.Infrastructure.Jobs.Borrowing;
 namespace LibraryApp.Infrastructure.Extensions;
 
 public static class BorrowingRegistrationExtensions
@@ -21,33 +21,46 @@ public static class BorrowingRegistrationExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Rule values and decided variants (SD-21): section "Borrowing" in appsettings.json, checked at start.
+        // Rule values and decided variants: section "Borrowing" in appsettings.json, checked at start.
         services.AddOptions<BorrowingOptions>()
             .Bind(configuration.GetSection(BorrowingOptions.SectionName))
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<BorrowingOptions>, BorrowingOptionsValidator>();
 
-        // Penalty-point policy (BOR-05, BR-BOR-6): the Domain gets the values, never the configuration.
+        // Penalty-point policy (BOR-05): the Domain gets the values, never the configuration.
         services.AddSingleton(provider =>
             new PenaltyPolicy(provider.GetRequiredService<IOptions<BorrowingOptions>>().Value.Penalties.ToRules()));
 
         // Loans (BOR-01, BOR-02)
         services.AddScoped<ILoanRepository, LoanRepository>();
         services.AddScoped<IPenaltyRepository, PenaltyRepository>();
+        services.AddScoped<IBorrowingDailyJobQuery, BorrowingDailyJobQuery>();
+        services.AddScoped<
+            IBorrowingDailyJobService,
+            BorrowingDailyJobService>();
+        // Daily Borrowing maintenance (BOR-06).
+        services.AddDailyJob<BorrowingDailyJob>(
+            BorrowingDailyJob.Name);
+        
         services.AddScoped<OverdueRule>();
         services.AddScoped<ReturnPenaltyCalculator>();
         services.AddScoped<IPenaltyService, PenaltyService>();
         services.AddScoped<ILoanService, LoanService>();
+        services.AddScoped<ILoanLostService, LoanLostService>();
+        services.AddScoped<ILoanRenewalService, LoanRenewalService>();
+        services.AddScoped<ILoanHistoryQuery, LoanHistoryQuery>();
+        services.AddScoped<ILoanHistoryService, LoanHistoryService>();
+        services.AddScoped<IPenaltyAdministrationService, PenaltyAdministrationService>();
         services.AddScoped<IReservationRepository, ReservationRepository>();
         services.AddScoped<IReservationService, ReservationService>();
 
-        // Contract for Catalog: a new or repaired copy goes to the reservation queue (BOR-07, BQ-G1-10)
+        // Contract for Catalog: a new or repaired copy goes to the reservation queue (BOR-07)
         services.AddScoped<ReservationQueueService>();
 
         services.AddScoped<IReservationQueueService>(provider =>
-            provider.GetRequiredService<ReservationQueueService>());//new
+            provider.GetRequiredService<ReservationQueueService>());
         
-        services.AddScoped<ILoanReturnService, LoanReturnService>();//new
+        services.AddScoped<ILoanReturnService, LoanReturnService>();
         
         // Contract for Staff: open loans for deactivation (BR-MEM-4)
         services.AddScoped<IBorrowingReadService, BorrowingReadService>();
@@ -55,7 +68,10 @@ public static class BorrowingRegistrationExtensions
         // Contract for Catalog: next expected return date of a book (CAT-08)
         services.AddScoped<ILoanQueryService, LoanQueryService>();
 
-        // Demo data, Development only (SD-17)
+        // Loan desk: copies held for pickup (BOR-07)
+        services.AddScoped<IPickupListService, PickupListService>();
+
+        // Demo data, Development only
         services.AddScoped<IModuleSeeder, BorrowingSeeder>();
 
         return services;

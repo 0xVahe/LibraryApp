@@ -1,0 +1,27 @@
+@model LibraryApp.Api.Areas.Borrowing.Components.StaffBorrowingView
+@using LibraryApp.Api.Areas.Borrowing.Components
+@* "Penalties" (Group 3) on My library: active records until they expire (penalty-point policy). *@
+<section class="card" aria-labelledby="my-penalties-title">
+    <div class="card-head">
+        <div><h2 id="my-penalties-title">Penalties</h2><p class="small muted">@Texts.Count(Model.ActivePenaltyPoints, "active point") in total.</p></div>
+    </div>
+    @if (Model.Penalties.Count == 0)
+    {
+        <p class="muted">No penalty points.</p>
+    }
+    else
+    {
+        <ul class="list">
+            @foreach (var penalty in Model.Penalties)
+            {
+                <li>
+                    <div class="grow">
+                        <p class="title">@penalty.Reason</p>
+                        <p class="small muted">@penalty.Book.Title · until @Texts.Date(penalty.Expires)</p>
+                    </div>
+                    <span class="badge badge-amber">@Texts.Count(penalty.Points, "point")</span>
+                </li>
+            }
+        </ul>
+    }
+</section>

@@ -1,4 +1,5 @@
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.OpenApi.Any;
@@ -7,11 +8,20 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace LibraryApp.Api.OpenApi;
 
-/// <summary>Valid request examples for Catalog endpoints (NFR-11).</summary>
-public sealed class CatalogExamples : ISchemaFilter
+/// <summary>Valid request and cover response examples for Catalog endpoints (NFR-11).</summary>
+public sealed class CatalogExamples(ICatalogCoverUrlBuilder coverUrls) : ISchemaFilter
 {
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
+        if (context.Type == typeof(BookDetailsDto) || context.Type == typeof(BookSearchResultDto))
+        {
+            if (schema.Properties.TryGetValue("coverImageUrl", out var coverImageUrl)
+                && coverUrls.Build(CatalogSeedIds.CoverImagePath(1)) is { } coverUrl)
+                coverImageUrl.Example = new OpenApiString(coverUrl);
+            if (schema.Properties.TryGetValue("coverImagePath", out var coverImagePath))
+                coverImagePath.Example = new OpenApiString(CatalogSeedIds.CoverImagePath(1));
+        }
+
         OpenApiObject? example = context.Type switch
         {
             Type type when type == typeof(CreateBookRequest) => CreateBook(),
@@ -19,13 +29,19 @@ public sealed class CatalogExamples : ISchemaFilter
             Type type when type == typeof(AddCopyRequest) => AddCopy(),
             Type type when type == typeof(UpdateCopyRequest) => UpdateCopy(),
             Type type when type == typeof(ChangeCopyStatusRequest) => ChangeCopyStatus(),
-            Type type when type == typeof(AuthorRequest) => new OpenApiObject { ["fullName"] = new OpenApiString("Example Author") },
+            Type type when type == typeof(AuthorRequest) => new OpenApiObject
+            {
+                ["fullName"] = new OpenApiString("Example Author"),
+            },
             Type type when type == typeof(CategoryRequest) => new OpenApiObject
             {
                 ["name"] = new OpenApiString("Example Category"),
                 ["parentCategoryId"] = new OpenApiNull(),
             },
-            Type type when type == typeof(PublisherRequest) => new OpenApiObject { ["name"] = new OpenApiString("Example Publisher") },
+            Type type when type == typeof(PublisherRequest) => new OpenApiObject
+            {
+                ["name"] = new OpenApiString("Example Publisher"),
+            },
             Type type when type == typeof(BookAuthorsRequest) => new OpenApiObject
             {
                 ["authorIds"] = new OpenApiArray
@@ -66,6 +82,7 @@ public sealed class CatalogExamples : ISchemaFilter
             new OpenApiString(Author(17).ToString()),
             new OpenApiString(Author(24).ToString()),
         },
+        ["coverImagePath"] = new OpenApiString(CatalogSeedIds.CoverImagePath(15)),
     };
 
     private static OpenApiObject UpdateBook() => new()
@@ -77,6 +94,7 @@ public sealed class CatalogExamples : ISchemaFilter
         ["description"] = new OpenApiString("Updated description."),
         ["categoryId"] = new OpenApiString(CatalogSeedIds.Category(3).ToString()),
         ["publisherId"] = new OpenApiString(Publisher(12).ToString()),
+        ["coverImagePath"] = new OpenApiString(CatalogSeedIds.CoverImagePath(15)),
     };
 
     private static OpenApiObject AddCopy() => new()
@@ -97,9 +115,7 @@ public sealed class CatalogExamples : ISchemaFilter
         ["status"] = new OpenApiString(nameof(BookCopyStatus.UnderRepair)),
     };
 
-    private static Guid Author(int number) =>
-        CatalogSeedData.Authors[number - 1].Id;
+    private static Guid Author(int number) => CatalogSeedData.Authors[number - 1].Id;
 
-    private static Guid Publisher(int number) =>
-        CatalogSeedData.Publishers[number - 1].Id;
+    private static Guid Publisher(int number) => CatalogSeedData.Publishers[number - 1].Id;
 }

@@ -5,6 +5,8 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Notifications;
 /// <summary>
 /// Default template of every notification type of the catalogue (requirements section 9). Constant ids, pattern
 /// 40000000-0000-0000-0001-&lt;NotificationType value&gt; (4 = Notifications module); they never change.
+/// The only source of the default templates: <c>NotificationTemplateConfiguration</c> passes them to <c>HasData</c>, so
+/// they reach every database through the migrations (no seeder, no environment condition).
 /// </summary>
 /// <remarks>
 /// Only {{EmployeeName}}, {{BookTitle}} and {{DueDate}} are named by NOT-02. All other placeholders
@@ -69,5 +71,11 @@ public static class NotificationTemplateSeedData
         new(NotificationType.ReturnReceipt,
             "Return receipt for \"{{BookTitle}}\"",
             "<p>Dear {{EmployeeName}},</p><p>Thank you. \"{{BookTitle}}\" was returned on {{ReturnedDate}}.</p>"),
+
+        new(NotificationType.PasswordChanged,
+            "Your library password was changed",
+            "<p>Dear {{EmployeeName}},</p><p>The password of your library account was changed. " +
+            "If you made this change, no action is needed.</p>" +
+            "<p>If you did not change your password, contact the library administrator immediately.</p>"),
     ];
 }

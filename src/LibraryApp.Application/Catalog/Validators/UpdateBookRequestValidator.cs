@@ -33,5 +33,14 @@ public sealed class UpdateBookRequestValidator : AbstractValidator<UpdateBookReq
 
         RuleFor(x => x.PublisherId)
             .NotEqual(Guid.Empty);
+
+        // Only the format, also when covers are off (empty Catalog:Covers:BaseUrl): the Edit book form and a PUT send the
+        // saved path back, so refusing it would block every edit of a book with a cover. A new book is still refused a
+        // cover path while covers are off (CreateBookRequestValidator).
+        RuleFor(x => x.CoverImagePath)
+            .Cascade(CascadeMode.Stop)
+            .MaximumLength(Book.CoverImagePathMaxLength)
+            .Must(path => CoverImagePathRules.IsValid(path))
+            .WithMessage(CoverImagePathRules.Message);
     }
 }

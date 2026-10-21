@@ -23,6 +23,16 @@ public sealed class StaffMemberExamples : ISchemaFilter
             return;
         }
 
+        if (context.Type == typeof(UpdateMyProfileRequest))
+        {
+            schema.Example = new OpenApiObject
+            {
+                ["firstName"] = new OpenApiString("Anna"),
+                ["lastName"] = new OpenApiString("Petrosyan"),
+            };
+            return;
+        }
+
         if (context.Type != typeof(EnrolStaffMemberRequest) && context.Type != typeof(UpdateStaffMemberRequest))
             return;
 

@@ -1,6 +1,7 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
 using LibraryApp.Domain.Catalog;
@@ -11,6 +12,7 @@ using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Catalog;
 
@@ -34,7 +36,7 @@ public sealed class CatalogServiceDatabase : IAsyncLifetime
     public static readonly Guid StatusCopyId = new("e3000000-0000-0000-0000-000000000007");          // ST-1
     public static readonly Guid ConflictCopyId = new("e3000000-0000-0000-0000-000000000008");        // ST-2
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {
@@ -296,7 +298,11 @@ public class CatalogServiceDatabaseTests(CatalogServiceDatabase database) : ICla
     }
 
     private static CatalogService Service(LibraryDbContext db) =>
-        new(new CatalogCopyQuery(db), new BookCopyRepository(db), new BookDetailsQuery(db));
+        new(new CatalogCopyQuery(db), new BookCopyRepository(db), new BookDetailsQuery(db),
+            new CatalogCoverUrlBuilder(Options.Create(new CatalogCoversOptions
+            {
+                BaseUrl = "https://images.example.test/",
+            })));
 }
 
 /// <summary>Other modules get the real service, scoped like the DbContext it shares with them. No database needed.</summary>

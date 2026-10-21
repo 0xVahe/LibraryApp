@@ -6,6 +6,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Authors and the authors of a book (CAT-02, BR-CAT-5); every change runs in one transaction.</summary>
 public sealed class AuthorService(
     IAuthorRepository repository, IUnitOfWork unitOfWork, IIdGenerator ids, IApplicationLock applicationLock) : IAuthorService
 {
@@ -41,6 +42,15 @@ public sealed class AuthorService(
                 throw new DomainException(CatalogErrors.AuthorInUse);
             repository.Remove(author);
         }, ct);
+
+    public async Task<IReadOnlyList<Guid>> GetBookAuthorIdsAsync(Guid bookId, CancellationToken ct = default)
+    {
+        if (!await repository.BookExistsAsync(bookId, ct))
+            throw new DomainException(CatalogErrors.BookNotFound);
+
+        var authors = await repository.GetBookAuthorsAsync(bookId, ct);
+        return authors.Select(x => x.AuthorId).ToArray();
+    }
 
     public Task SetBookAuthorsAsync(Guid bookId, BookAuthorsRequest request, CancellationToken ct = default) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>

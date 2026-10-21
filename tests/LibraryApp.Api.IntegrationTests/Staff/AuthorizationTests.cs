@@ -33,7 +33,7 @@ public sealed class TestAuthorizationController : ControllerBase
 public class AuthorizationTests(AuthorizationFactory factory) : IClassFixture<AuthorizationFactory>
 {
     private string Token(params string[] roles) => factory.Services.GetRequiredService<IAccessTokenIssuer>()
-        .Issue(new LoginAccount(Guid.NewGuid(), "anna@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, roles))
+        .Issue(factory.Account(roles))
         .Token;
 
     private Task<HttpResponseMessage> Get(string path, string? token = null)

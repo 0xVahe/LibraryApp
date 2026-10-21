@@ -1,0 +1,65 @@
+@model BookFormPageModel
+@* The fields of the book form (CAT-01), shared by New book and Edit book. The page wraps them in its own form. *@
+<div class="field field-wide">
+    <label asp-for="Input.Title">Title</label>
+    <input asp-for="Input.Title" aria-invalid="@Model.AriaInvalid("Title")" aria-describedby="title-error" />
+    <span id="title-error" class="error-text" asp-validation-for="Input.Title"></span>
+</div>
+<div class="field">
+    <label asp-for="Input.Isbn">ISBN</label>
+    <input asp-for="Input.Isbn" aria-invalid="@Model.AriaInvalid("Isbn")" aria-describedby="isbn-hint isbn-error" />
+    <span id="isbn-hint" class="hint">ISBN-10 or ISBN-13; hyphens and spaces are fine.</span>
+    <span id="isbn-error" class="error-text" asp-validation-for="Input.Isbn"></span>
+</div>
+<div class="field">
+    <label asp-for="Input.PublicationYear">Publication year</label>
+    <input asp-for="Input.PublicationYear" inputmode="numeric" aria-invalid="@Model.AriaInvalid("PublicationYear")" aria-describedby="year-error" />
+    <span id="year-error" class="error-text" asp-validation-for="Input.PublicationYear"></span>
+</div>
+<div class="field">
+    <label asp-for="Input.Language">Language</label>
+    <select asp-for="Input.Language" aria-describedby="language-error">
+        @if (Model.OtherLanguage is { } otherLanguage)
+        {
+            <option value="@otherLanguage">@otherLanguage</option>
+        }
+        @foreach (var language in Model.Languages)
+        {
+            <option value="@language.Code">@language.Name</option>
+        }
+    </select>
+    <span id="language-error" class="error-text" asp-validation-for="Input.Language"></span>
+</div>
+<div class="field">
+    <label asp-for="Input.PublisherId">Publisher</label>
+    <select asp-for="Input.PublisherId" aria-describedby="publisher-error">
+        <option value="">No publisher</option>
+        @foreach (var publisher in Model.Publishers)
+        {
+            <option value="@publisher.Id">@publisher.Name</option>
+        }
+    </select>
+    <span id="publisher-error" class="error-text" asp-validation-for="Input.PublisherId"></span>
+</div>
+<div class="field field-wide">
+    <label asp-for="Input.CategoryId">Category</label>
+    <select asp-for="Input.CategoryId" aria-describedby="category-error">
+        <option value="">Choose a category</option>
+        @foreach (var category in Model.Categories)
+        {
+            <option value="@category.Id">@category.Path</option>
+        }
+    </select>
+    <span id="category-error" class="error-text" asp-validation-for="Input.CategoryId"></span>
+</div>
+<div class="field field-wide">
+    <label asp-for="Input.CoverImagePath">Cover image path (optional)</label>
+    <input asp-for="Input.CoverImagePath" maxlength="@LibraryApp.Domain.Catalog.Book.CoverImagePathMaxLength" placeholder="library-covers/01.png"
+           aria-invalid="@Model.AriaInvalid("CoverImagePath")" aria-describedby="cover-hint cover-error" />
+    <span id="cover-hint" class="hint">A file in the library's cover storage: letters, digits, - _ /, ending in .png, .jpg or .webp. Leave empty for no cover.</span>
+    <span id="cover-error" class="error-text" asp-validation-for="Input.CoverImagePath"></span>
+</div>
+<div class="field field-wide">
+    <label asp-for="Input.Description">Description</label>
+    <textarea asp-for="Input.Description" rows="4"></textarea>
+</div>

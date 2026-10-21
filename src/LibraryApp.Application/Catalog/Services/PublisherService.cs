@@ -6,6 +6,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Publishers; every change runs in one transaction.</summary>
 public sealed class PublisherService(
     IPublisherRepository repository, IUnitOfWork unitOfWork, IIdGenerator ids, IApplicationLock applicationLock) : IPublisherService
 {

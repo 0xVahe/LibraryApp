@@ -1,7 +1,9 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -12,7 +14,11 @@ public sealed class BookSearchServiceTests
 
     public BookSearchServiceTests()
     {
-        _service = new BookSearchService(_query);
+        _service = new BookSearchService(_query,
+            new CatalogCoverUrlBuilder(Options.Create(new CatalogCoversOptions
+            {
+                BaseUrl = "https://images.example.test/",
+            })));
     }
 
     [Fact]
@@ -22,6 +28,20 @@ public sealed class BookSearchServiceTests
 
         Assert.Equal("978-0-13 475759-9", _query.Filter!.Text);
         Assert.Equal("9780134757599", _query.Filter.IsbnText);
+    }
+
+    [Theory]
+    [InlineData("1000000060", "9781000000061")]
+    [InlineData(" 1-000-00006-0 ", "9781000000061")]
+    [InlineData("100000001X", "9781000000016")]
+    [InlineData("9781000000061", "9781000000061")]
+    [InlineData("000-0006", "0000006")]
+    public async Task A_whole_isbn_10_or_13_is_searched_as_the_stored_isbn_13_and_part_of_an_isbn_as_typed(
+        string search, string expectedIsbnText)
+    {
+        await _service.SearchAsync(Request(search: search));
+
+        Assert.Equal(expectedIsbnText, _query.Filter!.IsbnText);
     }
 
     [Fact]
@@ -63,6 +83,23 @@ public sealed class BookSearchServiceTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => _service.SearchAsync(null!));
     }
 
+    [Fact]
+    public async Task An_empty_cover_base_url_returns_null_instead_of_the_stored_path()
+    {
+        _query.Result = new PagedResult<BookSearchResultDto>(
+            [new BookSearchResultDto(Guid.NewGuid(), "Book", "9781000000000", 2020,
+                ["Author"], Guid.NewGuid(), "Category", "en", 1, 1, "library-covers/01.png")],
+            1,
+            1,
+            20);
+        var service = new BookSearchService(_query,
+            new CatalogCoverUrlBuilder(Options.Create(new CatalogCoversOptions())));
+
+        var result = await service.SearchAsync(Request());
+
+        Assert.Null(result.Items.Single().CoverImageUrl);
+    }
+
     private static BookSearchRequest Request(string? search = null, string? language = null) =>
         new(search, null, language, null, new PageRequest());
 
@@ -71,6 +108,7 @@ public sealed class BookSearchServiceTests
         public BookSearchFilter? Filter { get; private set; }
         public PageRequest? Paging { get; private set; }
         public CancellationToken CancellationToken { get; private set; }
+        public PagedResult<BookSearchResultDto>? Result { get; set; }
 
         public Task<PagedResult<BookSearchResultDto>> SearchAsync(
             BookSearchFilter filter,
@@ -80,7 +118,7 @@ public sealed class BookSearchServiceTests
             Filter = filter;
             Paging = paging;
             CancellationToken = cancellationToken;
-            return Task.FromResult(new PagedResult<BookSearchResultDto>([], 0, paging.Page, paging.PageSize));
+            return Task.FromResult(Result ?? new PagedResult<BookSearchResultDto>([], 0, paging.Page, paging.PageSize));
         }
     }
 }

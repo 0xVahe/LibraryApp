@@ -1,22 +1,31 @@
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Ports;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Services;
+using LibraryApp.Infrastructure.Catalog;
 using LibraryApp.Infrastructure.Persistence.Repositories.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
 public static class CatalogRegistrationExtensions
 {
     /// <summary>
-    /// Catalog module services. Called from Program.cs. Each member adds the registrations of their own part here
-    /// (repositories, services, seeder), one line per class, in their own pull request. Validators are registered automatically.
+    /// The Catalog module, called from Program.cs: the cover settings, repositories, queries, services and the seeder.
+    /// Validators are registered automatically (AddValidatorsFromAssembly in AddPlatform).
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<CatalogCoversOptions>()
+            .Bind(configuration.GetSection(CatalogCoversOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<CatalogCoversOptions>, CatalogCoversOptionsValidator>();
+        services.AddSingleton<ICatalogCoverUrlBuilder, CatalogCoverUrlBuilder>();
+
         // Search (CAT-05)
         services.AddScoped<IBookSearchQuery, BookSearchQuery>();
         services.AddScoped<IBookSearchService, BookSearchService>();
@@ -49,6 +58,10 @@ public static class CatalogRegistrationExtensions
         // Book CRUD (CAT-01)
         services.AddScoped<IBookRepository, BookRepository>();
         services.AddScoped<IBookService, BookService>();
+
+        // Book CSV import (CAT-09)
+        services.AddSingleton<IBookCsvParser, BookCsvParser>();
+        services.AddScoped<IBookImportService, BookImportService>();
 
         // Book purchase suggestions (CAT-10)
         services.AddScoped<IBookSuggestionRepository, BookSuggestionRepository>();

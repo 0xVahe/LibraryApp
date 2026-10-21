@@ -1,0 +1,104 @@
+@page "/catalog/books/{id:guid}"
+@model DetailsModel
+@{
+    ViewData["Title"] = Model.Book.Title;
+    var book = Model.Book;
+    PageAction[]? actions = Model.CanEdit ? [new("Edit", $"/catalog/books/{book.Id}/edit")] : null;
+}
+<partial name="_PageHead" model="@(new PageHeadModel(book.Title, book.Authors.Count > 0 ? string.Join(", ", book.Authors) : null, actions, Crumbs: [new("Catalog", "/catalog")]))" />
+
+<div class="grid grid-side">
+    <div class="stack-lg">
+        <section class="card" aria-labelledby="details-title">
+            <div class="grid book-hero">
+                <partial name="_BookCover" model="Model.Cover" />
+                <div class="stack">
+                    <h2 id="details-title" class="visually-hidden">Details</h2>
+                    <div class="stat">
+                        <span class="stat-value" id="availability">@book.Availability</span>
+                        @if (book.NextExpectedReturnDate is { } returnDate)
+                        {
+                            <span class="muted">Next expected return: <time id="next-return" datetime="@returnDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)">@returnDate.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</time></span>
+                        }
+                    </div>
+                    <div>
+                    <dl class="dl">
+                        <dt>ISBN</dt>
+                        <dd>@book.Isbn</dd>
+                        <dt>Publisher</dt>
+                        <dd>@(book.PublisherName ?? "None")</dd>
+                        <dt>Year</dt>
+                        <dd>@book.PublicationYear</dd>
+                        <dt>Language</dt>
+                        <dd>@Model.LanguageName</dd>
+                        <dt>Category</dt>
+                        <dd>
+                            @for (var index = 0; index < Model.CategoryTrail.Count; index++)
+                            {
+                                var category = Model.CategoryTrail[index];
+                                if (index > 0)
+                                {
+                                    <text> / </text>
+                                }
+                                <a href="/catalog?categoryId=@category.Id">@category.Name</a>
+                            }
+                        </dd>
+                    </dl>
+                    </div>
+                    @if (book.Description is { } description)
+                    {
+                        <p>@description</p>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="card flush" aria-labelledby="copies-title">
+            <div class="card-head"><h2 id="copies-title">Copies</h2></div>
+            <table class="table">
+                <thead>
+                    <tr><th scope="col">Barcode</th><th scope="col">Shelf</th><th scope="col">Condition</th><th scope="col">Status</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var copy in Model.Copies)
+                    {
+                        <tr>
+                            <td data-label="Barcode">@copy.Barcode</td>
+                            <td data-label="Shelf">@(copy.ShelfLocation ?? "Not set")</td>
+                            <td data-label="Condition">@copy.Condition</td>
+                            <td data-label="Status"><partial name="_StatusBadge" model="copy.Status" /></td>
+                        </tr>
+                    }
+                    @if (Model.Copies.Count == 0)
+                    {
+                        <tr><td colspan="4">The library has no copies of this book yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        @if (Model.MoreBooks.Count > 0)
+        {
+            <section class="card" aria-labelledby="more-title">
+                <h2 id="more-title" class="mb-16">More in @book.CategoryName</h2>
+                <ul class="list" id="more-books">
+                    @foreach (var other in Model.MoreBooks)
+                    {
+                        <li>
+                            <partial name="_BookCover" model="@(new BookCoverModel(other.Title, null, other.CoverImageUrl, other.CategoryId, Mini: true))" />
+                            <div class="grow">
+                                <a class="title" href="/catalog/books/@other.Id">@other.Title</a>
+                                <div class="small muted">@string.Join(", ", other.Authors)</div>
+                            </div>
+                            <span class="small muted">@other.AvailableCopies of @other.TotalCopies available</span>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    </div>
+
+    <aside class="stack-lg">
+        <vc:reserve-panel book-id="@book.Id" />
+    </aside>
+</div>

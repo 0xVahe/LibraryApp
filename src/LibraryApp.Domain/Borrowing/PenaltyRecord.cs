@@ -10,7 +10,7 @@ public sealed class PenaltyRecord : Entity
 {
     public const int ReasonMaxLength = 500;
 
-    /// <summary>Most points one record can hold: the schema limit of the agreed CHECK constraint (G3-04).</summary>
+    /// <summary>Most points one record can hold: the schema limit of the agreed CHECK constraint.</summary>
     public const int MaxPoints = 10;
 
     /// <summary>

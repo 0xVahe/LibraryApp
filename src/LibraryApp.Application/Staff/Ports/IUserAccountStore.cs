@@ -9,6 +9,7 @@ public sealed record LoginAccount(
     Guid? StaffMemberId,
     StaffMemberStatus? StaffStatus,
     IReadOnlyList<string> Roles,
+    string SecurityStamp,
     bool MustChangePassword = false);
 
 /// <summary>Hides ASP.NET Core Identity from the Application layer.</summary>

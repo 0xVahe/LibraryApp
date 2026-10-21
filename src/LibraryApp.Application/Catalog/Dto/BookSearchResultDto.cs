@@ -1,14 +1,18 @@
 namespace LibraryApp.Application.Catalog.Dto;
 
 /// <summary>One book in the search result (CAT-05).</summary>
+/// <param name="CategoryId">The book's category; the Catalog page colours the text cover by it, like the Book page.</param>
 /// <param name="TotalCopies">Copies in the collection: Lost and Withdrawn copies are not counted (as in BookDto, CAT-06).</param>
+/// <param name="CoverImageUrl">Full public cover URL, or null when the book has no cover.</param>
 public sealed record BookSearchResultDto(
     Guid Id,
     string Title,
     string Isbn,
     int PublicationYear,
     IReadOnlyList<string> Authors,
+    Guid CategoryId,
     string Category,
     string Language,
     int AvailableCopies,
-    int TotalCopies);
+    int TotalCopies,
+    string? CoverImageUrl = null);

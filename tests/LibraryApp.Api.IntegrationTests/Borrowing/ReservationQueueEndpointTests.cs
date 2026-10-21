@@ -21,7 +21,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// A copy that becomes free outside a loan goes to the reservation queue (BOR-07, BQ-G1-10): Catalog's endpoints call
+/// A copy that becomes free outside a loan goes to the reservation queue (BOR-07): Catalog's endpoints call
 /// Borrowing's IReservationQueueService inside their own transaction. Real host and database; every test uses its own
 /// book with one seeded copy.
 /// </summary>
@@ -33,7 +33,7 @@ public class ReservationQueueEndpointTests(ApiHostWithoutBorrowingSeed factory) 
     {
         var client = factory.CreateClient();
         var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-            new LoginAccount(Guid.NewGuid(), "librarian@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian])).Token;
+            factory.Account(StaffRoles.Librarian)).Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }

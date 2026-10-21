@@ -16,6 +16,9 @@ namespace LibraryApp.Application.Catalog.Dto;
 /// <param name="AvailableCopies">Copies with status Available.</param>
 /// <param name="Availability">The two numbers as text, for example "2 of 3 available".</param>
 /// <param name="NextExpectedReturnDate">Earliest due date of an open loan in the library's local time zone; null when no copy is on loan (CAT-08).</param>
+/// <param name="CoverImageUrl">Full public cover URL, or null when the book has no cover.</param>
+/// <param name="CoverImagePath">The stored path in the cover storage, for example "library-covers/01.png", or null when
+/// the book has no cover. The Edit book form sends it back, so saving the form keeps the cover (CAT-01).</param>
 public sealed record BookDetailsDto(
     Guid Id,
     string Title,
@@ -31,4 +34,6 @@ public sealed record BookDetailsDto(
     int TotalCopies,
     int AvailableCopies,
     string Availability,
-    DateOnly? NextExpectedReturnDate);
+    DateOnly? NextExpectedReturnDate,
+    string? CoverImageUrl = null,
+    string? CoverImagePath = null);

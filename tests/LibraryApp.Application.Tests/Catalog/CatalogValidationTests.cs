@@ -2,7 +2,9 @@ using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Tests.Fakes;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Catalog;
 
@@ -94,5 +96,43 @@ public class CatalogValidationTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(CreateBookRequest.Isbn));
+    }
+
+    [Fact]
+    public void Create_book_rejects_a_cover_path_when_cover_storage_is_disabled()
+    {
+        var validator = new CreateBookRequestValidator(
+            new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)),
+            Options.Create(new CatalogCoversOptions()));
+
+        var result = validator.Validate(new CreateBookRequest(
+            "Test book",
+            "9780306406157",
+            2024,
+            "en",
+            null,
+            Guid.NewGuid(),
+            null,
+            [Guid.NewGuid()],
+            "library-covers/01.png"));
+
+        var error = Assert.Single(result.Errors, error =>
+            error.PropertyName == nameof(CreateBookRequest.CoverImagePath));
+        Assert.Equal(CoverImagePathRules.Message, error.ErrorMessage);
+    }
+
+    [Fact]
+    public void Update_book_checks_only_the_cover_path_format_so_a_saved_cover_does_not_block_an_edit()
+    {
+        // The update validator does not depend on Catalog:Covers: with covers off the Edit form still sends the saved path.
+        var validator = new UpdateBookRequestValidator(new TestClock(new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc)));
+
+        UpdateBookRequest Request(string coverImagePath) =>
+            new("Test book", "9780306406157", 2024, "en", null, Guid.NewGuid(), null, coverImagePath);
+
+        Assert.True(validator.Validate(Request("library-covers/01.png")).IsValid);
+        var error = Assert.Single(validator.Validate(Request("/library-covers/01.png")).Errors);
+        Assert.Equal(nameof(UpdateBookRequest.CoverImagePath), error.PropertyName);
+        Assert.Equal(CoverImagePathRules.Message, error.ErrorMessage);
     }
 }

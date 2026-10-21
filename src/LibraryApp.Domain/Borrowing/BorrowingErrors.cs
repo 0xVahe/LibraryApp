@@ -15,6 +15,10 @@ public static class BorrowingErrors
     public static readonly Error CopyNotFound =
         Error.NotFound("borrowing.copy_not_found", "No copy with this barcode was found.");
 
+    /// <summary>The copy exists but has no open (Active or Overdue) loan: it is on the shelf, held or already returned.</summary>
+    public static readonly Error NoOpenLoanForCopy =
+        Error.NotFound("borrowing.no_open_loan_for_copy", "This copy is not on loan.");
+
     /// <summary>The copy exists but cannot be lent now (on loan, reserved, under repair, lost or withdrawn).</summary>
     public static readonly Error CopyNotAvailable =
         Error.BusinessRule("borrowing.copy_not_available", "This copy is not available for lending.");
@@ -186,6 +190,11 @@ public static class BorrowingErrors
         "borrowing.penalty_reason_required",
         "A reason is required for the penalty.");
 
+    /// <summary>The loan history was asked for an issue period that ends before it starts (BOR-10).</summary>
+    public static readonly Error HistoryPeriodInvalid = Error.Validation(
+        "borrowing.history_period_invalid",
+        "The start of the issue period must not be after its end.");
+
     /// <summary>
     /// A waiver requires an explanation.
     /// </summary>
@@ -206,4 +215,35 @@ public static class BorrowingErrors
     public static readonly Error PenaltyNotDueToExpire = Error.BusinessRule(
         "borrowing.penalty_not_due_to_expire",
         "The penalty has not reached its expiry timestamp.");
+
+    /// <summary>No penalty record has this id (BOR-08).</summary>
+    public static readonly Error PenaltyNotFound =
+        Error.NotFound("borrowing.penalty_not_found", "The penalty record does not exist.");
+
+    // Renewal errors (BOR-04, BR-BOR-1), in the order the checks run
+
+    /// <summary>BR-BOR-1: an Overdue loan, or one past the overdue rule before the daily job marked it, is not renewed.</summary>
+    public static readonly Error LoanOverdueCannotBeRenewed = Error.BusinessRule(
+        "borrowing.loan_overdue_cannot_be_renewed",
+        "An overdue loan cannot be renewed.");
+
+    /// <summary>BR-BOR-1, BR-MEM-3: a Restricted employee cannot renew.</summary>
+    public static readonly Error RestrictedRenewalForbidden = Error.BusinessRule(
+        "borrowing.restricted_renewal_forbidden",
+        "A Restricted employee cannot renew a loan.");
+
+    /// <summary>A Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
+    public static readonly Error SuspendedRenewalForbidden = Error.BusinessRule(
+        "borrowing.suspended_renewal_forbidden",
+        "A Suspended employee cannot renew a loan.");
+
+    /// <summary>BR-BOR-1: <c>RenewalCount</c> reached the category's <c>MaxRenewals</c> (text from the acceptance criteria).</summary>
+    public static readonly Error MaxRenewalsReached = Error.BusinessRule(
+        "borrowing.max_renewals_reached",
+        "Maximum renewals reached");
+
+    /// <summary>BR-BOR-1: another employee has a Waiting reservation for the book.</summary>
+    public static readonly Error RenewalBlockedByReservation = Error.BusinessRule(
+        "borrowing.renewal_blocked_by_reservation",
+        "Another employee is waiting for this book, so the loan cannot be renewed.");
 }

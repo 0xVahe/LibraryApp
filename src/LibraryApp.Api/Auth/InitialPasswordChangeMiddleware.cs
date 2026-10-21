@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace LibraryApp.Api.Auth;
 
 /// <summary>
-/// Limits imported accounts to the initial password change until they choose a personal password.
+/// Limits newly enrolled accounts to the initial password change until they choose a personal password.
 /// API: only POST /api/auth/change-password; anything else answers 403 <c>staff.password_change_required</c>.
 /// Pages (UI guide, Part 0 "First login"): every page redirects to the change-password page, except that page, sign-out
 /// and the status pages — so the account can still sign out and see an error page.

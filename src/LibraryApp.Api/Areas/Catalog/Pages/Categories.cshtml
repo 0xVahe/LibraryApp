@@ -1,0 +1,89 @@
+@page "/catalog/categories"
+@model CategoriesModel
+@{
+    ViewData["Title"] = "Categories";
+    var tree = new CategoryTree(Model.Items);
+    // The rows in tree order (CAT-03): each top-level category, then its subcategories, as in the book form.
+    var byId = Model.Items.ToDictionary(item => item.Id);
+    var rows = tree.Options.Select(option => byId[option.Id]).ToList();
+}
+<partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Categories", "Manage catalog categories.", Crumbs: [new("Catalog", "/catalog")])' />
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-red mb-16" role="alert" asp-validation-summary="All"></div>
+}
+<section class="card mb-24" aria-labelledby="create-heading">
+    <div class="card-head"><h2 id="create-heading">Create category</h2></div>
+    <form class="form" method="post" asp-page-handler="Create">
+        <div class="field">
+            <label for="create-name">Name</label>
+            <input id="create-name" name="Name" value="@Model.CreateInput.Name" required>
+        </div>
+        <div class="field">
+            <label for="create-parent">Parent category</label>
+            <select id="create-parent" name="ParentCategoryId">
+                <option value="">No parent</option>
+                @foreach (var parent in tree.TopLevel)
+                {
+                    <option value="@parent.Id" selected="@(Model.CreateInput.ParentCategoryId == parent.Id)">@parent.Name</option>
+                }
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Create category</button>
+        </div>
+    </form>
+</section>
+<section class="card flush" aria-labelledby="list-heading">
+    <div class="card-head"><h2 id="list-heading">Existing categories</h2></div>
+    <table class="table">
+        <thead>
+            <tr><th scope="col">Name</th><th scope="col">Edit</th><th scope="col">Delete</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var item in rows)
+            {
+                var input = Model.EditId == item.Id ? Model.EditInput : new CategoryRequest(item.Name, item.ParentCategoryId);
+                <tr>
+                    <td data-label="Name">@tree.PathOf(item.Id)</td>
+                    <td data-label="Edit">
+                        <form class="form" method="post" asp-page-handler="Edit">
+                            <input type="hidden" name="id" value="@item.Id">
+                            <div class="field">
+                                <label for="name-@item.Id">Name</label>
+                                <input id="name-@item.Id" name="Name" value="@input.Name" required>
+                            </div>
+                            <div class="field">
+                                <label for="parent-@item.Id">Parent category</label>
+                                <select id="parent-@item.Id" name="ParentCategoryId">
+                                    <option value="">No parent</option>
+                                    @if (tree.ChildrenOf(item.Id).Count == 0)
+                                    {
+                                        @foreach (var parent in tree.TopLevel.Where(parent => parent.Id != item.Id))
+                                        {
+                                            <option value="@parent.Id" selected="@(input.ParentCategoryId == parent.Id)">@parent.Name</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-secondary btn-sm" type="submit">Save changes</button>
+                            </div>
+                        </form>
+                    </td>
+                    <td data-label="Delete">
+                        <form method="post" asp-page-handler="Delete">
+                            <input type="hidden" name="id" value="@item.Id">
+                            <label class="check"><input type="checkbox" name="confirmDelete" value="true"> I want to delete this category</label>
+                            <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete @item.Name">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="3">No categories yet.</td></tr>
+            }
+        </tbody>
+    </table>
+</section>

@@ -42,7 +42,7 @@ public sealed class StaffManagementService(
                 await ReferenceNamesAsync(request.DepartmentId, request.StaffCategoryId, token);
 
             var userId = ids.NewId();
-            await accounts.CreateAsync(userId, email, request.Password, role, token);
+            await accounts.CreateAsync(userId, email, request.Password, role, token, requirePasswordChange: true);
             var member = new StaffMember(ids.NewId(), userId, employeeId, request.FirstName, request.LastName,
                 email, request.DepartmentId, request.Position, request.LineManagerEmail, request.StaffCategoryId,
                 clock.UtcNow);

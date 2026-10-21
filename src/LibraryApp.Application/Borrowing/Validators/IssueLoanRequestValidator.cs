@@ -11,7 +11,7 @@ public sealed class IssueLoanRequestValidator : AbstractValidator<IssueLoanReque
     {
         RuleFor(x => x.StaffMemberId).NotEmpty();
 
-        // The barcode as scanned: Catalog ignores case and surrounding spaces (G1-06).
+        // The barcode as scanned: Catalog ignores case and surrounding spaces.
         RuleFor(x => x.Barcode)
             .Cascade(CascadeMode.Stop)
             .NotEmpty()

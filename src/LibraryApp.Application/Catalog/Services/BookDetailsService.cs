@@ -9,7 +9,11 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Application.Catalog.Services;
 
 /// <summary>Shows one book with "N of M available" (CAT-06). A deleted book is hidden, like in the search.</summary>
-public sealed class BookDetailsService(IBookDetailsQuery query, ILoanQueryService loanQuery, IClock clock) : IBookDetailsService
+public sealed class BookDetailsService(
+    IBookDetailsQuery query,
+    ILoanQueryService loanQuery,
+    IClock clock,
+    ICatalogCoverUrlBuilder coverUrls) : IBookDetailsService
 {
     public async Task<BookDetailsDto> GetBookDetailsAsync(Guid bookId, CancellationToken cancellationToken = default)
     {
@@ -38,6 +42,9 @@ public sealed class BookDetailsService(IBookDetailsQuery query, ILoanQueryServic
             book.TotalCopies,
             book.AvailableCopies,
             Availability: $"{book.AvailableCopies} of {book.TotalCopies} available",
-            nextExpectedReturnDate);
+            nextExpectedReturnDate,
+            coverUrls.Build(book.CoverImageUrl),
+            // The details query returns the stored path in CoverImageUrl; the public URL is built from it above.
+            CoverImagePath: book.CoverImageUrl);
     }
 }
