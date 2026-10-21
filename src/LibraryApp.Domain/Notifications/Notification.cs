@@ -11,7 +11,6 @@ public sealed class Notification : Entity
     public const int SubjectMaxLength = 300;   // G4-07
     public const int LastErrorMaxLength = 2000;
 
-    /// <summary>The staff member the notification is for.</summary>
     public Guid StaffMemberId { get; private set; }
 
     /// <summary>The loan it is about, or null (Welcome, AccessRestricted, ...). Used for NOT-06.</summary>
@@ -39,10 +38,7 @@ public sealed class Notification : Entity
 
     public DateTime CreatedAtUtc { get; private set; }
 
-    /// <summary>
-    /// Yerevan calendar date of <see cref="CreatedAtUtc"/> (from <c>IClock.ToLocalDate</c>).
-    /// Part of the unique rule "same type for the same loan at most once a day" (NOT-06, G4-02).
-    /// </summary>
+    /// <summary>Yerevan date of <see cref="CreatedAtUtc"/>; part of the once-a-day rule per loan (NOT-06, G4-02).</summary>
     public DateOnly LocalDate { get; private set; }
 
     public DateTime? SentAtUtc { get; private set; }
@@ -54,8 +50,8 @@ public sealed class Notification : Entity
     public int Attempts { get; private set; }
 
     /// <summary>
-    /// Earliest time of the next delivery attempt: the lease of a Pending email being sent (NOT-03), or the retry time
-    /// of a Failed one (NOT-08, G4-03). Null: a Pending email is due now; a Failed one is not retried.
+    /// Lease while the email is being sent (NOT-03), or the retry time of a Failed one (NOT-08, G4-03).
+    /// Null: a Pending email is due now; a Failed one is not retried.
     /// </summary>
     public DateTime? NextAttemptAtUtc { get; private set; }
 
@@ -120,7 +116,6 @@ public sealed class Notification : Entity
         };
     }
 
-    /// <summary>Records a successful delivery.</summary>
     public void MarkSent(DateTime sentAtUtc)
     {
         EnsureUtc(sentAtUtc);
@@ -134,10 +129,7 @@ public sealed class Notification : Entity
         LastError = null;
     }
 
-    /// <summary>
-    /// Records a failed delivery. The caller decides the next retry time (5, 15, 60 minutes - NOT-08)
-    /// and passes null when no retry is left.
-    /// </summary>
+    /// <summary>The caller passes the next retry time, or null when no retry is left (NOT-08).</summary>
     public void MarkFailed(string error, DateTime? nextAttemptAtUtc)
     {
         if (Status == NotificationStatus.Sent)
