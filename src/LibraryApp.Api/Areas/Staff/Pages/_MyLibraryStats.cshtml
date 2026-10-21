@@ -1,0 +1,20 @@
+@using LibraryApp.Domain.Staff
+@model MyLibraryModel
+<div class="grid grid-4" role="group" aria-label="My library summary">
+    <div class="card stat" id="my-loans-stat">
+        <span class="small muted">Books on loan</span>
+        <span class="stat-value">@Model.Borrowing.Loans.Count <span class="small muted">of @Model.Borrowing.Rules.MaxLoans</span></span>
+    </div>
+    <div class="card stat" id="my-reservations-stat">
+        <span class="small muted">Reservations</span>
+        <span class="stat-value">@Model.Borrowing.Reservations.Count</span>
+    </div>
+    <div class="card stat" id="my-penalties-stat">
+        <span class="small muted">Penalty points</span>
+        <span class="stat-value">@Model.Borrowing.ActivePenaltyPoints</span>
+    </div>
+    <div class="card stat" id="my-status-stat">
+        <span class="small muted">Library access</span>
+        <span class="stat-value"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="Enum.Parse<StaffMemberStatus>(Model.Profile.Status)" /></span>
+    </div>
+</div>

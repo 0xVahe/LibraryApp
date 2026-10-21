@@ -707,7 +707,8 @@ public sealed class LoanReturnPenaltyTests : LoanReturnEndpointTests
             (await EventsAsync<PenaltyApplied>()),
             x => x.LoanId == loanId);
 
-        Assert.Equal(penalty.Id, applied.PenaltyRecordId);
+        Assert.Equal(StaffId, applied.StaffMemberId);
+        Assert.Equal(penalty.Reason, applied.Reason);
         Assert.Equal(5, applied.Points);
         Assert.Equal(priorPoints + 5, applied.ActivePointsTotal);
 
@@ -829,10 +830,20 @@ public sealed class LoanReturnPenaltyTests : LoanReturnEndpointTests
             StaffMemberStatus.Restricted,
             await StaffStatusAsync());
 
-        Assert.Equal(
-            2,
-            (await EventsAsync<PenaltyApplied>())
-            .Count(x => x.LoanId == loanId));
+        // One notice per return (catalogue "points added and new total"): the sum of both records and the final total.
+        PenaltyApplied applied = Assert.Single(
+            (await EventsAsync<PenaltyApplied>()),
+            x => x.LoanId == loanId);
+        string[] reasons = await Db(db =>
+            db.PenaltyRecords.Where(x => x.LoanId == loanId).Select(x => x.Reason).ToArrayAsync());
+        int activeTotal = await Db(db =>
+            db.PenaltyRecords
+                .Where(x => x.StaffMemberId == StaffId && x.Status == PenaltyRecordStatus.Active && x.CreatedAtUtc <= Now && x.ExpiresAtUtc > Now)
+                .SumAsync(x => x.Points));
+
+        Assert.Equal(7, applied.Points);
+        Assert.Equal(activeTotal, applied.ActivePointsTotal);
+        Assert.Equal(reasons.Order(), applied.Reason.Split("; ").Order());
 
         Assert.Single(
             (await EventsAsync<StaffStatusChanged>()),

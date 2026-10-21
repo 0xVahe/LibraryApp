@@ -180,28 +180,31 @@ public sealed class PenaltyService(
         int finalActivePoints =
             checked(previousActivePoints + pointsApplied);
 
-        int runningActivePoints = previousActivePoints;
-
         foreach (PenaltyRecord record in created)
         {
             await penalties.AddAsync(record, ct);
+        }
 
-            runningActivePoints =
-                checked(runningActivePoints + record.Points);
-
-            if (record.Points == 0)
-                continue;
+        // One event per operation, not per record: a late and damaged return is one notice with the sum of its
+        // points and the final total (catalogue "points added and new total"); NOT-06 keeps one notice per loan
+        // and day.
+        if (pointsApplied > 0)
+        {
+            string reasons = string.Join(
+                "; ",
+                created
+                    .Where(record => record.Points > 0)
+                    .Select(record => record.Reason));
 
             await events.PublishAsync(
                 new PenaltyApplied(
                     ids.NewId(),
                     nowUtc,
-                    record.Id,
-                    record.StaffMemberId,
-                    record.LoanId,
-                    record.Points,
-                    runningActivePoints,
-                    record.Reason),
+                    loan.StaffMemberId,
+                    loan.Id,
+                    pointsApplied,
+                    finalActivePoints,
+                    reasons),
                 ct);
         }
 

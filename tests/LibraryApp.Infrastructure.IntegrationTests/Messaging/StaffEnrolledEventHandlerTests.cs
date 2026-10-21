@@ -90,7 +90,7 @@ public sealed class StaffEnrolledEventHandlerTests
             new LoanRenewed(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), occurredAtUtc.AddDays(21), 1),
             new LoanReturned(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), occurredAtUtc, 0),
             new ReservationReady(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), occurredAtUtc.AddDays(3)),
-            new PenaltyApplied(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, 1, "Late return"),
+            new PenaltyApplied(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), 1, 1, "Late return"),
             new StaffStatusChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), StaffMemberStatus.Active, StaffMemberStatus.Restricted, "Penalty threshold", null),
             new StaffPasswordChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid()),
         };

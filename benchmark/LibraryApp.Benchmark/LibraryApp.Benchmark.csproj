@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- NFR-01 measurement tool: seeds the loans and times the API over HTTP. Not a test project, not run by CI. -->
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\LibraryApp.Infrastructure\LibraryApp.Infrastructure.csproj" />
+    </ItemGroup>
+
+</Project>
