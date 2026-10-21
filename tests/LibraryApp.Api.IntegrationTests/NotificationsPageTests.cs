@@ -87,6 +87,19 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
         Assert.Null(await ReadAtAsync(id));
     }
 
+    [Fact]
+    public async Task My_library_shows_the_latest()
+    {
+        string subject = await AddAsync(Members.AnnaPetrosyan, minute: 9);
+
+        var (response, html, _) = await GetAsync(await CookieAsync(Anna), "/my-library");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(subject, html);
+        Assert.Contains("id=\"latest-notifications-title\"", html);
+        Assert.Contains("href=\"/notifications\">View all", html);
+    }
+
     private Task<string> CookieAsync(string email) => UiTestClient.CookieAsync(factory, email, StaffSeedData.Password);
 
     private async Task<(HttpResponseMessage Response, string Html, string SetCookies)> GetAsync(string cookies, string path)
