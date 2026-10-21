@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Application.Reporting.Options;
 using LibraryApp.Application.Reporting.Ports;
 using LibraryApp.Application.Reporting.Services;
 using LibraryApp.Application.Tests.Fakes;
@@ -7,6 +8,7 @@ using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Reporting;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Reporting;
 
@@ -39,7 +41,13 @@ public sealed class ReadingActivityByDepartmentReportTests
                 LostPoints: 10,
                 LifetimeDays: 90,
                 RestrictedFromPoints: 5,
-                SuspendedFromPoints: 10)));
+                SuspendedFromPoints: 10)),
+            Options.Create(new ReportingOptions
+            {
+                DashboardCacheMinutes = 5,
+                TopBooksLimit = 10,
+                TopCategoriesLimit = 5
+            }));
 
     [Fact]
     public async Task Counts_loans_per_department_and_per_10_employees()

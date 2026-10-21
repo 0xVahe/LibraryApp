@@ -1,3 +1,4 @@
+using LibraryApp.Application.Reporting.Options;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
@@ -5,6 +6,7 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Repositories.Reporting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Reporting;
 
@@ -20,7 +22,7 @@ public sealed class ReadingActivityDatabase : IAsyncLifetime
     public static readonly Guid RiskCategoryId = Guid.NewGuid();
     public static readonly Guid TechnologyCategoryId = Guid.NewGuid();
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {
@@ -114,7 +116,12 @@ public sealed class ReadingActivityRepositoryTests(ReadingActivityDatabase datab
     public async Task Lists_every_department_with_employees_who_have_not_left()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = (await repository.GetDepartmentEmployeesAsync()).OrderBy(row => row.Department).ToList();
 
@@ -126,7 +133,12 @@ public sealed class ReadingActivityRepositoryTests(ReadingActivityDatabase datab
     public async Task Counts_loans_in_the_period_per_department_and_category()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetDepartmentCategoryLoansAsync(OctoberStartUtc, OctoberEndUtc);
 
