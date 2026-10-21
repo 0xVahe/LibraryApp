@@ -1,17 +1,18 @@
 using System.Text;
 using LibraryApp.Api.Staff;
+using LibraryApp.Api.Ui;
 using LibraryApp.Api.Ui.Forms;
 using LibraryApp.Api.Ui.Shared;
-using LibraryApp.Api.Ui;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Formatting;
 using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
@@ -59,7 +60,7 @@ public sealed class ImportModel(
             return FileError("Choose a non-empty CSV file.");
         var maxFileBytes = options.Value.Import.MaxFileBytes;
         if (CsvFile.Length > maxFileBytes)
-            return FileError($"The file must be {maxFileBytes} bytes or smaller.");
+            return FileError($"The file must be {StaffFileSizeFormatter.Format(maxFileBytes)} or smaller.");
 
         try
         {

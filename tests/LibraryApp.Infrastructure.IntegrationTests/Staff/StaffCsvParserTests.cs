@@ -99,6 +99,23 @@ public sealed class StaffCsvParserTests
         Assert.Contains($"{bytes.Length} bytes", error.Message);
     }
 
+    [Theory]
+    [InlineData(1000000, "1 MB")]
+    [InlineData(500000, "500 KB")]
+    public async Task Oversize_errors_display_the_configured_size(int maxBytes, string display)
+    {
+        var parser = new StaffCsvParser(Options.Create(new StaffOptions
+        {
+            Import = new() { MaxRows = 2, MaxFileBytes = maxBytes }
+        }));
+        using var stream = new MemoryStream(new byte[maxBytes + 1]);
+
+        var error = await Assert.ThrowsAsync<StaffCsvFormatException>(() => parser.ParseAsync(stream));
+
+        Assert.Equal("File", error.Field);
+        Assert.Equal($"The file must be {display} or smaller.", error.Message);
+    }
+
     private sealed class NonSeekableStream(byte[] bytes) : MemoryStream(bytes)
     {
         public override bool CanSeek => false;

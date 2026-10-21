@@ -33,6 +33,8 @@ public sealed class StaffOptionsValidatorTests
     [InlineData(3, 4096L, 0, 0, "RestrictedLimits:MaxLoans")]
     [InlineData(3, 4096L, -1, 0, "RestrictedLimits:MaxLoans")]
     [InlineData(3, 4096L, 1, -1, "RestrictedLimits:MaxRenewals")]
+    [InlineData(3, 4096L, 1, 1, "RestrictedLimits:MaxRenewals")]
+    [InlineData(3, 4096L, 1, 2, "RestrictedLimits:MaxRenewals")]
     [InlineData(3, 4096L, 1, null, "RestrictedLimits:MaxRenewals")]
     public void Invalid_or_missing_values_fail(int rows, long bytes, int loans, int? renewals, string key)
     {

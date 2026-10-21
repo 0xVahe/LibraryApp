@@ -1,6 +1,7 @@
 using System.Text;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Formatting;
 using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
 using Microsoft.Extensions.Options;
@@ -27,7 +28,7 @@ public sealed class StaffCsvParser(IOptions<StaffOptions> options) : IStaffCsvPa
         while ((read = await csv.ReadAsync(buffer.AsMemory(), ct)) != 0)
         {
             if (contentBuffer.Length + read > limits.MaxFileBytes)
-                throw new StaffCsvFormatException(1, "File", $"The file must be {limits.MaxFileBytes} bytes or smaller.");
+                throw new StaffCsvFormatException(1, "File", $"The file must be {StaffFileSizeFormatter.Format(limits.MaxFileBytes)} or smaller.");
             await contentBuffer.WriteAsync(buffer.AsMemory(0, read), ct);
         }
         contentBuffer.Position = 0;

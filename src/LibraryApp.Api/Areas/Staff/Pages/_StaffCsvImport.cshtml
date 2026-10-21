@@ -1,3 +1,4 @@
+@using LibraryApp.Application.Staff.Formatting
 @model IReadOnlyList<LibraryApp.Application.Staff.Dto.StaffImportError>
 @inject Microsoft.Extensions.Options.IOptions<LibraryApp.Application.Staff.Options.StaffOptions> StaffSettings
 @{
@@ -6,7 +7,7 @@
 <div class="stack">
     <section class="card" aria-labelledby="import-title">
         <div class="card-head"><h2 id="import-title">Import from CSV</h2></div>
-        <p class="small">Use UTF-8 CSV with department and category names. Up to @StaffSettings.Value.Import.MaxRows data rows, @StaffSettings.Value.Import.MaxFileBytes bytes.</p>
+        <p class="small">Use UTF-8 CSV with department and category names. Up to @StaffSettings.Value.Import.MaxRows data rows, @(StaffFileSizeFormatter.Format(StaffSettings.Value.Import.MaxFileBytes)).</p>
         <p class="hint">All rows are imported together. If any row is invalid, nothing is imported.</p>
         <form class="form mt-24" method="post" asp-page="./Import" enctype="multipart/form-data" novalidate>
             <div class="drop">

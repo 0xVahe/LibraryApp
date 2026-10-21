@@ -23,7 +23,7 @@ public sealed class ConfiguredStaffRulesFactory : ApiHostFactory
         builder.UseSetting("Staff:Import:MaxRows", "2");
         builder.UseSetting("Staff:Import:MaxFileBytes", "2048");
         builder.UseSetting("Staff:RestrictedLimits:MaxLoans", "2");
-        builder.UseSetting("Staff:RestrictedLimits:MaxRenewals", "1");
+        builder.UseSetting("Staff:RestrictedLimits:MaxRenewals", "0");
     }
 }
 
@@ -51,7 +51,7 @@ public sealed class ConfiguredStaffRulesTests(ConfiguredStaffRulesFactory factor
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("staff.import_invalid", body.GetProperty("code").GetString());
-        Assert.Contains("2048 bytes", body.GetProperty("rows")[0].GetProperty("message").GetString());
+        Assert.Contains("2.05 KB", body.GetProperty("rows")[0].GetProperty("message").GetString());
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class ConfiguredStaffRulesTests(ConfiguredStaffRulesFactory factor
             LoginPage.Email(StaffSeedIds.StaffMembers.AramSargsyan), StaffSeedData.Password);
         using var page = await client.GetAsync(ImportPage);
         var html = await page.Content.ReadAsStringAsync();
-        Assert.Contains("Up to 2 data rows, 2048 bytes.", html);
+        Assert.Contains("Up to 2 data rows, 2.05 KB.", html);
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
         Assert.NotEmpty(token);
         var cookies = string.Join("; ", client.DefaultRequestHeaders.GetValues("Cookie")) + "; " + UiTestClient.SetCookies(page);
@@ -90,7 +90,7 @@ public sealed class ConfiguredStaffRulesTests(ConfiguredStaffRulesFactory factor
         using var response = await client.PostAsync(ImportPage, content);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("The file must be 2048 bytes or smaller.", await response.Content.ReadAsStringAsync());
+        Assert.Contains("The file must be 2.05 KB or smaller.", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -103,6 +103,6 @@ public sealed class ConfiguredStaffRulesTests(ConfiguredStaffRulesFactory factor
             service.SetStatusAsync(memberId, StaffMemberStatus.Restricted, "Configured limit test", ct));
         var rules = await service.GetLendingRulesAsync(memberId);
         Assert.Equal(2, rules.MaxLoans);
-        Assert.Equal(1, rules.MaxRenewals);
+        Assert.Equal(0, rules.MaxRenewals);
     }
 }

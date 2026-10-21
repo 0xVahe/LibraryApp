@@ -296,7 +296,7 @@ public class StaffEnrolmentPageTests(ApiHostFactory factory) : IClassFixture<Api
         var response = await PostCsvAsync(client, new string('x', (int)factory.Services.GetRequiredService<IOptions<StaffOptions>>().Value.Import.MaxFileBytes + 1));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("The file must be 1000000 bytes or smaller.", await response.Content.ReadAsStringAsync());
+        Assert.Contains("The file must be 1 MB or smaller.", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]

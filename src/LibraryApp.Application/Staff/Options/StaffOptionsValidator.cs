@@ -24,8 +24,10 @@ public sealed class StaffOptionsValidator : IValidateOptions<StaffOptions>
         {
             if (options.RestrictedLimits.MaxLoans <= 0)
                 failures.Add("Staff:RestrictedLimits:MaxLoans is required and must be greater than zero.");
-            if (options.RestrictedLimits.MaxRenewals is null or < 0)
-                failures.Add("Staff:RestrictedLimits:MaxRenewals is required and must be zero or greater.");
+            // Borrowing's LoanRenewalService rejects Restricted members before checking lending rules.
+            // Allow positive limits only after coordinating renewal behavior with Group 3.
+            if (options.RestrictedLimits.MaxRenewals is not 0)
+                failures.Add("Staff:RestrictedLimits:MaxRenewals is required and must be 0 while Borrowing forbids renewals for Restricted members.");
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);

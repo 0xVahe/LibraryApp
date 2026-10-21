@@ -1,13 +1,14 @@
 using LibraryApp.Api.Staff;
-using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Formatting;
 using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
-using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using LibraryApp.Application.Common;
 using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.Controllers.Staff;
@@ -38,7 +39,7 @@ public sealed class StaffMembersController(
     {
         var maxFileBytes = options.Value.Import.MaxFileBytes;
         if (file.Length > maxFileBytes)
-            throw ImportFailure([new StaffImportError(1, "File", $"The file must be {maxFileBytes} bytes or smaller.")]);
+            throw ImportFailure([new StaffImportError(1, "File", $"The file must be {StaffFileSizeFormatter.Format(maxFileBytes)} or smaller.")]);
 
         try
         {

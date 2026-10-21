@@ -70,6 +70,8 @@ public sealed class StaffOptionsRegistrationTests
     [InlineData("Staff:Import:MaxFileBytes", "0")]
     [InlineData("Staff:RestrictedLimits:MaxLoans", "-1")]
     [InlineData("Staff:RestrictedLimits:MaxRenewals", "-1")]
+    [InlineData("Staff:RestrictedLimits:MaxRenewals", "1")]
+    [InlineData("Staff:RestrictedLimits:MaxRenewals", "2")]
     public async Task Invalid_values_prevent_host_start(string key, string value)
     {
         var settings = Valid();

@@ -94,9 +94,9 @@ public class StaffMemberServiceTests
     {
         var member = _repository.Add(StaffMemberStatus.Restricted, maxLoans: 5, loanDays: 30, maxRenewals: 2);
         var service = new StaffMemberService(_repository,
-            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 2, MaxRenewals = 1 } }));
+            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 2, MaxRenewals = 0 } }));
 
-        Assert.Equal(new LendingRules(2, 30, 1), await service.GetLendingRulesAsync(member.Id));
+        Assert.Equal(new LendingRules(2, 30, 0), await service.GetLendingRulesAsync(member.Id));
     }
 
     // ---- GetStatusAsync ----
