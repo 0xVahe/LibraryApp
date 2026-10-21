@@ -53,30 +53,11 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Import:MaxRows` | 200 | Maximum non-empty staff data rows, excluding the CSV header; positive integer | MEM-09 |
 | `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (in-memory parser bound) | MEM-09 |
 | `RestrictedLimits:MaxLoans` | 1 | Loan limit for Restricted members; positive integer | BR-MEM-3 |
-| `RestrictedLimits:MaxRenewals` | 0 | Required and must be exactly 0 while Borrowing forbids Restricted renewals | BR-MEM-3 |
+| `RestrictedLimits:MaxRenewals` | 0 | Renewal limit for Restricted members; must be 0 | BR-MEM-3 |
 
-All four values are required. Startup validation rejects missing or invalid settings,
-including an omitted `MaxRenewals`; an explicit `0` is valid. Parser, import service,
-API, Razor forms and lending-rule service use the same options. The HTTP request
-and multipart limits allow an additional 100000 bytes for the multipart envelope;
-the file-size rule itself remains `Import:MaxFileBytes`. Configure a reverse proxy's
-upload ceiling separately when increasing this setting. Staff-category limits stay
-in the administrator-managed database. `RestrictedLimits:MaxRenewals` must be exactly
-`0` because Borrowing's `LoanRenewalService` rejects Restricted renewals before checking
-lending rules. Positive values require coordination with Group 3 before they can be
-supported. Import text displays the configured bytes as readable decimal sizes
-(for example, `1000000` as `1 MB` and `500000` as `500 KB`); enforcement uses the exact
-byte value.
+All four values are required. Missing or invalid settings prevent startup, including an omitted `MaxRenewals`. Restricted members cannot renew, so `RestrictedLimits:MaxRenewals` must be exactly `0`. Staff-category limits remain in the administrator-managed database.
 
-#### Out of scope / follow-ups (Group 2 options inventory)
-
-- Remove the fallback defaults for `LoginRateLimit:PermitLimit` and
-  `LoginRateLimit:WindowSeconds` from `LoginRateLimiting.cs` in a separate PR,
-  keeping their values only in `appsettings.json` with startup validation.
-- Move password length (`8` in `IdentityRegistration`, both validators and the
-  Change password page text) and lockout settings into configuration in a separate
-  PR with Integration Owner approval. Update all consumers and startup validation
-  together.
+CSV file limits are enforced in bytes and displayed as readable decimal sizes (for example, `1000000` as `1 MB` and `500000` as `500 KB`). HTTP request and multipart limits include an additional 100000 bytes for the multipart envelope. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit.
 
 ### Access tokens (`Jwt`)
 
