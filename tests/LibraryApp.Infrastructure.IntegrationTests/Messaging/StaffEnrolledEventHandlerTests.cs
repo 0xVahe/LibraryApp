@@ -1,10 +1,16 @@
 using System.Collections.Concurrent;
+using LibraryApp.Application.Abstractions.Catalog;
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Messaging;
 using LibraryApp.Application.Notifications.EventHandlers;
+using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
+using LibraryApp.Domain.Notifications;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Extensions;
+using LibraryApp.Infrastructure.IntegrationTests.Identity;
 using LibraryApp.Infrastructure.Messaging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +32,9 @@ public sealed class StaffEnrolledEventHandlerTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddEventBus(configuration);
+        services.AddScoped<INotificationCreator, NoOpNotificationCreator>();
+        services.AddScoped<ICatalogService, StubCatalogService>();
+        services.AddSingleton<IClock>(new FixedClock(new DateTime(2026, 10, 10, 9, 0, 0, DateTimeKind.Utc)));   // these tests are about discovery, not about the notification
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -54,6 +63,9 @@ public sealed class StaffEnrolledEventHandlerTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddEventBus(configuration);
+        services.AddScoped<INotificationCreator, NoOpNotificationCreator>();
+        services.AddScoped<ICatalogService, StubCatalogService>();
+        services.AddSingleton<IClock>(new FixedClock(new DateTime(2026, 10, 10, 9, 0, 0, DateTimeKind.Utc)));   // these tests are about discovery, not about the notification
 
         var invocations = new HandlerInvocationRecorder();
         RegisterRecordingHandler<StaffEnrolled, StaffEnrolledEventHandler>(services, invocations);
@@ -64,6 +76,7 @@ public sealed class StaffEnrolledEventHandlerTests
         RegisterRecordingHandler<ReservationReady, ReservationReadyEventHandler>(services, invocations);
         RegisterRecordingHandler<PenaltyApplied, PenaltyAppliedEventHandler>(services, invocations);
         RegisterRecordingHandler<StaffStatusChanged, StaffStatusChangedEventHandler>(services, invocations);
+        RegisterRecordingHandler<StaffPasswordChanged, StaffPasswordChangedEventHandler>(services, invocations);
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -79,6 +92,7 @@ public sealed class StaffEnrolledEventHandlerTests
             new ReservationReady(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), occurredAtUtc.AddDays(3)),
             new PenaltyApplied(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), 1, 1, "Late return"),
             new StaffStatusChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), StaffMemberStatus.Active, StaffMemberStatus.Restricted, "Penalty threshold", null),
+            new StaffPasswordChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid()),
         };
 
         foreach (var domainEvent in events)
@@ -116,6 +130,7 @@ public sealed class StaffEnrolledEventHandlerTests
         ReservationReady value => PublishAsync<ReservationReady>(bus, value),
         PenaltyApplied value => PublishAsync<PenaltyApplied>(bus, value),
         StaffStatusChanged value => PublishAsync<StaffStatusChanged>(bus, value),
+        StaffPasswordChanged value => PublishAsync<StaffPasswordChanged>(bus, value),
         _ => throw new ArgumentOutOfRangeException(nameof(domainEvent), domainEvent.GetType().Name),
     };
 
@@ -128,6 +143,25 @@ public sealed class StaffEnrolledEventHandlerTests
             await inner.HandleAsync(domainEvent, ct);
             invocations.Record(domainEvent.EventId);
         }
+    }
+
+    private sealed class NoOpNotificationCreator : INotificationCreator
+    {
+        public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
+            IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values, Guid? loanId = null, bool ccLineManager = false, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class StubCatalogService : ICatalogService
+    {
+        public Task<BookDto?> GetBookAsync(Guid bookId, CancellationToken ct = default) =>
+            Task.FromResult<BookDto?>(new BookDto(bookId, "Clean Code", "9780132350884", 2008, "English", null,
+                Guid.NewGuid(), "Software", null, null, ["Robert C. Martin"], 1, 1, false));
+
+        public Task<BookCopyDto?> GetAvailableCopyAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task SetCopyStatusAsync(Guid copyId, BookCopyStatus status, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<BookCopyDto?> GetCopyByBarcodeAsync(string barcode, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<BookCopyDto>> GetCopiesAsync(IReadOnlyCollection<Guid> copyIds, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Guid>> GetCopyIdsAsync(Guid bookId, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class HandlerInvocationRecorder
