@@ -122,13 +122,32 @@ public sealed class PenaltyServiceTests
     }
 
     [Fact]
-    public async Task Every_record_with_points_publishes_PenaltyApplied_with_the_running_total()
+    public async Task One_operation_publishes_one_PenaltyApplied_with_the_sum_and_the_final_total()
     {
         PriorPoints(1);
 
-        await Apply(2, 3);
+        await Service().ApplyAsync(
+            LoanOfStaff(), [new ReturnPenaltyItem(2, "Returned 2 working days late"), new ReturnPenaltyItem(3, "Returned damaged")], Now);
+        _events.Commit();
 
-        Assert.Equal([3, 6], _events.Published.OfType<PenaltyApplied>().Select(e => e.ActivePointsTotal));
+        PenaltyApplied applied = Assert.Single(_events.Published.OfType<PenaltyApplied>());
+        Assert.Equal(5, applied.Points);
+        Assert.Equal(6, applied.ActivePointsTotal);
+        Assert.Equal("Returned 2 working days late; Returned damaged", applied.Reason);
+        Assert.Equal(Now, applied.OccurredAtUtc);
+        Assert.Equal(2, _penalties.Added.Count);
+    }
+
+    [Fact]
+    public async Task A_zero_point_record_adds_neither_points_nor_its_reason_to_the_event()
+    {
+        await Service().ApplyAsync(
+            LoanOfStaff(), [new ReturnPenaltyItem(0, "Returned late, no working day"), new ReturnPenaltyItem(5, "Returned damaged")], Now);
+        _events.Commit();
+
+        PenaltyApplied applied = Assert.Single(_events.Published.OfType<PenaltyApplied>());
+        Assert.Equal((5, 5, "Returned damaged"), (applied.Points, applied.ActivePointsTotal, applied.Reason));
+        Assert.Equal(2, _penalties.Added.Count);
     }
     
     [Fact]
