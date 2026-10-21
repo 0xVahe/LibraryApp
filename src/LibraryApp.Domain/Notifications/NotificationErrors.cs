@@ -42,6 +42,10 @@ public static class NotificationErrors
     public static readonly Error BookNotFound =
         Error.NotFound("notifications.book_not_found", "The book to notify about does not exist.");
 
+    /// <summary>A suspension notice needs the end date of the suspension, and the event did not carry one.</summary>
+    public static readonly Error EffectiveUntilRequired =
+        Error.Validation("notifications.effective_until_required", "A suspension notification needs the end date of the suspension.");
+
     // Template
     /// <summary>No active template of the type exists (NOT-02, G4-08).</summary>
     public static readonly Error TemplateNotFound =

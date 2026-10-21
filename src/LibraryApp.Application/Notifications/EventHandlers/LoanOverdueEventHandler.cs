@@ -37,6 +37,6 @@ public sealed class LoanOverdueEventHandler(
 
         await creator.CreateAsync(
             NotificationType.OverdueNotice, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values,
-            domainEvent.LoanId, ct);
+            domainEvent.LoanId, ct: ct);
     }
 }

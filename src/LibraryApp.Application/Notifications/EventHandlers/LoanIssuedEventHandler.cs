@@ -37,6 +37,6 @@ public sealed class LoanIssuedEventHandler(
 
         await creator.CreateAsync(
             NotificationType.LoanConfirmation, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values,
-            domainEvent.LoanId, ct);
+            domainEvent.LoanId, ct: ct);
     }
 }

@@ -87,7 +87,7 @@ public sealed class LoanReturnedEventHandlerTests
 
         public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
             IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values,
-            Guid? loanId = null, CancellationToken ct = default)
+            Guid? loanId = null, bool ccLineManager = false, CancellationToken ct = default)
         {
             Calls.Add(new CreatorCall(type, staffMemberId, eventId, channels, values, loanId));
             return Task.CompletedTask;

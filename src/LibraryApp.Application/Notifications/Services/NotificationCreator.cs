@@ -21,6 +21,7 @@ public sealed class NotificationCreator(
         IReadOnlyCollection<NotificationChannel> channels,
         IReadOnlyDictionary<string, string> values,
          Guid? loanId = null,
+        bool ccLineManager = false,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(channels);
@@ -66,7 +67,8 @@ public sealed class NotificationCreator(
         RenderedNotification rendered = renderer.Render(template.Subject, template.BodyTemplate, all);
 
         Notification Create(NotificationChannel channel) => Notification.Create(
-            ids.NewId(), staffMemberId, type, channel, recipient.Email, ccEmail: null,
+            ids.NewId(), staffMemberId, type, channel, recipient.Email,
+            ccEmail: ccLineManager && channel == NotificationChannel.Outlook ? recipient.LineManagerEmail : null,
             rendered.Subject, rendered.HtmlBody, nowUtc, localDate, loanId, eventId);
 
         foreach (NotificationChannel channel in missing)

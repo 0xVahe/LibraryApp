@@ -121,6 +121,24 @@ public sealed class StaffEnrolledEventHandlerTests
     }
 
     [Fact]
+    public async Task The_line_manager_is_copied_only_on_the_outlook_row_and_only_when_asked()
+    {
+        var fixture = new Fixture();
+        var none = new Dictionary<string, string>();
+        var both = new[] { NotificationChannel.Outlook, NotificationChannel.InApp };
+        var copied = Guid.NewGuid();
+        var notCopied = Guid.NewGuid();
+
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, copied, both, none, ccLineManager: true);
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, notCopied, both, none);
+
+        Assert.Equal("manager@ameriabank.am",
+            fixture.Notifications.Items.Single(n => n.EventId == copied && n.Channel == NotificationChannel.Outlook).CcEmail);
+        Assert.Null(fixture.Notifications.Items.Single(n => n.EventId == copied && n.Channel == NotificationChannel.InApp).CcEmail);
+        Assert.All(fixture.Notifications.Items.Where(n => n.EventId == notCopied), n => Assert.Null(n.CcEmail));
+    }
+
+    [Fact]
     public async Task A_different_event_for_the_same_member_creates_its_own_notifications()
     {
         var fixture = new Fixture();
@@ -237,7 +255,7 @@ public sealed class StaffEnrolledEventHandlerTests
     {
         public Task<NotificationRecipient?> FindAsync(Guid staffMemberId, CancellationToken ct = default) =>
             Task.FromResult(staffMemberId == StaffId
-                ? new NotificationRecipient(StaffId, "Anna Petrosyan", "anna@ameriabank.am")
+                ? new NotificationRecipient(StaffId, "Anna Petrosyan", "anna@ameriabank.am", "manager@ameriabank.am")
                 : null);
     }
 

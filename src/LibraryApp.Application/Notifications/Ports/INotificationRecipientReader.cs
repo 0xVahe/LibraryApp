@@ -9,4 +9,5 @@ public interface INotificationRecipientReader
 
 /// <param name="FullName">"First Last", used as {{EmployeeName}}.</param>
 /// <param name="Email">Corporate email (stored in lower case).</param>
-public sealed record NotificationRecipient(Guid StaffMemberId, string FullName, string Email);
+/// <param name="LineManagerEmail">Line manager's email (stored in lower case), or null; copied on some notices.</param>
+public sealed record NotificationRecipient(Guid StaffMemberId, string FullName, string Email, string? LineManagerEmail = null);

@@ -29,6 +29,6 @@ public sealed class PenaltyAppliedEventHandler(INotificationCreator creator) : I
 
         return creator.CreateAsync(
             NotificationType.PenaltyApplied, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values,
-            domainEvent.LoanId, ct);
+            domainEvent.LoanId, ct: ct);
     }
 }

@@ -15,6 +15,8 @@ public interface INotificationCreator
     /// Must run inside the caller's unit of work (event handlers do). An event that already created this type is ignored (G4-09).
     /// <paramref name="loanId"/> is stored when the notification is about a loan; then a channel that already has this
     /// type for this loan on the same Yerevan day is skipped (NOT-06, G4-02).
+    /// With <paramref name="ccLineManager"/> the recipient's line manager is put in CC of the Outlook row (when the
+    /// recipient has one); in-app rows have no CC.
     /// {{EmployeeName}} is added from the recipient; <paramref name="values"/> carries the other placeholders.
     /// </summary>
     /// <exception cref="Domain.Common.DomainException">The recipient or the active template does not exist.</exception>
@@ -28,5 +30,6 @@ public interface INotificationCreator
         IReadOnlyCollection<NotificationChannel> channels,
         IReadOnlyDictionary<string, string> values,
         Guid? loanId = null,
+        bool ccLineManager = false,
         CancellationToken ct = default);
 }

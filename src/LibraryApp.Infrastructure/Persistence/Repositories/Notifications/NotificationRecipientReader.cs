@@ -9,6 +9,6 @@ public sealed class NotificationRecipientReader(LibraryDbContext db) : INotifica
     public Task<NotificationRecipient?> FindAsync(Guid staffMemberId, CancellationToken ct = default) =>
         db.StaffMembers.AsNoTracking()
             .Where(x => x.Id == staffMemberId)
-            .Select(x => new NotificationRecipient(x.Id, x.FirstName + " " + x.LastName, x.CorporateEmail))
+            .Select(x => new NotificationRecipient(x.Id, x.FirstName + " " + x.LastName, x.CorporateEmail, x.LineManagerEmail))
             .SingleOrDefaultAsync(ct);
 }
