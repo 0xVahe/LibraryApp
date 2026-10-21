@@ -1,0 +1,157 @@
+@page "/settings"
+@model SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='new PageHeadModel("Settings", "Manage departments and staff borrowing limits.")' />
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="ModelOnly" class="alert alert-red mb-16" role="alert"></div>
+}
+
+<section class="card flush mb-24" aria-labelledby="departments-heading">
+    <div class="card-head">
+        <div>
+            <h2 id="departments-heading">Departments</h2>
+            <p class="small muted">Add or rename departments. Departments cannot be deleted.</p>
+        </div>
+    </div>
+    <form class="form form-2 card-filters" method="post" asp-page-handler="CreateDepartment" novalidate>
+        <div class="field">
+            <label for="department-create-name">Department name</label>
+            <input id="department-create-name" name="Name" value="@Model.DepartmentInput.Name" maxlength="100" required
+                   aria-invalid="@Model.Invalid("department-create", "Name")" aria-describedby="department-create-name-error">
+            <span class="error-text" id="department-create-name-error">@Model.ErrorFor("department-create", "Name")</span>
+        </div>
+        <div class="form-actions department-create-actions">
+            <button class="btn btn-primary department-create-submit" type="submit">Add department</button>
+        </div>
+    </form>
+    <table class="table">
+            <thead><tr><th scope="col">Department</th><th scope="col">Rename</th></tr></thead>
+            <tbody>
+            @foreach (var department in Model.Departments)
+            {
+                var editing = Model.EditingDepartmentId == department.Id;
+                var name = editing ? Model.DepartmentEditInput.Name : department.Name;
+                <tr>
+                    <td data-label="Department">@department.Name</td>
+                    <td data-label="Rename">
+                        <form class="form" method="post" asp-page-handler="RenameDepartment" novalidate>
+                            <input type="hidden" name="id" value="@department.Id">
+                            <div class="field">
+                                <label for="department-@department.Id">New department name</label>
+                                <input id="department-@department.Id" name="Name" value="@name" maxlength="100" required
+                                       aria-invalid="@(editing ? Model.Invalid("department-edit", "Name") : null)" aria-describedby="department-@department.Id-error">
+                                <span class="error-text" id="department-@department.Id-error">@(editing ? Model.ErrorFor("department-edit", "Name") : null)</span>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-secondary btn-sm" type="submit">Save name</button>
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (Model.Departments.Count == 0)
+            {
+                <tr><td data-label="Departments" colspan="2" class="muted">No departments yet.</td></tr>
+            }
+            </tbody>
+    </table>
+</section>
+
+<section class="card flush" aria-labelledby="categories-heading">
+    <div class="card-head">
+        <div>
+            <h2 id="categories-heading">Staff categories</h2>
+            <p class="small muted">Set the borrowing limits used for each staff category.</p>
+        </div>
+    </div>
+    <form class="form form-2 card-filters" method="post" asp-page-handler="CreateCategory" novalidate>
+        <div class="field">
+            <label for="category-create-name">Category name</label>
+            <input id="category-create-name" name="Name" value="@Model.CategoryInput.Name" maxlength="100" required
+                   aria-invalid="@Model.Invalid("category-create", "Name")" aria-describedby="category-create-name-error">
+            <span class="error-text" id="category-create-name-error">@Model.ErrorFor("category-create", "Name")</span>
+        </div>
+        <div class="field">
+            <label for="category-create-books">Maximum books</label>
+            <input id="category-create-books" name="MaxLoans" type="number" min="1" value="@Model.CategoryInput.MaxLoans" required
+                   aria-invalid="@Model.Invalid("category-create", "MaxLoans")" aria-describedby="category-create-books-error">
+            <span class="error-text" id="category-create-books-error">@Model.ErrorFor("category-create", "MaxLoans")</span>
+        </div>
+        <div class="field">
+            <label for="category-create-days">Loan days</label>
+            <input id="category-create-days" name="LoanDays" type="number" min="1" value="@Model.CategoryInput.LoanDays" required
+                   aria-invalid="@Model.Invalid("category-create", "LoanDays")" aria-describedby="category-create-days-error">
+            <span class="error-text" id="category-create-days-error">@Model.ErrorFor("category-create", "LoanDays")</span>
+        </div>
+        <div class="field">
+            <label for="category-create-renewals">Maximum renewals</label>
+            <input id="category-create-renewals" name="MaxRenewals" type="number" min="0" value="@Model.CategoryInput.MaxRenewals" required
+                   aria-invalid="@Model.Invalid("category-create", "MaxRenewals")" aria-describedby="category-create-renewals-error">
+            <span class="error-text" id="category-create-renewals-error">@Model.ErrorFor("category-create", "MaxRenewals")</span>
+        </div>
+        <div class="form-actions field-wide">
+            <button class="btn btn-primary" type="submit">Add staff category</button>
+        </div>
+    </form>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Category</th>
+                <th scope="col">Books</th>
+                <th scope="col">Days</th>
+                <th scope="col">Renewals</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var category in Model.Categories)
+        {
+            var editing = Model.EditingCategoryId == category.Id;
+            var input = editing ? Model.CategoryEditInput : new LibraryApp.Application.Staff.Dto.UpsertStaffCategoryRequest(
+                category.Name, category.MaxLoans, category.LoanDays, category.MaxRenewals);
+            var formId = $"update-category-{category.Id}";
+            <tr>
+                <td data-label="Category">
+                    <label class="visually-hidden" for="category-name-@category.Id">Category name</label>
+                    <input id="category-name-@category.Id" name="Name" form="@formId" value="@input.Name" maxlength="100" required
+                           aria-invalid="@(editing ? Model.Invalid("category-edit", "Name") : null)" aria-describedby="category-name-@category.Id-error">
+                    <span class="error-text" id="category-name-@category.Id-error">@(editing ? Model.ErrorFor("category-edit", "Name") : null)</span>
+                </td>
+                <td data-label="Books">
+                    <label class="visually-hidden" for="category-books-@category.Id">Maximum books</label>
+                    <input id="category-books-@category.Id" name="MaxLoans" form="@formId" type="number" min="1" value="@input.MaxLoans" required
+                           aria-invalid="@(editing ? Model.Invalid("category-edit", "MaxLoans") : null)" aria-describedby="category-books-@category.Id-error">
+                    <span class="error-text" id="category-books-@category.Id-error">@(editing ? Model.ErrorFor("category-edit", "MaxLoans") : null)</span>
+                </td>
+                <td data-label="Days">
+                    <label class="visually-hidden" for="category-days-@category.Id">Loan days</label>
+                    <input id="category-days-@category.Id" name="LoanDays" form="@formId" type="number" min="1" value="@input.LoanDays" required
+                           aria-invalid="@(editing ? Model.Invalid("category-edit", "LoanDays") : null)" aria-describedby="category-days-@category.Id-error">
+                    <span class="error-text" id="category-days-@category.Id-error">@(editing ? Model.ErrorFor("category-edit", "LoanDays") : null)</span>
+                </td>
+                <td data-label="Renewals">
+                    <label class="visually-hidden" for="category-renewals-@category.Id">Maximum renewals</label>
+                    <input id="category-renewals-@category.Id" name="MaxRenewals" form="@formId" type="number" min="0" value="@input.MaxRenewals" required
+                           aria-invalid="@(editing ? Model.Invalid("category-edit", "MaxRenewals") : null)" aria-describedby="category-renewals-@category.Id-error">
+                    <span class="error-text" id="category-renewals-@category.Id-error">@(editing ? Model.ErrorFor("category-edit", "MaxRenewals") : null)</span>
+                </td>
+                <td data-label="Actions" class="actions">
+                    <form id="@formId" method="post" asp-page-handler="UpdateCategory">
+                        <input type="hidden" name="id" value="@category.Id">
+                        <button class="btn btn-secondary btn-sm" type="submit">Save</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        @if (Model.Categories.Count == 0)
+        {
+            <tr><td data-label="Categories" colspan="5" class="muted">No staff categories yet.</td></tr>
+        }
+        </tbody>
+    </table>
+</section>
