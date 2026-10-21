@@ -170,6 +170,46 @@ Databases left by an interrupted run (for example after stopping the test proces
 
 Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
 
+## Performance benchmark
+
+NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,000 loans." `benchmark/LibraryApp.Benchmark` is a console application, not a test: CI does not build or run it, and `dotnet test` builds it but finds no tests in it. It times the running API over HTTP (Kestrel, authentication, database and serialization included) and writes a report to `docs/performance/`.
+
+| Command | What it does |
+|---|---|
+| `seed [--total 10000]` | Adds synthetic returned loans (built by `Loan.Issue` and `Loan.Return`, spread over the last year, no overlapping loans of a copy) until the database holds the target number of loans. A second run adds nothing. No audit rows and no events are written. |
+| `clean` | Removes the loans added by `seed` (their ids start with `be7c0000-0000-0000-0000-`). |
+| `run [--base-url http://localhost:5055] [--iterations 50] [--warmup 5]` | Signs in with the seeded accounts (Administrator, Librarian, Staff Member), calls 16 read endpoints of every module, the three reports included, one at a time, and writes the report. Exit code 0: every endpoint within its limit; 1: a limit exceeded or a call failed; 2: the run could not be done. |
+
+The database is the one of `ConnectionStrings__LibraryDb` (environment or `.env`), or `--connection`. Only a local SQL Server and a local API are accepted unless `--allow-remote` is given. The seeded password of the test accounts is used unless `--password` or `LIBRARYAPP_BENCHMARK_PASSWORD` is set.
+
+A run on a separate database keeps the development data unchanged:
+
+```bash
+docker compose up -d sqlserver
+```
+```bash
+export ConnectionStrings__LibraryDb="Server=localhost,1433;Database=LibraryApp_Benchmark;User Id=sa;Password=<MSSQL_SA_PASSWORD>;TrustServerCertificate=True"
+```
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/LibraryApp.Api -c Release --no-launch-profile --urls http://localhost:5155
+```
+In a second terminal with the same `ConnectionStrings__LibraryDb`, once `http://localhost:5155/health/ready` answers 200 (the API has created and seeded the database):
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- seed
+```
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- run --base-url http://localhost:5155
+```
+
+**The report.** File name: `yyyy-MM-dd[_tag]_<commit>[-dirty].md` (Asia/Yerevan date; `-dirty` when the working tree has uncommitted changes, so the measured code is not exactly the commit). It holds the result per endpoint (min, p50, p95, max, mean, the first call before warm-up, errors), the manifest (commit, tag, branch, API address, OS, CPU, memory, .NET, SQL Server version, row counts of the database) and every measured time. An endpoint passes when every call succeeded and its 95th percentile is within its limit. The dashboard report is cached by the application (`Reporting:DashboardCacheMinutes`): its measured calls are cache hits, and its first call shows the uncached time.
+
+**For comparable numbers:**
+- run the API in Release (`-c Release`), with no debugger attached, and wait until `/health/ready` answers;
+- keep the machine otherwise idle: no build, test run, IDE indexing or second API instance at the same time; on a laptop, connect the power supply;
+- commit first, so the report names exactly the measured code (no `-dirty`);
+- compare only reports made on the same machine: the manifest records which one; numbers of a GitHub runner or another computer are not comparable;
+- one report is one sample: when a result is close to a limit, repeat the run.
+
 ## Demo data
 
 In Development the API seeds synthetic data (C-2) at start: 57 books with 115 copies, 30 staff members in 6 departments, and 40 loans of which 6 are overdue (the dashboard shows an overdue rate of 15.0 %), with a reservation queue, a copy held for pickup and penalty records in every status. Loan dates are counted from the moment of seeding: the figures stay exact for 12 days, after which more loans become overdue.
