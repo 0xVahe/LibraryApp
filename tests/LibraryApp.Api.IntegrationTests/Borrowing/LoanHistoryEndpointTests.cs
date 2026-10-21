@@ -19,7 +19,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-09 (BOR-10, NFR-03) through HTTP on SQL Server: the loan history per staff member and per book, with the status
+/// BOR-10, NFR-03 through HTTP on SQL Server: the loan history per staff member and per book, with the status
 /// filter and paging, newest first; a Staff Member gets only their own loans. The class seeds its loans once on a host
 /// without the Borrowing seed.
 /// </summary>
@@ -108,7 +108,7 @@ public class LoanHistoryEndpointTests(LoanHistoryEndpointTests.Host factory) : I
         Assert.Equal(factory.TigranOld.Id, Assert.Single(second.Items).LoanId);
         Assert.Equal((3, 2, 2), (second.TotalCount, second.Page, second.PageSize));
 
-        // SD-14: page below 1 is page 1, the page size is at most 100.
+        // Page below 1 is page 1, the page size is at most 100.
         PagedResult<LoanHistoryItemDto> clamped = await GetAsync(
             StaffRoles.Librarian, $"staffMemberId={Members.TigranMelikyan}&page=0&pageSize=1000");
         Assert.Equal((1, PageRequest.MaxPageSize, 3), (clamped.Page, clamped.PageSize, clamped.Items.Count));

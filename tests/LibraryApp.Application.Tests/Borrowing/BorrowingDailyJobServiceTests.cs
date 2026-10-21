@@ -256,7 +256,7 @@ public sealed class BorrowingDailyJobServiceTests
     }
 
     [Theory]
-    // Held on Friday 16 October: 3 working days (BOR-07) end on Wednesday 21 October at local midnight (BQ-BA-12).
+    // Held on Friday 16 October: 3 working days (BOR-07) end on Wednesday 21 October at local midnight.
     [InlineData("2026-10-21T23:59:00", false)]   // the last minute of the third working day
     [InlineData("2026-10-22T00:30:00", true)]    // the next daily job (BOR-06, 00:30)
     public async Task Pickup_held_on_friday_expires_at_the_first_daily_job_after_the_third_working_day(
@@ -298,13 +298,13 @@ public sealed class BorrowingDailyJobServiceTests
         Assert.Equal(new[] { $"lock:{BorrowingLocks.Book(_bookId)}" }, _locks.Log);
         Assert.Equal(0, expired.QueuePosition);
 
-        // Tuesday 20 October + 3 working days → the end of Friday 23 October, local time (BOR-07, BQ-BA-12).
+        // Tuesday 20 October + 3 working days → the end of Friday 23 October, local time (BOR-07).
         DateTime newDeadline = new DateTime(2026, 10, 23, 20, 0, 0, DateTimeKind.Utc).AddTicks(-1);
         Assert.Equal(ReservationStatus.ReadyForPickup, first.Status);
         Assert.Equal(newDeadline, first.ReadyUntilUtc);
         Assert.Equal((1, 2), (second.QueuePosition, third.QueuePosition));
 
-        // One event, for the next member only: no message about the expiry itself (BQ-BA-13).
+        // One event, for the next member only: no message about the expiry itself.
         var ready = Assert.IsType<ReservationReady>(Assert.Single(_events.Published));
         Assert.Equal(first.Id, ready.ReservationId);
         Assert.Equal(_bookId, ready.BookId);

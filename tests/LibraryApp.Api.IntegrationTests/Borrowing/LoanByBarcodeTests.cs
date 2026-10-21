@@ -10,7 +10,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-21: the Loan desk finds the open loan of a copy by its barcode (BOR-03), through the real Catalog lookup and SQL
+/// The Loan desk finds the open loan of a copy by its barcode (BOR-03), through the real Catalog lookup and SQL
 /// Server. Every test uses its own copies.
 /// </summary>
 public class LoanByBarcodeTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>

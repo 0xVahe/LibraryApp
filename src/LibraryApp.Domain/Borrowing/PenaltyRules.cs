@@ -1,7 +1,7 @@
 namespace LibraryApp.Domain.Borrowing;
 
 /// <summary>
-/// The values of the penalty-point policy (BOR-05, BR-BOR-6). Plain values only: the Domain does not read configuration;
+/// The values of the penalty-point policy (BOR-05). Plain values only: the Domain does not read configuration;
 /// the Borrowing module builds them from the "Borrowing:Penalties" settings and validates them at start.
 /// </summary>
 /// <param name="PointsPerLateWorkingDay">Points for each working day a loan is returned late.</param>

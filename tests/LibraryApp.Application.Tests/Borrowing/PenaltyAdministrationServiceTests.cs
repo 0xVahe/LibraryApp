@@ -11,7 +11,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
-/// <summary>G3-08 (BOR-08): the waiver under the owner's staff lock, the status recalculated in the same transaction.</summary>
+/// <summary>BOR-08: the waiver under the owner's staff lock, the status recalculated in the same transaction.</summary>
 public sealed class PenaltyAdministrationServiceTests
 {
     private static readonly DateTime Now = new(2026, 10, 20, 8, 0, 0, DateTimeKind.Utc);

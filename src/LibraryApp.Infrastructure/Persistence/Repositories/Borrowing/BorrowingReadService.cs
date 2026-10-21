@@ -29,7 +29,7 @@ public sealed class BorrowingReadService(LibraryDbContext db, IClock clock) : IB
             .Select(r => new OpenReservationInfo(r.Id, r.BookId, r.Status, r.QueuePosition, r.ReadyUntilUtc, r.CreatedAtUtc))
             .ToListAsync(ct);
 
-        // Points stop counting at ExpiresAtUtc even before the daily job marks the record Expired (BQ-G2-11, note 2).
+        // Points stop counting at ExpiresAtUtc even before the daily job marks the record Expired.
         DateTime now = clock.UtcNow;
         // The book through the penalty's loan and that loan's copy (foreign keys), in the same query.
         List<ActivePenaltyInfo> penalties = await (

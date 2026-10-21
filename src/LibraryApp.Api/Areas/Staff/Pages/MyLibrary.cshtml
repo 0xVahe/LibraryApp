@@ -1,0 +1,30 @@
+@page "/my-library"
+@model MyLibraryModel
+@{
+    ViewData["Title"] = "My library";
+    var memberId = Model.Profile.Id;
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel($"Hello, {Model.Profile.FirstName}",
+             "Your books, reservations and standing in the library.",
+             [new PageAction("Browse the catalog", UiNavigation.Catalog, Primary: true)]))' />
+
+<div class="stack-lg">
+    <vc:overdue-banner staff-member-id="@memberId" />
+    <partial name="_MyLibraryStats" model="Model" />
+    <div class="grid grid-side">
+        <div class="stack-lg">
+            <vc:my-loans staff-member-id="@memberId" />
+            <vc:my-reservations staff-member-id="@memberId" />
+        </div>
+        <aside class="stack-lg" aria-label="My profile and standing">
+            <vc:my-profile-card />
+            <vc:my-penalties staff-member-id="@memberId" />
+            @* Group 4's LatestNotifications View Component belongs here once its contract is merged. *@
+            <section class="card" aria-labelledby="latest-emails-title">
+                <div class="card-head"><h2 id="latest-emails-title">Latest emails</h2></div>
+                <p class="muted">Latest notifications are currently unavailable.</p>
+            </section>
+        </aside>
+    </div>
+</div>

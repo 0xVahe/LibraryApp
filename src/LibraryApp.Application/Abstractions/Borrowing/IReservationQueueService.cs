@@ -1,7 +1,7 @@
 namespace LibraryApp.Application.Abstractions.Borrowing;
 
 /// <summary>
-/// The reservation queue of a book (BOR-07), as Catalog uses it (agreed answer BQ-G1-10). Provider: Group 3 (Borrowing).
+/// The reservation queue of a book (BOR-07), as Catalog uses it. Provider: Group 3 (Borrowing).
 /// Consumer: Group 1 (Catalog).
 /// </summary>
 public interface IReservationQueueService

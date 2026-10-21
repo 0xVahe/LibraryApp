@@ -11,9 +11,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace LibraryApp.Api.Areas.Borrowing.Pages;
 
 /// <summary>
-/// Declares the copy of an open loan lost (BOR-09, G3-22) from the "Declare lost" button of a loan row in
+/// Declares the copy of an open loan lost (BOR-09) from the "Declare lost" button of a loan row in
 /// <c>StaffBorrowingSummary</c> on Group 2's Staff member page, then goes back to that page (Post/Redirect/Get) with an
-/// amber or red <c>_Alert</c>. Library staff only: the G3-07 service leaves the role to its caller, as the API does.
+/// amber or red <c>_Alert</c>. Library staff only: the service leaves the role to its caller, as the API does.
 /// The form lives on another group's page, so a refusal (already returned or lost, not past due) is a red alert there.
 /// </summary>
 [Authorize(Policy = UiPolicies.LibraryStaff)]

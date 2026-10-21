@@ -10,7 +10,7 @@ using LibraryApp.Application.Borrowing.Options;
 namespace LibraryApp.Application.Tests.Borrowing;
 
 /// <summary>
-/// The shared penalty component (G3-01; reused by the daily job, lost and waive): records, events and the staff status
+/// The shared penalty component (reused by the daily job, lost and waive): records, events and the staff status
 /// from <see cref="PenaltyPolicy"/>, with default settings (Restricted from 5, Suspended from 10, 30 days).
 /// </summary>
 public sealed class PenaltyServiceTests
@@ -83,7 +83,7 @@ public sealed class PenaltyServiceTests
     }
 
     /// <summary>
-    /// After a suspension has ended the employee is Restricted while the points stay at 10 or more (BQ-BA-01); a new
+    /// After a suspension has ended the employee is Restricted while the points stay at 10 or more; a new
     /// penalty does not suspend again, because this operation does not cross the threshold.
     /// </summary>
     [Fact]

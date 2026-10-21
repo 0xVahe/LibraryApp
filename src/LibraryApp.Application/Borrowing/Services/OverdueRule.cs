@@ -5,9 +5,9 @@ using Microsoft.Extensions.Options;
 namespace LibraryApp.Application.Borrowing.Services;
 
 /// <summary>
-/// The one answer to "is this loan overdue at this moment" (BQ-BA-05, setting <c>Borrowing:Loans:OverdueFrom</c>).
+/// The one answer to "is this loan overdue at this moment" (setting <c>Borrowing:Loans:OverdueFrom</c>).
 /// <c>NextLocalDay</c>: from the local day after the due date (the whole due date is allowed); <c>DueTime</c>: from the exact
-/// due time. Used by the return (late points) and by the daily job that marks loans Overdue (G3-04), so a loan the job
+/// due time. Used by the return (late points) and by the daily job that marks loans Overdue, so a loan the job
 /// marks is always late when it comes back. <see cref="Domain.Borrowing.Loan.MarkOverdue"/> only refuses a moment before
 /// the due time, which both variants respect.
 /// </summary>

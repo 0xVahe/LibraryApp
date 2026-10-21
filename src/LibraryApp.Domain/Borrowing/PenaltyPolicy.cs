@@ -3,7 +3,7 @@
 namespace LibraryApp.Domain.Borrowing;
 
 /// <summary>
-/// The penalty-point policy (BOR-05, BR-BOR-6): points for late, damaged and lost copies, how long they count and the
+/// The penalty-point policy (BOR-05): points for late, damaged and lost copies, how long they count and the
 /// staff status they give. One policy for every Borrowing use case, the daily job and the seed; the values come from
 /// <see cref="PenaltyRules"/>.
 /// </summary>
@@ -38,7 +38,7 @@ public class PenaltyPolicy(PenaltyRules rules)
         return createdAtUtc.AddDays(rules.LifetimeDays);
     }
 
-    /// <summary>The status the active penalty points give: Restricted and Suspended from their thresholds (BR-BOR-6).</summary>
+    /// <summary>The status the active penalty points give: Restricted and Suspended from their thresholds (penalty-point policy).</summary>
     public StaffMemberStatus GetStatus(int activePoints)
     {
         if (activePoints < rules.RestrictedFromPoints)
