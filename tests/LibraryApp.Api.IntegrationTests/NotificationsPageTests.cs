@@ -88,6 +88,25 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
     }
 
     [Fact]
+    public async Task Empty_page_goes_to_the_last_page()
+    {
+        // Its own member, so the 21 rows do not change the other tests.
+        var subjects = new List<string>();
+        for (int minute = 100; minute < 121; minute++)
+            subjects.Add(await AddAsync(Members.MariamAvetisyan, minute));
+        string cookie = await CookieAsync("mariam.avetisyan@ameriabank.am");
+
+        // Page 2 holds the oldest one only; marking it leaves 20 unread, all on page 1.
+        using var marked = await PostReadAsync(cookie, await IdOfAsync(subjects[0]), unread: true, page: 2);
+        Assert.Equal(Route + "?unread=true&page=2", marked.Headers.Location?.ToString());
+
+        var (response, _, _) = await GetAsync(cookie, Route + "?unread=true&page=2");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(Route + "?unread=true", response.Headers.Location?.ToString());
+    }
+
+    [Fact]
     public async Task My_library_shows_the_latest()
     {
         string subject = await AddAsync(Members.AnnaPetrosyan, minute: 9);
@@ -111,7 +130,7 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
     }
 
     /// <summary>Posts the "Mark as read" form like a browser: the antiforgery token and cookie come from the page.</summary>
-    private async Task<HttpResponseMessage> PostReadAsync(string auth, Guid id)
+    private async Task<HttpResponseMessage> PostReadAsync(string auth, Guid id, bool unread = false, int page = 1)
     {
         var (_, html, set) = await GetAsync(auth, Route);
         string token = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
@@ -120,7 +139,8 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
         var post = new HttpRequestMessage(HttpMethod.Post, Route + "?handler=Read")
         {
             Content = new FormUrlEncodedContent([
-                new("id", id.ToString()), new("unread", "false"), new("page", "1"), new("__RequestVerificationToken", token)]),
+                new("id", id.ToString()), new("unread", unread ? "true" : "false"), new("page", page.ToString()),
+                new("__RequestVerificationToken", token)]),
         };
         post.Headers.Add("Cookie", $"{auth}; {set}");
         return await UiTestClient.Anonymous(factory).SendAsync(post);

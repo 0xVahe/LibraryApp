@@ -25,10 +25,16 @@ public sealed class IndexModel(INotificationService notifications, IClock clock)
 
     public PagedResult<NotificationDto> Result { get; private set; } = new([], 0, 1, PageRequest.DefaultPageSize);
 
-    public async Task OnGetAsync([FromQuery(Name = PagerModel.PageParameter)] int page, CancellationToken ct)
+    public async Task<IActionResult> OnGetAsync([FromQuery(Name = PagerModel.PageParameter)] int page, CancellationToken ct)
     {
         Response.Headers.CacheControl = "no-store";
         Result = await notifications.ListAsync(Unread, new PageRequest(page), ct);
+
+        // A page past the end (e.g. after marking the only item of the last page) goes to the last page with items.
+        if (Result.Items.Count == 0 && Result.Page > 1 && Result.TotalPages > 0)
+            return LocalRedirect(PathOf(Unread, Result.TotalPages));
+
+        return Page();
     }
 
     public async Task<IActionResult> OnPostReadAsync(Guid id, bool unread, int page, CancellationToken ct)
@@ -42,8 +48,13 @@ public sealed class IndexModel(INotificationService notifications, IClock clock)
             return this.DomainError(ex);
         }
 
-        string back = unread ? UnreadPath : UiNavigation.Notifications;
-        return LocalRedirect(page > 1 ? QueryHelpers.AddQueryString(back, PagerModel.PageParameter, page.ToString(CultureInfo.InvariantCulture)) : back);
+        return LocalRedirect(PathOf(unread, page));
+    }
+
+    private static string PathOf(bool unread, int page)
+    {
+        string path = unread ? UnreadPath : UiNavigation.Notifications;
+        return page > 1 ? QueryHelpers.AddQueryString(path, PagerModel.PageParameter, page.ToString(CultureInfo.InvariantCulture)) : path;
     }
 
     public string LocalTime(DateTime utc) => clock.ToLocal(utc).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
