@@ -20,7 +20,7 @@ A module is a vertical slice through the four projects (the same module folder i
 | Catalog | Group 1 | `ICatalogService` |
 | Staff Members | Group 2 | `IStaffMemberService`, login and roles |
 | Borrowing & Return | Group 3 | `IBorrowingReadService`, `ILoanQueryService`, `IReservationQueueService`; loan, reservation and penalty events |
-| Notifications & Reporting | Group 4 | `IOutlookNotificationSender` (MailKit → smtp4dev in development); reports under `/api/reports` |
+| Notifications & Reporting | Group 4 | No interface; consumes the INT-07 events. Endpoints `/api/notifications` (in-app), `/api/reports` |
 | Platform | Integration Owner | `IEventBus`, `IUnitOfWork`, `IClock`, `IWorkingDayCalendar`, `IApplicationLock`, `IDailyJob`, error handling, audit log, migrations, CI |
 
 ## Run it
