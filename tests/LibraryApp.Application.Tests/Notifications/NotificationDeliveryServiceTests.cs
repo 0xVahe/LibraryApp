@@ -119,6 +119,21 @@ public sealed class NotificationDeliveryServiceTests
     }
 
     [Fact]
+    public async Task Stops_when_the_lease_has_ended()
+    {
+        var clock = new TestClock(Now);
+        var store = new FakeStore(NewNotification("anna@ameriabank.am"), NewNotification("gor@ameriabank.am"));
+        var sender = new FakeSender { OnSent = () => clock.UtcNow = Now.AddMinutes(15) };
+
+        await Service(store, sender, clock).DeliverPendingAsync();
+
+        Assert.Single(sender.Sent);
+        Assert.Equal(NotificationStatus.Sent, store.Notifications[0].Status);
+        Assert.Equal(NotificationStatus.Pending, store.Notifications[1].Status);
+        Assert.Equal(1, store.Saves);
+    }
+
+    [Fact]
     public async Task Sent_status_is_saved_even_when_the_app_is_stopping()
     {
         using var stopping = new CancellationTokenSource();
@@ -131,8 +146,8 @@ public sealed class NotificationDeliveryServiceTests
         Assert.Equal(1, store.Saves);
     }
 
-    private static NotificationDeliveryService Service(FakeStore store, FakeSender sender) =>
-        new(store, sender, new TestClock(Now), Settings, NullLogger<NotificationDeliveryService>.Instance);
+    private static NotificationDeliveryService Service(FakeStore store, FakeSender sender, TestClock? clock = null) =>
+        new(store, sender, clock ?? new TestClock(Now), Settings, NullLogger<NotificationDeliveryService>.Instance);
 
     private static readonly IOptions<NotificationsOptions> Settings = Microsoft.Extensions.Options.Options.Create(new NotificationsOptions
     {

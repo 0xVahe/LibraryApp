@@ -20,10 +20,21 @@ public sealed class NotificationDeliveryService(
     {
         DeliveryOptions settings = options.Value.Delivery;
         DateTime now = clock.UtcNow;
-        var claimed = await store.ClaimDueAsync(now, now + settings.Lease, settings.BatchSize, ct);
+        DateTime leaseUntil = now + settings.Lease;
+        var claimed = await store.ClaimDueAsync(now, leaseUntil, settings.BatchSize, ct);
 
-        foreach (var notification in claimed)
+        for (int i = 0; i < claimed.Count; i++)
         {
+            // After the lease another instance may claim the rest; leave it to the next round instead of sending twice.
+            if (clock.UtcNow >= leaseUntil)
+            {
+                logger.LogWarning(
+                    "Delivery round stopped: the lease ended with {Left} claimed emails not sent; Lease is too short for one batch",
+                    claimed.Count - i);
+                break;
+            }
+
+            var notification = claimed[i];
             await DeliverAsync(notification, settings.RetryDelays, ct);
             // One save per email, so a later failure does not undo it. Not cancelled when the app stops: the email is
             // already out, and an unsaved Sent would send it again when the lease ends. The host's shutdown timeout and
