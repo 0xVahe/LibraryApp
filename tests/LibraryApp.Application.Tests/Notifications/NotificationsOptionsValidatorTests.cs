@@ -15,7 +15,32 @@ public sealed class NotificationsOptionsValidatorTests
     }
 
     [Fact]
-    public void Missing_settings_fail_with_both_keys()
+    public void Missing_retry_delays_fail_with_the_key()
+    {
+        var options = Options(TimeSpan.FromSeconds(5), 20, TimeSpan.FromMinutes(15));
+        options.Delivery.RetryDelays = [];
+
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains("Notifications:Delivery:RetryDelays", result.FailureMessage);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1441)]
+    public void Retry_delay_out_of_range_fails(int minutes)
+    {
+        var options = Options(TimeSpan.FromSeconds(5), 20, TimeSpan.FromMinutes(15));
+        options.Delivery.RetryDelays = [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(minutes)];
+
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+    }
+
+    [Fact]
+    public void Missing_settings_fail_with_every_key()
     {
         var result = Validator.Validate(null, new NotificationsOptions());
 
@@ -23,6 +48,7 @@ public sealed class NotificationsOptionsValidatorTests
         Assert.Contains("Notifications:Delivery:PollInterval", result.FailureMessage);
         Assert.Contains("Notifications:Delivery:BatchSize", result.FailureMessage);
         Assert.Contains("Notifications:Delivery:Lease", result.FailureMessage);
+        Assert.Contains("Notifications:Delivery:RetryDelays", result.FailureMessage);
     }
 
     [Theory]
@@ -41,5 +67,14 @@ public sealed class NotificationsOptionsValidatorTests
     }
 
     private static NotificationsOptions Options(TimeSpan pollInterval, int batchSize, TimeSpan lease) =>
-        new() { Delivery = new DeliveryOptions { PollInterval = pollInterval, BatchSize = batchSize, Lease = lease } };
+        new()
+        {
+            Delivery = new DeliveryOptions
+            {
+                PollInterval = pollInterval,
+                BatchSize = batchSize,
+                Lease = lease,
+                RetryDelays = [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60)],
+            },
+        };
 }
