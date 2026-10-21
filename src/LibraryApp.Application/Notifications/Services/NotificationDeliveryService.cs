@@ -20,7 +20,7 @@ public sealed class NotificationDeliveryService(
     {
         DeliveryOptions settings = options.Value.Delivery;
         DateTime now = clock.UtcNow;
-        var claimed = await store.ClaimPendingAsync(now, now + settings.Lease, settings.BatchSize, ct);
+        var claimed = await store.ClaimDueAsync(now, now + settings.Lease, settings.BatchSize, ct);
 
         foreach (var notification in claimed)
         {

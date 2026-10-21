@@ -111,7 +111,7 @@ public sealed class NotificationDeliveryServiceTests
         public DateTime RequestedLeaseUntil { get; private set; }
         public int Saves { get; private set; }
 
-        public Task<IReadOnlyList<Notification>> ClaimPendingAsync(
+        public Task<IReadOnlyList<Notification>> ClaimDueAsync(
             DateTime nowUtc, DateTime leaseUntilUtc, int max, CancellationToken ct = default)
         {
             RequestedMax = max;
