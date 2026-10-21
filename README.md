@@ -193,7 +193,7 @@ Get the database only through the shared helpers: `TestDatabase.NewConnectionStr
 
 ## Performance benchmark
 
-NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,000 loans." `benchmark/LibraryApp.Benchmark` is a console application, not a test: CI does not build or run it, and `dotnet test` builds it but finds no tests in it. It times the running API over HTTP (Kestrel, authentication, database and serialization included) and writes a report to `docs/performance/`.
+NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,000 loans." `benchmark/LibraryApp.Benchmark` is a console application, not a test, and not part of `LibraryApp.sln`: the solution build, `dotnet test`, CI and the Docker image do not build it. A change in `src/` can therefore break it unnoticed; before a measurement, `dotnet build benchmark/LibraryApp.Benchmark -c Release` shows whether it still compiles. It times the running API over HTTP (Kestrel, authentication, database and serialization included) and writes a report to `docs/performance/`.
 
 | Command | What it does |
 |---|---|
