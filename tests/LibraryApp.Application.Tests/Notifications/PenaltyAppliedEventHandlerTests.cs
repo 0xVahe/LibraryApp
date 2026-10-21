@@ -14,7 +14,7 @@ public sealed class PenaltyAppliedEventHandlerTests
     public async Task Passes_points_total_reason_and_the_loan_to_the_creator_for_both_channels()
     {
         var creator = new RecordingCreator();
-        var domainEvent = new PenaltyApplied(Guid.NewGuid(), Now, Guid.NewGuid(), StaffId, Guid.NewGuid(), 4, 7, "Returned 4 working days late");
+        var domainEvent = new PenaltyApplied(Guid.NewGuid(), Now, StaffId, Guid.NewGuid(), 4, 7, "Returned 4 working days late");
 
         await new PenaltyAppliedEventHandler(creator).HandleAsync(domainEvent, CancellationToken.None);
 
@@ -35,7 +35,7 @@ public sealed class PenaltyAppliedEventHandlerTests
         var creator = new RecordingCreator();
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        var domainEvent = new PenaltyApplied(Guid.NewGuid(), Now, Guid.NewGuid(), StaffId, Guid.NewGuid(), 1, 1, "Late");
+        var domainEvent = new PenaltyApplied(Guid.NewGuid(), Now, StaffId, Guid.NewGuid(), 1, 1, "Late");
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             new PenaltyAppliedEventHandler(creator).HandleAsync(domainEvent, cancellation.Token));
