@@ -356,8 +356,6 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 .check input { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--green-text); }
 .search { position: relative; flex: 1; min-width: 200px; }
 .form-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-.department-create-actions { align-items: center; padding-top: 24px; }
-.department-create-submit { min-height: 40px; padding: 8px 16px; }
 
 .drop {
   border: 2px dashed #b9b9b9;
