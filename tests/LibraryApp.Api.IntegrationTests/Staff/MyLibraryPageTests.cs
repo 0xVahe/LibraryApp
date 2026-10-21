@@ -2,20 +2,41 @@ using System.Net;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Application.Abstractions.Borrowing;
+using LibraryApp.Application.Abstractions.Staff;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Repositories.Borrowing;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
 /// <summary>MEM-08: real UI cookies, SQL Server and the merged Borrowing components (NFR-03).</summary>
-public class MyLibraryPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
+public class MyLibraryPageTests(MyLibraryPageFactory factory) : IClassFixture<MyLibraryPageFactory>
 {
     private const string Route = "/my-library";
+
+    [Fact]
+    public async Task Stats_and_all_borrowing_blocks_share_one_summary_read_per_request()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory,
+            "anna.petrosyan@ameriabank.am", StaffSeedData.Password);
+        var before = factory.SummaryReads;
+
+        using var response = await client.GetAsync(Route);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, factory.SummaryReads - before);
+
+        // A new request must read again, so a change is never hidden by another request's cached view.
+        using var next = await client.GetAsync(Route);
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+        Assert.Equal(2, factory.SummaryReads - before);
+    }
 
     [Theory]
     [InlineData("anna.petrosyan@ameriabank.am")]
@@ -30,6 +51,7 @@ public class MyLibraryPageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         var expected = await scope.ServiceProvider.GetRequiredService<IBorrowingReadService>()
             .GetStaffSummaryAsync(person.StaffMemberId);
         var profile = await scope.ServiceProvider.GetRequiredService<IStaffManagementService>().GetAsync(person.StaffMemberId);
+        var rules = await scope.ServiceProvider.GetRequiredService<IStaffMemberService>().GetLendingRulesAsync(person.StaffMemberId);
         using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
 
         using var response = await client.GetAsync(Route);
@@ -37,7 +59,7 @@ public class MyLibraryPageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.CacheControl?.NoStore);
         var html = await response.Content.ReadAsStringAsync();
-        Assert.Equal(expected.ActiveLoans.Count.ToString(), Stat(html, "my-loans-stat"));
+        Assert.Equal($"{expected.ActiveLoans.Count} of {rules.MaxLoans}", Stat(html, "my-loans-stat"));
         Assert.Equal(expected.Reservations.Count.ToString(), Stat(html, "my-reservations-stat"));
         Assert.Equal(expected.ActivePenaltyPoints.ToString(), Stat(html, "my-penalties-stat"));
         Assert.Equal(profile.Status, Stat(html, "my-status-stat"));
@@ -105,7 +127,7 @@ public class MyLibraryPageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
 
         var html = await client.GetStringAsync(Route);
 
-        Assert.Equal("0", Stat(html, "my-loans-stat"));
+        Assert.StartsWith("0 of ", Stat(html, "my-loans-stat"));
         Assert.Equal("0", Stat(html, "my-reservations-stat"));
         Assert.Equal("0", Stat(html, "my-penalties-stat"));
         Assert.Contains("No books on loan.", html);
@@ -153,4 +175,34 @@ public class MyLibraryPageTests(ApiHostFactory factory) : IClassFixture<ApiHostF
 
     private static string ProfileCard(string html) =>
         Regex.Match(html, "<section[^>]*aria-labelledby=\"my-profile-title\"[\\s\\S]*?</section>").Value;
+}
+
+/// <summary>Counts the real SQL-backed reads; no Borrowing data or authentication is replaced.</summary>
+public sealed class MyLibraryPageFactory : ApiHostFactory
+{
+    private int _summaryReads;
+    public int SummaryReads => Volatile.Read(ref _summaryReads);
+
+    protected override void ConfigureTestServices(IServiceCollection services)
+    {
+        services.RemoveAll<IBorrowingReadService>();
+        services.AddScoped<IBorrowingReadService>(provider => new CountingBorrowingReadService(
+            ActivatorUtilities.CreateInstance<BorrowingReadService>(provider),
+            () => Interlocked.Increment(ref _summaryReads)));
+    }
+
+    private sealed class CountingBorrowingReadService(IBorrowingReadService inner, Action summaryRead) : IBorrowingReadService
+    {
+        public Task<IReadOnlyList<OpenLoanInfo>> GetActiveLoansAsync(Guid staffMemberId, CancellationToken ct = default) =>
+            inner.GetActiveLoansAsync(staffMemberId, ct);
+
+        public Task<StaffBorrowingSummary> GetStaffSummaryAsync(Guid staffMemberId, CancellationToken ct = default)
+        {
+            summaryRead();
+            return inner.GetStaffSummaryAsync(staffMemberId, ct);
+        }
+
+        public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
+            inner.GetLoansDueOnAsync(localDate, ct);
+    }
 }

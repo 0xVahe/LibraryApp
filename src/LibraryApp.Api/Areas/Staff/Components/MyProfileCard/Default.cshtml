@@ -3,12 +3,14 @@
     var initials = string.Concat(Model.FirstName.Take(1).Concat(Model.LastName.Take(1))).ToUpperInvariant();
 }
 <section class="card" aria-labelledby="my-profile-title">
-    <div class="card-head"><h2 class="visually-hidden" id="my-profile-title">My profile</h2></div>
-    <div class="row mb-16">
-        <span class="avatar lg" aria-hidden="true">@initials</span>
-        <div class="text-wrap">
-            <p class="ink"><strong>@Model.FirstName @Model.LastName</strong></p>
-            <p class="small muted">@Model.Position</p>
+    <div class="card-head">
+        <h2 class="visually-hidden" id="my-profile-title">My profile</h2>
+        <div class="row">
+            <span class="avatar lg" aria-hidden="true">@initials</span>
+            <div class="text-wrap">
+                <p class="ink"><strong>@Model.FirstName @Model.LastName</strong></p>
+                <p class="small muted">@Model.Position</p>
+            </div>
         </div>
     </div>
     <dl class="dl">

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using FluentValidation;
 using LibraryApp.Api.Auth;
 using LibraryApp.Api.ErrorHandling;
+using LibraryApp.Api.Logging;
 using LibraryApp.Api.OpenApi;
 using LibraryApp.Api.Ui;
 using LibraryApp.Application.Abstractions.Common;
@@ -108,8 +109,8 @@ _ = app.Services.GetRequiredService<IOptions<JwtOptions>>().Value;
 
 // Outside the exception handler: the request log shows the status the client gets (409, 422 ...), not 500.
 // The logger of this host, not the static Log.Logger: another host in the same process (integration tests)
-// closes the static one when it stops.
-app.UseSerilogRequestLogging(options => options.Logger = app.Services.GetRequiredService<Serilog.ILogger>());
+// closes the static one when it stops. User, route, duration and status on every request (NFR-10).
+app.UseSerilogRequestLogging(options => RequestLogging.Configure(options, app.Services.GetRequiredService<Serilog.ILogger>()));
 
 app.UseErrorAnswers();   // /api: ProblemDetails, also for empty 401/403/404 answers; pages: the Error and Not found pages
 
