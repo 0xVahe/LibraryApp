@@ -2,6 +2,8 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Ports;
 using LibraryApp.Application.Common;
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Caching.Memory;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Common;
@@ -14,7 +16,8 @@ public sealed class ReportingService(
     IClock clock,
     IWorkingDayCalendar workingDayCalendar,
     IMemoryCache cache,
-    PenaltyPolicy penaltyPolicy) : IReportingService
+    PenaltyPolicy penaltyPolicy,
+    IOptions<ReportingOptions> options) : IReportingService
 {
     public Task<OverdueLoansReportDto> GetOverdueLoansAsync(
         Guid? departmentId,
@@ -128,7 +131,7 @@ public sealed class ReportingService(
             counts.RestrictedEmployees,
             counts.SuspendedEmployees);
 
-        cache.Set(cacheKey, report, TimeSpan.FromMinutes(5));
+        cache.Set(cacheKey, report, TimeSpan.FromMinutes(options.Value.DashboardCacheMinutes));
         return report;
     }
 

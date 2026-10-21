@@ -8,12 +8,24 @@ public sealed class InMemoryCatalogService : ICatalogService
 {
     private Dictionary<Guid, BookCopyDto> _copies = new();
 
+    // Null until a test seeds a book: GetBookAsync then fails loudly instead of answering for an unexpected caller.
+    private Dictionary<Guid, BookDto>? _books;
+
     public bool ThrowOnNextSetCopyStatus { get; set; }
 
     public int LookupCalls { get; private set; }
     public int SetStatusCalls { get; private set; }
 
     public void Seed(BookCopyDto copy) => _copies.Add(copy.Id, copy);
+
+    /// <summary>A book for <see cref="GetBookAsync"/>; a book that is not seeded is unknown (null).</summary>
+    public void SeedBook(Guid bookId, bool isDeleted)
+    {
+        _books ??= new();
+        _books[bookId] = new BookDto(
+            bookId, $"Book {bookId:N}", "9780134685991", 2020, "en", null, Guid.NewGuid(), "Category", null, null,
+            ["Author"], TotalCopies: 1, AvailableCopies: 0, IsDeleted: isDeleted);
+    }
 
     public Task<BookCopyDto?> GetCopyByBarcodeAsync(
         string barcode,
@@ -81,7 +93,14 @@ public sealed class InMemoryCatalogService : ICatalogService
 
     public Task<BookDto?> GetBookAsync(
         Guid bookId, CancellationToken ct = default)
-        => throw new NotSupportedException();
+    {
+        ct.ThrowIfCancellationRequested();
+
+        if (_books is null)
+            throw new NotSupportedException("No book was seeded for this test.");
+
+        return Task.FromResult(_books.GetValueOrDefault(bookId));
+    }
 
     public Task<IReadOnlyList<BookCopyDto>> GetCopiesAsync(
         IReadOnlyCollection<Guid> copyIds,

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Stored cover path + <c>Catalog:Covers:BaseUrl</c> = the public cover URL; null when covers are off.</summary>
 public sealed class CatalogCoverUrlBuilder(IOptions<CatalogCoversOptions> options) : ICatalogCoverUrlBuilder
 {
     private readonly string _baseUrl = options.Value.BaseUrl;

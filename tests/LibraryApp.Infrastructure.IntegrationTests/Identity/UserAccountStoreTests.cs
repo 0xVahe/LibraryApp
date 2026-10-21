@@ -11,7 +11,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Identity;
 /// <summary>A migrated throw-away database with Identity; every test creates its own account.</summary>
 public sealed class UserAccountStoreFixture : IAsyncLifetime
 {
-    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewConnectionString());
+    public ServiceProvider Services { get; } = BuildServices(TestDatabase.NewDatabase());
 
     private static ServiceProvider BuildServices(string connectionString)
     {

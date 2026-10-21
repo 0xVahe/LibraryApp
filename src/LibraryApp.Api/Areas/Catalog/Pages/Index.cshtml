@@ -20,6 +20,14 @@
 }
 <partial name="/Pages/Shared/_PageHead.cshtml" model='new PageHeadModel("Catalog", "Browse the library collection and find your next book.", actions)' />
 
+@if (Model.CanManageBooks)
+{
+    @* The lists a new book needs first (CAT-02, CAT-03): the book form and the CSV import only choose from them. *@
+    <nav class="small muted mb-16" aria-label="Catalog lists">
+        Manage: <a href="/catalog/categories">Categories</a> · <a href="/catalog/authors">Authors</a> · <a href="/catalog/publishers">Publishers</a>
+    </nav>
+}
+
 <section class="card card-filters mb-24" aria-label="Catalog filters">
     <form method="get" action="/catalog" class="form catalog-filters">
         <div class="field search-field">
@@ -49,41 +57,59 @@
 </section>
 
 <div class="catalog-category-row">
-    <nav class="chips" aria-label="Categories">
-        <a class="chip" href="@Model.CategoryHref(null)" aria-current="@(Model.CategoryId is null ? "true" : null)">All</a>
-        @foreach (var category in Model.CategoryTree.TopLevel)
+    <div class="stack">
+        <nav class="chips" aria-label="Categories">
+            <a class="chip" href="@Model.CategoryHref(null)" aria-current="@(Model.CategoryId is null ? "true" : null)">All</a>
+            @foreach (var category in Model.CategoryTree.TopLevel)
+            {
+                <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.SelectedTopLevel?.Id == category.Id ? "true" : null)">@category.Name</a>
+            }
+        </nav>
+        @if (Model.SelectedTopLevel is { } topLevel && Model.Subcategories.Count > 0)
         {
-            <a class="chip" href="@Model.CategoryHref(category.Id)" aria-current="@(Model.CategoryId == category.Id ? "true" : null)">@category.Name</a>
+            <div class="catalog-subcategory-group">
+                <p class="catalog-subcategory-label">Subcategories</p>
+                <nav class="chips chips-subcategories" aria-label="Subcategories of @topLevel.Name">
+                    <a class="chip chip-subcategory" href="@Model.CategoryHref(topLevel.Id)" aria-current="@(Model.CategoryId == topLevel.Id ? "true" : null)">All in @topLevel.Name</a>
+                    @foreach (var subcategory in Model.Subcategories)
+                    {
+                        <a class="chip chip-subcategory" href="@Model.CategoryHref(subcategory.Id)" aria-current="@(Model.CategoryId == subcategory.Id ? "true" : null)">@subcategory.Name</a>
+                    }
+                </nav>
+            </div>
         }
-    </nav>
-    <p class="catalog-count">Showing @firstResult–@lastResult of @Model.Result.TotalCount</p>
+    </div>
+    <p class="catalog-count">@(Model.Result.Items.Count > 0
+        ? $"Showing {firstResult}–{lastResult} of {Model.Result.TotalCount}"
+        : $"{Model.Result.TotalCount} {(Model.Result.TotalCount == 1 ? "book" : "books")} in total")</p>
 </div>
 
 @if (Model.Result.Items.Count == 0)
 {
-    <section class="card" aria-live="polite"><p>No books match your filters.</p></section>
+    <section class="card" aria-live="polite">
+        @if (Model.Result.TotalCount > 0)
+        {
+            <p>This page is empty. <a href="@Model.FirstPageHref">Go to the first page</a>.</p>
+        }
+        else
+        {
+            <p>No books match your filters.</p>
+        }
+    </section>
 }
 else
 {
     <section class="grid grid-4" aria-label="Books">
-        @for (var index = 0; index < Model.Result.Items.Count; index++)
+        @foreach (var book in Model.Result.Items)
         {
-            var book = Model.Result.Items[index];
-            var hasCover = !string.IsNullOrWhiteSpace(book.CoverImageUrl);
+            var authors = string.Join(", ", book.Authors);
             var availability = book.TotalCopies == 0
                 ? "No copies"
                 : book.AvailableCopies > 0 ? $"{book.AvailableCopies} available" : "Not available now";
             <a class="book-card" href="/catalog/books/@book.Id">
-                <div class="cover c@((index % 6) + 1) @(hasCover ? "has-image" : null)" aria-hidden="true">
-                    @if (hasCover)
-                    {
-                        <img class="cover-img" src="@book.CoverImageUrl" alt="" loading="lazy" referrerpolicy="no-referrer">
-                    }
-                    <span>@book.Title</span>
-                    <span class="small">@string.Join(", ", book.Authors)</span>
-                </div>
+                <partial name="_BookCover" model="@(new BookCoverModel(book.Title, authors.Length == 0 ? null : authors, book.CoverImageUrl, book.CategoryId))" />
                 <span class="title">@book.Title</span>
-                <span>@string.Join(", ", book.Authors) · @book.PublicationYear</span>
+                <span>@authors · @book.PublicationYear</span>
                 <span class="badge @(book.AvailableCopies > 0 ? "badge-green" : "badge-grey")">@availability</span>
             </a>
         }

@@ -25,7 +25,7 @@ namespace LibraryApp.Api.IntegrationTests.Borrowing;
 /// </summary>
 public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixture<ApiHostWithoutBorrowingSeed>
 {
-    // As the API writes JSON: camelCase, enums as names (SD-11).
+    // As the API writes JSON: camelCase, enums as names.
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
     private HttpClient Client(string? role = StaffRoles.Librarian)
@@ -34,7 +34,7 @@ public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixt
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "librarian@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [role])).Token;
+                factory.Account(role)).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;
@@ -148,7 +148,7 @@ public class LoanEndpointTests(ApiHostWithoutBorrowingSeed factory) : IClassFixt
     }
 
     /// <summary>
-    /// BQ-BA-08: any copy of the book fulfils the holder's reservation; the held copy goes to the next in the queue. Both
+    /// Any copy of the book fulfils the holder's reservation; the held copy goes to the next in the queue. Both
     /// orders of the two reservation ids: EF writes the two updates in key order, and the database allows one
     /// ReadyForPickup reservation per copy, so the fulfilled one must be written first whatever the ids are.
     /// </summary>

@@ -34,7 +34,7 @@ public sealed class JobsFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        string connectionString = TestDatabase.NewConnectionString();
+        string connectionString = TestDatabase.NewDatabase();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:LibraryDb"] = connectionString,
@@ -581,6 +581,11 @@ public class DailyJobRunnerTests(JobsFixture fixture) : IClassFixture<JobsFixtur
 
         await runner.StartAsync(default);
         await JobsFixture.EventuallyAsync(() => fixture.Log.Runs.GetValueOrDefault(runner.JobName) == 1, "the first, failing run");
+        // While the run works, its lease heartbeat waits on a timer too. Only after the failure is recorded (the
+        // heartbeat is stopped before that) is the waiting timer the loop's next check, which the clock must reach.
+        await JobsFixture.EventuallyAsync(
+            async () => (await fixture.RunRecordAsync(runner.JobName, new DateOnly(2026, 10, 31))).Status == JobRunStatus.Failed,
+            "the failure is recorded");
         await JobsFixture.EventuallyAsync(() => fixture.Time.WaitingTimers > 0, "the loop waits for its next check");
 
         fixture.Time.Advance(TimeSpan.FromMinutes(16));                // past the retry delay

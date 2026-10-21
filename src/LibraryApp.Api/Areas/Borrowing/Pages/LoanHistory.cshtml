@@ -1,0 +1,79 @@
+@page "/staff/{id:guid}/loans"
+@model LoanHistoryModel
+@{
+    ViewData["Title"] = $"Loan history · {Model.StaffName}";
+    var toErrors = Model.ErrorsOf(nameof(Model.To));
+    var fromErrors = Model.ErrorsOf(nameof(Model.From));
+}
+<partial name="_PageHead" model="@(new PageHeadModel("Loan history", $"{Model.StaffName} — every loan, also returned and lost ones.",
+    Crumbs: [new("Staff members", UiNavigation.Staff), new(Model.StaffName, Model.StaffPath)]))" />
+
+@* StaffLoanHistory (Group 3): filters through the query string, the table and the shared pager. *@
+<form class="card mb-24" method="get" role="search" aria-label="Filter the loan history">
+    <div class="row filters">
+        <div class="field min-w-160">
+            <label for="history-status">Status</label>
+            <select id="history-status" name="status">
+                <option value="">Any status</option>
+                @foreach (var status in LoanHistoryModel.Statuses)
+                {
+                    <option value="@status" selected="@(Model.Status == status)">@StatusBadge.Label(status)</option>
+                }
+            </select>
+        </div>
+        <div class="field grow-160">
+            <label for="history-from">Issued from</label>
+            <input id="history-from" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" aria-invalid="@(fromErrors.Count > 0 ? "true" : null)">
+            @foreach (var error in fromErrors)
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <div class="field grow-160">
+            <label for="history-to">Issued to</label>
+            <input id="history-to" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" aria-invalid="@(toErrors.Count > 0 ? "true" : null)">
+            @foreach (var error in toErrors)
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <button class="btn btn-primary self-end" type="submit">Filter</button>
+    </div>
+</form>
+
+<section class="card flush" aria-label="Loans">
+    <div class="card-head"><p class="small muted" role="status">@Model.CountText</p></div>
+    @if (Model.Loans.Items.Count == 0)
+    {
+        <div class="card-foot">
+            <p class="muted">@(Model.Filtered ? "No loans match these filters." : "No loans yet.")</p>
+            @if (Model.Filtered)
+            {
+                <a class="link-btn" href="@Model.HistoryPath">Show every loan</a>
+            }
+        </div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Book</th><th scope="col">Copy</th><th scope="col">Issued</th><th scope="col">Due</th><th scope="col">Returned</th><th scope="col">Status</th><th scope="col">Points</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var loan in Model.Loans.Items)
+                {
+                    <tr>
+                        <td data-label="Book">@loan.Title</td>
+                        <td class="nowrap" data-label="Copy">@(loan.Barcode ?? "—")</td>
+                        <td data-label="Issued">@Texts.Date(loan.Issued)</td>
+                        <td data-label="Due">@Texts.Date(loan.Due)</td>
+                        <td data-label="Returned">@(loan.Returned is { } returned ? Texts.Date(returned) : "—")</td>
+                        <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="loan.Status" /></td>
+                        <td data-label="Points">@(loan.Points > 0 ? loan.Points.ToString() : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+<partial name="_Pager" model="PagerModel.From(Model.Loans, HttpContext.Request)" />

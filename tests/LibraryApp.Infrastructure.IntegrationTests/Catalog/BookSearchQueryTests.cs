@@ -26,7 +26,7 @@ public sealed class BookSearchDatabase : IAsyncLifetime
 
     public const int PagingBookCount = 22;
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {
@@ -194,6 +194,7 @@ public class BookSearchQueryTests(BookSearchDatabase database) : IClassFixture<B
         Assert.Equal("9780000000001", book.Isbn);
         Assert.Equal(2020, book.PublicationYear);
         Assert.Equal(new[] { "Anna Petrosyan" }, book.Authors);
+        Assert.Equal(BookSearchDatabase.RiskCategoryId, book.CategoryId);
         Assert.Equal("Risk, Compliance & AML", book.Category);
         Assert.Equal("en", book.Language);
     }

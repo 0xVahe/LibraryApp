@@ -53,7 +53,8 @@ public sealed class UserAccountStore(
             await ResetFailedAttemptsAsync(user.Id, ct);
 
         var mustChangePassword = (await userManager.GetClaimsAsync(user)).Any(IsPasswordChangeMarker);
-        return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList(), mustChangePassword);
+        return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList(),
+            await userManager.GetSecurityStampAsync(user), mustChangePassword);
     }
 
     public async Task<bool> VerifyCurrentPasswordAsync(Guid userId, string currentPassword, CancellationToken ct)

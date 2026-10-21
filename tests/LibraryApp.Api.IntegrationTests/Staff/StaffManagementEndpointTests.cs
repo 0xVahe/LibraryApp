@@ -69,7 +69,7 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
         if (role is not null)
         {
             var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                new LoginAccount(Guid.NewGuid(), "test.librarian@ameriabank.am", Guid.NewGuid(), StaffMemberStatus.Active, [role]));
+                factory.Account(role));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
         }
         return client;
@@ -560,12 +560,12 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
     }
 
     [Fact]
-    public async Task Update_deactivated_member_returns_409()
+    public async Task Update_deactivated_member_returns_422()
     {
         var id = StaffSeedIds.StaffMembers.HaykManukyan;
         var member = (await Client().GetFromJsonAsync<StaffMemberDto>($"{Route}/{id}"))!;
         await AssertError(await Client().PutAsJsonAsync($"{Route}/{id}", UpdateRequest(member)),
-            HttpStatusCode.Conflict, "staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
+            HttpStatusCode.UnprocessableEntity, "staff.deactivated_profile_locked", "A deactivated staff member's profile cannot be updated.");
     }
 
     [Fact]

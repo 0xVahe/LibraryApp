@@ -10,7 +10,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 /// <summary>A migrated database, so the foreign keys and CHECK constraints are the real ones.</summary>
 public sealed class UnitOfWorkReferenceDatabase : IAsyncLifetime
 {
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

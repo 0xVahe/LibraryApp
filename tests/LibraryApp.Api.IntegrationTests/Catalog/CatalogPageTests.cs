@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using LibraryApp.Api.Areas.Catalog;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
@@ -35,6 +36,9 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.DoesNotContain("Import CSV", html);
         Assert.DoesNotContain("href=\"/catalog/import\"", html);
         Assert.Contains("href=\"/catalog/suggestions\"", html);
+        Assert.DoesNotContain("href=\"/catalog/categories\"", html);
+        Assert.DoesNotContain("href=\"/catalog/authors\"", html);
+        Assert.DoesNotContain("href=\"/catalog/publishers\"", html);
     }
 
     [Theory]
@@ -51,6 +55,20 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
         Assert.Contains("href=\"/catalog/import\"", html);
         Assert.Contains("Import CSV", html);
         Assert.Contains("href=\"/catalog/suggestions\"", html);
+    }
+
+    [Theory]
+    [InlineData(Librarian)]
+    [InlineData(Administrator)]
+    public async Task Library_staff_see_links_to_the_categories_authors_and_publishers_pages(string email)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync("/catalog");
+
+        Assert.Contains("href=\"/catalog/categories\"", html);
+        Assert.Contains("href=\"/catalog/authors\"", html);
+        Assert.Contains("href=\"/catalog/publishers\"", html);
     }
 
     [Fact]
@@ -98,7 +116,10 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
 
         var html = await client.GetStringAsync("/catalog?search=The+Intelligent+Investor");
 
-        Assert.Contains("class=\"cover c1 has-image\"", html);
+        // The colour follows the category, as on the Book page.
+        var categoryId = CatalogSeedIds.Category(CatalogSeedData.Books.Single(book => book.Number == 1).CategoryNumber);
+        var cover = new BookCoverModel("The Intelligent Investor", null, "cover", categoryId);
+        Assert.Contains($"class=\"{cover.CssClass}\"", html);
         Assert.Contains("class=\"cover-img\"", html);
         Assert.Contains("src=\"https://res.cloudinary.com/hil9ktuv/image/upload/library-covers/01.png\"", html);
         Assert.Contains("alt=\"\"", html);
@@ -107,13 +128,70 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
     }
 
     [Fact]
+    public async Task A_page_past_the_last_one_says_so_and_links_the_first_page_with_the_filters()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync("/catalog?language=en&page=999");
+
+        Assert.Contains("This page is empty.", html);
+        Assert.Contains("<a href=\"/catalog?language=en\">Go to the first page</a>", html);
+        Assert.DoesNotContain("No books match your filters.", html);
+        Assert.DoesNotContain("Showing 0", html);
+    }
+
+    [Fact]
+    public async Task A_category_with_subcategories_shows_them_in_a_second_row_of_chips()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
+        var banking = CatalogSeedIds.Category(1);
+
+        var html = await client.GetStringAsync($"/catalog?language=en&categoryId={banking}");
+
+        var subcategories = SubcategoryRow(html, "Banking &amp; Finance");
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={banking}\" aria-current=\"true\">All in Banking &amp; Finance</a>", subcategories);
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(9)}\">Investing &amp; Markets</a>", subcategories);
+        Assert.Contains($"<a class=\"chip chip-subcategory\" href=\"/catalog?language=en&amp;categoryId={CatalogSeedIds.Category(10)}\">Banking &amp; Financial History</a>", subcategories);
+    }
+
+    [Fact]
+    public async Task A_selected_subcategory_keeps_its_parent_current_and_lists_only_its_books()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
+        var banking = CatalogSeedIds.Category(1);
+        var investing = CatalogSeedIds.Category(9);
+
+        var html = await client.GetStringAsync($"/catalog?categoryId={investing}");
+
+        var categories = Regex.Match(html, "<nav class=\"chips\" aria-label=\"Categories\">.*?</nav>", RegexOptions.Singleline).Value;
+        Assert.Contains($"href=\"/catalog?categoryId={banking}\" aria-current=\"true\">Banking &amp; Finance</a>", categories);
+        Assert.Contains($"href=\"/catalog?categoryId={investing}\" aria-current=\"true\">Investing &amp; Markets</a>",
+            SubcategoryRow(html, "Banking &amp; Finance"));
+        Assert.Contains("The Big Short", html);
+        Assert.DoesNotContain("The Ascent of Money", html);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("?categoryId=10000000-0000-0000-0001-000000000007")]
+    public async Task Without_a_category_or_with_one_that_has_no_subcategories_there_is_no_second_row(string query)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, StaffMember, StaffSeedData.Password);
+
+        var html = await client.GetStringAsync("/catalog" + query);
+
+        Assert.DoesNotContain("aria-label=\"Subcategories of", html);
+    }
+
+    [Fact]
     public async Task A_book_without_a_cover_renders_only_the_text_cover()
     {
         var title = "Catalog page no-cover " + Guid.NewGuid().ToString("N")[..8];
+        var categoryId = Guid.NewGuid();
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
-            var category = new Category(Guid.NewGuid(), title + " category");
+            var category = new Category(categoryId, title + " category");
             var author = new Author(Guid.NewGuid(), title + " author");
             var book = new Book(Guid.NewGuid(), title, "9791000000015", 2024, "en", null, category.Id, null);
             db.AddRange(category, author, book, new BookAuthor(book.Id, author.Id));
@@ -125,6 +203,10 @@ public sealed class CatalogPageTests(ApiHostFactory factory) : IClassFixture<Api
 
         Assert.Contains(title, html);
         Assert.DoesNotContain("class=\"cover-img\"", html);
-        Assert.Contains("class=\"cover c1", html);
+        Assert.Contains($"class=\"{new BookCoverModel(title, null, null, categoryId).CssClass}\"", html);
     }
+
+    private static string SubcategoryRow(string html, string encodedParentName) =>
+        Regex.Match(html, $"<nav class=\"chips chips-subcategories\" aria-label=\"Subcategories of {Regex.Escape(encodedParentName)}\">.*?</nav>",
+            RegexOptions.Singleline).Value;
 }

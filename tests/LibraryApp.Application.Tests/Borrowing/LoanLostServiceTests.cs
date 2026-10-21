@@ -335,6 +335,18 @@ public sealed class LoanLostServiceTests
             return Task.FromResult(records);
         }
 
+        public Task<PenaltyRecord?> FindAsync(Guid penaltyId, CancellationToken ct = default) =>
+            Task.FromResult(Records.SingleOrDefault(r => r.Id == penaltyId));
+
+        public Task<PenaltyRecord?> GetForUpdateAsync(Guid penaltyId, CancellationToken ct = default) =>
+            Task.FromResult(Records.SingleOrDefault(r => r.Id == penaltyId));
+
+        public Task<LibraryApp.Application.Common.PagedResult<PenaltyRecord>> PageForStaffAsync(
+            Guid staffMemberId,
+            PenaltyRecordStatus? status,
+            LibraryApp.Application.Common.PageRequest page,
+            CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task AddAsync(
             PenaltyRecord penalty,
             CancellationToken ct = default)
@@ -372,6 +384,11 @@ public sealed class LoanLostServiceTests
             return Task.CompletedTask;
         }
 
+        public Task<StaffMemberLookup?> FindAsync(
+            string employeeIdOrEmail,
+            CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
             IReadOnlyCollection<Guid> staffMemberIds,
             CancellationToken ct = default) =>
@@ -386,5 +403,6 @@ public sealed class LoanLostServiceTests
             Guid staffMemberId,
             CancellationToken ct = default) =>
             throw new NotSupportedException();
+
     }
 }

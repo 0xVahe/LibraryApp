@@ -3,6 +3,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Ports;
 
+/// <summary>Book suggestions (CAT-10).</summary>
 public interface IBookSuggestionRepository
 {
     void Add(BookSuggestion suggestion);

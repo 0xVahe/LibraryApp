@@ -127,6 +127,22 @@ public class BookCopyServiceTests
         Assert.Equal(1, _unitOfWork.Transactions);
     }
 
+    [Theory]
+    [InlineData(BookCopyStatus.Lost)]
+    [InlineData(BookCopyStatus.Withdrawn)]
+    public async Task The_details_of_a_retired_copy_do_not_change(BookCopyStatus retired)
+    {
+        Guid bookId = _repository.AddBook();
+        var copy = _repository.AddCopy(bookId, "BK-1", retired);
+        var before = (copy.Condition, copy.ShelfLocation);
+
+        var error = await ErrorOf(() => _service.UpdateCopyAsync(bookId, copy.Id, new UpdateCopyRequest(BookCopyCondition.Poor, "B-07")));
+
+        Assert.Equal(CatalogErrors.CopyRetired, error);
+        Assert.Equal(ErrorKind.Conflict, error.Kind);
+        Assert.Equal(before, (copy.Condition, copy.ShelfLocation));
+    }
+
     // ---------- status (BR-CAT-4) ----------
 
     [Theory]

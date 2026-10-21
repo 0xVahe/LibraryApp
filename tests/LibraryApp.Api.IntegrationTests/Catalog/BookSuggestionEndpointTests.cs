@@ -13,6 +13,7 @@ using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,25 +22,25 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
 /// <summary>CAT-10: real controllers, services, JWT, validators and ProblemDetails; test-only persistence.</summary>
-public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
+public sealed class BookSuggestionHostFactory : ApiHostFactory
 {
     // JWT lifetime validation uses real time; keep a stable instant within the token's current lifetime.
     public static readonly DateTime Now = DateTime.UtcNow;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        base.ConfigureWebHost(builder);
         builder.UseEnvironment("Development");
-        builder.UseSetting("ConnectionStrings:LibraryDb", "Server=localhost;Database=UnusedSuggestionTests;Integrated Security=true;TrustServerCertificate=true");
-        builder.UseSetting("Database:MigrateOnStartup", "false");
-        builder.UseSetting("Seed:Enabled", "false");
         builder.UseSetting("UseHttpsRedirection", "false");
         builder.UseSetting("Messaging:DispatcherEnabled", "false");
         builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         builder.ConfigureServices(services =>
         {
+            // Real accounts for JWT validation; the Catalog repositories below still use test persistence.
+            services.RemoveAll<IModuleSeeder>();
+            services.AddScoped<IModuleSeeder, StaffSeeder>();
             services.AddSingleton<Store>();
             services.Replace(ServiceDescriptor.Singleton<IBookSuggestionRepository>(sp => sp.GetRequiredService<Store>()));
-            services.Replace(ServiceDescriptor.Singleton<IUnitOfWork>(sp => sp.GetRequiredService<Store>()));
             services.Replace(ServiceDescriptor.Singleton<IApplicationLock>(sp => sp.GetRequiredService<Store>()));
             services.Replace(ServiceDescriptor.Singleton<IStaffMemberService, StaffNames>());
             services.Replace(ServiceDescriptor.Singleton<IClock, FixedClock>());
@@ -56,14 +57,12 @@ public sealed class BookSuggestionHostFactory : WebApplicationFactory<Program>
         public DateTime EndOfLocalDayUtc(DateOnly date) => StartOfLocalDayUtc(date.AddDays(1)).AddTicks(-1);
     }
 
-    private sealed class Store : IBookSuggestionRepository, IUnitOfWork, IApplicationLock
+    private sealed class Store : IBookSuggestionRepository, IApplicationLock
     {
         private readonly List<BookSuggestion> _items = [];
         public void Add(BookSuggestion suggestion) => _items.Add(suggestion);
         public Task<BookSuggestion?> FindAsync(Guid id, CancellationToken ct) => Task.FromResult(_items.SingleOrDefault(x => x.Id == id));
         public Task AcquireAsync(string resource, CancellationToken ct = default) => Task.CompletedTask;
-        public Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default) => operation(ct);
-        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default) => operation(ct);
         public Task<PagedResult<BookSuggestion>> ListAsync(Guid? staffMemberId, BookSuggestionStatus? status,
             PageRequest paging, CancellationToken ct)
         {
@@ -101,13 +100,13 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
         Converters = { new JsonStringEnumConverter() },
     };
 
-    private HttpClient Client(string? role, Guid? staffId = null, Guid? userId = null)
+    private HttpClient Client(string? role, Guid? staffId = null)
     {
         var client = factory.CreateClient();
         if (role is not null)
         {
-            var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(new LoginAccount(
-                userId ?? Guid.NewGuid(), "suggestion-tests@ameriabank.am", staffId, StaffMemberStatus.Active, [role])).Token;
+            var token = factory.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
+                factory.Account(role) with { StaffMemberId = staffId }).Token;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
         return client;
@@ -221,8 +220,8 @@ public class BookSuggestionEndpointTests(BookSuggestionHostFactory factory) : IC
     {
         using var staff = Client(StaffRoles.StaffMember, Guid.NewGuid());
         var suggestion = await Create(staff);
-        var reviewer = Guid.NewGuid();
-        using var admin = Client(StaffRoles.LibraryAdministrator, userId: reviewer);
+        var reviewer = factory.Account(StaffRoles.LibraryAdministrator).UserId;
+        using var admin = Client(StaffRoles.LibraryAdministrator);
         using var response = await admin.PostAsJsonAsync($"{Route}/{suggestion.Id}/{(reject ? "reject" : "approve")}",
             new { comment = "  Review comment  ", reviewedByUserId = Guid.NewGuid(), reviewedAtUtc = "2000-01-01T00:00:00Z" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

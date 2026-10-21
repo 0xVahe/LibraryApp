@@ -15,7 +15,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 
 /// <summary>
-/// Demo data of Borrowing (SD-17, Development only, synthetic C-2): 40 loans in every status, 6 of them overdue (the
+/// Demo data of Borrowing (Development only, synthetic C-2): 40 loans in every status, 6 of them overdue (the
 /// historical loans of the requirements scope and the REP-02 acceptance example: overdue rate 15.0 %), a waiting queue, a
 /// copy held for pickup and penalty records in every status, matching the statuses of the Staff seed (Gor Restricted with
 /// 6 active points, Sona Suspended with 10, Hayk Deactivated without open loans).
@@ -149,7 +149,7 @@ public sealed class BorrowingSeeder(
         db.PenaltyRecords.AddRange(
             LatePenalty(1, gorLate1),
             LatePenalty(2, gorLate2),
-            // Sona: the lost copy, 10 points by default — Suspended (BR-BOR-6).
+            // Sona: the lost copy, 10 points by default — Suspended (penalty-point policy).
             PenaltyRecord.Create(Ids.Penalty(3), Members.SonaVardanyan, lost.Id, policy.CalculateLostPoints(),
                 "Copy lost", lost.ReturnedAtUtc!.Value, policy.ExpiresAtUtc(lost.ReturnedAtUtc!.Value)));
 

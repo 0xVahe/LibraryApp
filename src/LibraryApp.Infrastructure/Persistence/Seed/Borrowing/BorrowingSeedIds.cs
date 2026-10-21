@@ -1,7 +1,7 @@
 namespace LibraryApp.Infrastructure.Persistence.Seed.Borrowing;
 
 /// <summary>
-/// Constant ids of the Borrowing seed (SD-17). Pattern 30000000-0000-0000-&lt;kind&gt;-&lt;number&gt; (3 = Borrowing module):
+/// Constant ids of the Borrowing seed. Pattern 30000000-0000-0000-&lt;kind&gt;-&lt;number&gt; (3 = Borrowing module):
 /// kind 0001 loans, 0002 reservations, 0003 penalty records. They never change.
 /// </summary>
 public static class BorrowingSeedIds

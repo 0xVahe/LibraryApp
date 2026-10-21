@@ -17,7 +17,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
-/// <summary>The Borrowing seed (SD-17) on the real host in Development, after the Catalog and Staff seed.</summary>
+/// <summary>The Borrowing seed on the real host in Development, after the Catalog and Staff seed.</summary>
 public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
     private async Task<T> Read<T>(Func<IServiceProvider, Task<T>> read)
@@ -105,7 +105,7 @@ public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostF
         // REP-02 acceptance: "Given 40 seeded loans of which 6 are overdue … overdue count is 6 and overdue rate is 15.0%".
         using var client = factory.CreateClient();
         string token = factory.Services.GetRequiredService<IAccessTokenIssuer>()
-            .Issue(new LoginAccount(Guid.NewGuid(), "seed-tests@example.com", Guid.NewGuid(), StaffMemberStatus.Active, [StaffRoles.Librarian]))
+            .Issue(factory.Account(StaffRoles.Librarian))
             .Token;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 

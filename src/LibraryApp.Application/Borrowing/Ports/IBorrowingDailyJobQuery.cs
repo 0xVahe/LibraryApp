@@ -14,10 +14,28 @@ public interface IBorrowingDailyJobQuery
         DateTime cutoffUtc,
         CancellationToken ct = default);
 
+    /// <summary>Finds ReadyForPickup reservations whose pickup deadline is strictly before now.</summary>
+    Task<IReadOnlyList<Guid>> GetReadyReservationIdsPastDeadlineAsync(
+        DateTime nowUtc,
+        CancellationToken ct = default);
+
     /// <summary>
     /// Finds staff members with at least one Active penalty record: the only ones
     /// whose points can expire or whose suspension can end.
     /// </summary>
     Task<IReadOnlyList<Guid>> GetStaffIdsWithActivePenaltiesAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The books that have Waiting reservations; the job asks Catalog whether each one was deleted.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetBookIdsWithWaitingReservationsAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The staff members with Waiting or ReadyForPickup reservations; the job asks Staff whether each one was
+    /// deactivated.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetStaffIdsWithActiveReservationsAsync(
         CancellationToken ct = default);
 }

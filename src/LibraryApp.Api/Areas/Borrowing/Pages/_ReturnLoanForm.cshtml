@@ -1,0 +1,35 @@
+@model DeskModel
+@* ReturnLoanForm (Group 3): the copy by barcode, "Damaged — send to repair" and a note (BOR-03, BOR-09; no "Worn");
+   DeclareLostButton posts the same barcode to the Lost handler. *@
+<section class="card" aria-labelledby="return-title">
+    <div class="card-head"><h2 id="return-title">Take back a book</h2></div>
+    @foreach (var error in Model.ErrorsOf(DeskModel.ReturnForm))
+    {
+        <div class="alert alert-red mb-16" role="alert"><strong>The book was not taken back.</strong>@error</div>
+    }
+    <form class="form" method="post" asp-page-handler="Return">
+        <div class="field">
+            <label for="return-barcode">Copy barcode</label>
+            <input id="return-barcode" name="ReturnBarcode" value="@Model.ReturnBarcode" placeholder="BK-0001-01" autocomplete="off" aria-invalid="@Model.InvalidOf(nameof(Model.ReturnBarcode))">
+            @foreach (var error in Model.ErrorsOf(nameof(Model.ReturnBarcode)))
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <label class="check"><input type="checkbox" name="Damaged" value="true" checked="@Model.Damaged"> Damaged — send to repair</label>
+        <input type="hidden" name="Damaged" value="false">
+        <div class="field">
+            <label for="return-note">Note (optional)</label>
+            <input id="return-note" name="Note" value="@Model.Note" aria-invalid="@Model.InvalidOf(nameof(Model.Note))">
+            @foreach (var error in Model.ErrorsOf(nameof(Model.Note)))
+            {
+                <span class="error-text">@error</span>
+            }
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Take back</button>
+            <button class="btn btn-danger" type="submit" asp-page-handler="Lost">Declare lost</button>
+        </div>
+        <p class="hint">Late returns and damaged copies add penalty points by the penalty policy. Declare lost adds the lost points and marks the copy Lost.</p>
+    </form>
+</section>

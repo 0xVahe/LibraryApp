@@ -11,7 +11,7 @@ namespace LibraryApp.Infrastructure.IntegrationTests.Persistence;
 /// </summary>
 public sealed class UnitOfWorkDatabase : IAsyncLifetime
 {
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {

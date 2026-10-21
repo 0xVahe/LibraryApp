@@ -1,0 +1,45 @@
+@model DeskModel
+@* PickupQueueTable (Group 3): copies held at the desk, the earliest deadline first (BOR-07); "Issue" fulfils the reservation. *@
+<section class="card flush" aria-labelledby="pickup-title">
+    <div class="card-head">
+        <div><h2 id="pickup-title">Waiting for pickup</h2><p class="small muted">Reserved copies held at the desk.</p></div>
+    </div>
+    @foreach (var error in Model.ErrorsOf(DeskModel.PickupForm))
+    {
+        <div class="card-foot"><div class="alert alert-red" role="alert"><strong>The book was not issued.</strong>@error</div></div>
+    }
+    @if (Model.Pickups.Items.Count == 0)
+    {
+        <div class="card-foot"><p class="muted">No copies are waiting for pickup.</p></div>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr><th scope="col">Book</th><th scope="col">Staff member</th><th scope="col">Copy</th><th scope="col">Hold until</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Pickups.Items)
+                {
+                    <tr>
+                        <td data-label="Book">@row.Title</td>
+                        <td data-label="Staff member"><a class="row-link" href="@UiNavigation.Staff/@row.StaffMemberId">@row.StaffName</a></td>
+                        <td class="nowrap" data-label="Copy">@(row.Barcode ?? "—")</td>
+                        <td data-label="Hold until">@Texts.Date(row.HoldUntil)</td>
+                        <td class="actions">
+                            @if (row.Barcode is not null)
+                            {
+                                <form method="post" asp-page-handler="IssueHeld">
+                                    <input type="hidden" name="StaffMemberId" value="@row.StaffMemberId">
+                                    <input type="hidden" name="Barcode" value="@row.Barcode">
+                                    <button class="btn btn-secondary btn-sm" type="submit" aria-label="Issue @row.Title to @row.StaffName">Issue</button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+<partial name="_Pager" model="PagerModel.From(Model.Pickups, Context.Request)" />

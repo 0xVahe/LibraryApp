@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Borrowing;
 
-/// <summary>AddBorrowingModule binds the "Borrowing" section, checks it and builds the penalty policy from it (SD-21).</summary>
+/// <summary>AddBorrowingModule binds the "Borrowing" section, checks it and builds the penalty policy from it.</summary>
 public class BorrowingRegistrationTests
 {
     private static readonly Dictionary<string, string?> Valid = new()

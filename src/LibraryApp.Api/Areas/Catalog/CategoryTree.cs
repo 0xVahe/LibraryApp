@@ -7,8 +7,9 @@ public sealed record CategoryOption(Guid Id, string Path);
 
 /// <summary>
 /// The categories of <c>ICategoryService.ListAsync</c> as the Catalog pages show them (CAT-03: two levels at most):
-/// the top-level categories for the catalog chips, the "Parent / Child" path for the book page, and the choices of the
-/// book form. Built once per request from the list; it never calls a service itself.
+/// the top-level categories and their subcategories for the catalog chips, the parent of a subcategory for the book page,
+/// the "Parent / Child" path for the Categories page, and the choices of the book form. Built once per request from the
+/// list; it never calls a service itself.
 /// </summary>
 public sealed class CategoryTree
 {

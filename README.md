@@ -46,6 +46,19 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Access tokens (`Jwt`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `AccessTokenMinutes` | 60 | Lifetime of an access token | MEM-02 |
+| `SecurityStampCacheSeconds` | 30 | Account-state cache duration, from 1 to 30 seconds; defaults to 30 when omitted, validated at startup | MEM-02, NFR-02, S1-03-ADD-02 |
+
+JWTs carry the account's `security_stamp`. Bearer authentication checks it against the current account and rejects a missing account, missing Staff profile, a mismatched stamp or Deactivated status with the standard 401 problem response. Restricted and Suspended members can still sign in to view their standing.
+
+Role membership changes through `UserManager` rotate the stamp in the same Identity save through `StaffUserStore`. Email changes save the new stamp with the updated email in the Staff transaction; deactivation and password changes also rotate it.
+
+Account state is cached per user and token stamp, with absolute expiration on each application instance. Email, password, role changes and deactivation invalidate previously issued tokens within the configured cache duration; requests do not extend it. A new login uses its new stamp immediately. Deactivated members cannot sign in. Tokens issued before this stamp check was added require a new login. Browser cookies continue to use `Ui:SecurityStampValidationInterval` (see [Browser UI](#browser-ui)).
+
 ### Borrowing (`Borrowing`)
 
 | Key | Value | Meaning | Requirement |
@@ -60,6 +73,7 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Penalties:SuspensionDays` | 30 | Calendar days a suspension lasts once the points cross the Suspended threshold | BR-BOR-6, BQ-BA-01 |
 | `Penalties:LateAndDamaged` | Sum | Late and damaged on one return: `Sum` — two records, points add up; `Highest` — one record with the higher points | BQ-BA-02 |
 | `Loans:OverdueFrom` | NextLocalDay | When a loan counts as late: `NextLocalDay` — from the day after the local due date; `DueTime` — from the exact due time | BOR-05, BQ-BA-05 |
+| `Loans:SuspendedMayRenew` | false | A Suspended employee may renew a loan; a Restricted one never may | BR-BOR-1, BQ-BA-11 |
 | `Loans:AllowLostBeforeDue` | true | An Active loan may be declared lost before it is overdue; false: only a loan past the overdue rule (`Loans:OverdueFrom`) may be declared lost | BOR-09, BQ-BA-06 |
 | `Reservations:MaxActive` | 3 | Active reservations per employee | BR-BOR-2 |
 | `Reservations:PickupWorkingDays` | 3 | Working days a copy is held for the first person in the queue | BOR-07 |
@@ -69,6 +83,28 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Reservations:AnyCopyFulfils` | true | Issuing any copy of a book closes the employee's active reservation for it: a ready one is fulfilled and its held copy goes to the next in the queue, a waiting one is cancelled. false: only collecting the held copy fulfils | BOR-07 (BQ-BA-08) |
 
 Point values are at most 10 per record (database constraint). The Development seed gives its staff members the statuses that match these values.
+
+### Reporting (`Reporting`)
+
+Configure reporting in `src/LibraryApp.Api/appsettings.json`.
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `DashboardCacheMinutes` | 5 | Dashboard cache lifetime in minutes (1–60) | REP-02 / REP-F4 |
+| `TopBooksLimit` | 10 | Maximum top books returned (1–100) | REP-03 |
+| `TopCategoriesLimit` | 5 | Maximum top categories returned (1–100) | REP-03 |
+
+All three settings are required. Missing or out-of-range values prevent application startup.
+
+### Notifications (`Notifications`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
+| `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
+| `Delivery:Lease` | 00:15:00 | How long a claimed email is reserved for one API instance; must be longer than sending one batch | NOT-03 |
+
+Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
 
 ## Daily jobs
 
@@ -104,7 +140,7 @@ Scheduled jobs:
 
 | Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
 |---|---|---|---|---|
-| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints` | BOR-06, policy table, BQ-BA-01, BQ-G2-03 |
+| `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself; Waiting reservations of a book deleted in Catalog → Cancelled; Waiting and ReadyForPickup reservations of a Deactivated staff member → Cancelled, a held copy goes to the next Waiting reservation or becomes Available | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G1-09, BQ-G2-03, BR-MEM-4 |
 
 ## Tests
 
@@ -166,6 +202,10 @@ Razor Pages live in the API host (UI guide in the team docs): the shared shell i
 - **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
 - **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
 - **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).
+
+Staff pages (MEM-01, MEM-07): `/staff` provides search, department/status filters and pagination; `/staff/{id}` shows the profile and deactivation form. Both routes require a Librarian or Library Administrator.
+
+The profile invokes Group 3's `StaffBorrowingSummary` View Component with `staffMemberId` when available; otherwise it displays an unavailable message. Borrowing actions remain owned by Group 3.
 
 ## Test accounts
 

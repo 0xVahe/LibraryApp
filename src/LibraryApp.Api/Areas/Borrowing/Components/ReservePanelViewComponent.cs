@@ -53,7 +53,7 @@ public sealed class ReservePanelViewComponent(
     /// <summary>
     /// On the shelf: a copy is Available. All out: no copy is Available but one will come back (on loan, held for
     /// someone, under repair). No copies: none at all, or all Lost or Withdrawn — a reservation then gets the next copy
-    /// Catalog adds (<c>OfferCopyAsync</c>, BQ-G1-10).
+    /// Catalog adds (<c>OfferCopyAsync</c>).
     /// </summary>
     private async Task<ReservePanelState> AvailabilityAsync(Guid bookId, CancellationToken ct)
     {

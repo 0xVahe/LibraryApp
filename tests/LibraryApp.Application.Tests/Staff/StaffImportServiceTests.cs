@@ -62,6 +62,7 @@ public sealed class StaffImportServiceTests
     private sealed class FakeRepository : IStaffManagementRepository
     {
         public Task<StaffMember?> GetByIdAsync(Guid id, CancellationToken ct) => Task.FromResult<StaffMember?>(null);
+        public Task<StaffMemberProfile?> GetForProfileUpdateAsync(Guid id, CancellationToken ct) => Task.FromResult<StaffMemberProfile?>(null);
         public Task<StaffMemberDto?> GetDetailsAsync(Guid id, CancellationToken ct) => Task.FromResult<StaffMemberDto?>(null);
         public Task<bool> EmployeeIdExistsAsync(string employeeId, CancellationToken ct) => Task.FromResult(false);
         public Task<bool> EmailExistsAsync(string email, Guid? exceptMemberId, CancellationToken ct) => Task.FromResult(false);

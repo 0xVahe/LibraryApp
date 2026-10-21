@@ -2,6 +2,7 @@ using LibraryApp.Application.Catalog.Dto;
 
 namespace LibraryApp.Application.Catalog.Services;
 
+/// <summary>Publishers of the catalog. A publisher referenced by a book is never deleted.</summary>
 public interface IPublisherService
 {
     Task<IReadOnlyList<PublisherDto>> ListAsync(CancellationToken ct = default);

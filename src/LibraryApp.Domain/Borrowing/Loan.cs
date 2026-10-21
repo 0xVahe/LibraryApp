@@ -233,8 +233,8 @@ public sealed class Loan : Entity
     /// The UTC timestamp when the copy was declared lost.
     /// </param>
     /// <remarks>
-    /// PROVISIONAL: Active to Lost is permitted pending BQ-BA-06.
-    /// PROVISIONAL: ReturnedAtUtc stores the lost-loan closing timestamp.
+    /// Active and Overdue loans may be declared lost; Application applies Borrowing:Loans:AllowLostBeforeDue to Active ones.
+    /// ReturnedAtUtc stores the moment the loan was closed as lost.
     /// Application coordinates the Catalog update and penalty.
     /// </remarks>
     public void MarkLost(DateTime declaredAtUtc)

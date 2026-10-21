@@ -1,4 +1,5 @@
-
+using LibraryApp.Application.Reporting.Options;
+using Microsoft.Extensions.Options;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
@@ -17,7 +18,7 @@ public sealed class ReportingDatabase : IAsyncLifetime
     public static readonly Guid FinanceStaffId = Guid.NewGuid();
     public static readonly Guid BookId = Guid.NewGuid();
 
-    public string ConnectionString { get; } = TestDatabase.NewConnectionString();
+    public string ConnectionString { get; } = TestDatabase.NewDatabase();
 
     public LibraryDbContext NewContext()
     {
@@ -117,7 +118,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Overdue_report_excludes_returned_loans()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetOverdueLoansAsync(Cutoff, null);
 
@@ -129,7 +135,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Overdue_report_filters_department_in_database()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetOverdueLoansAsync(
             Cutoff, ReportingDatabase.EngineeringId);
@@ -145,7 +156,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Overdue_report_returns_empty_for_unknown_department()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetOverdueLoansAsync(Cutoff, Guid.NewGuid());
 
@@ -156,7 +172,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Dashboard_counts_books_copies_and_loans()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var counts = await repository.GetDashboardCountsAsync(Cutoff);
 
@@ -174,7 +195,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Top_books_count_loans_in_requested_period()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetTopBooksAsync(
             new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -189,7 +215,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Top_categories_count_loans_in_requested_period()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetTopCategoriesAsync(
             new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -204,7 +235,12 @@ public sealed class ReportingReadRepositoryTests(ReportingDatabase database)
     public async Task Top_books_return_empty_outside_requested_period()
     {
         await using var db = database.NewContext();
-        var repository = new ReportingReadRepository(db);
+        var repository = new ReportingReadRepository(db, Options.Create(new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5
+        }));
 
         var rows = await repository.GetTopBooksAsync(
             new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
