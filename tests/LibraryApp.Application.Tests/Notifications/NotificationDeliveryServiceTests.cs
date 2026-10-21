@@ -118,6 +118,19 @@ public sealed class NotificationDeliveryServiceTests
         Assert.Equal(0, store.Saves);
     }
 
+    [Fact]
+    public async Task Sent_status_is_saved_even_when_the_app_is_stopping()
+    {
+        using var stopping = new CancellationTokenSource();
+        var store = new FakeStore(NewNotification());
+        var sender = new FakeSender { OnSent = stopping.Cancel };
+
+        await Service(store, sender).DeliverPendingAsync(stopping.Token);
+
+        Assert.Equal(NotificationStatus.Sent, store.Notifications[0].Status);
+        Assert.Equal(1, store.Saves);
+    }
+
     private static NotificationDeliveryService Service(FakeStore store, FakeSender sender) =>
         new(store, sender, new TestClock(Now), Settings, NullLogger<NotificationDeliveryService>.Instance);
 
@@ -156,6 +169,7 @@ public sealed class NotificationDeliveryServiceTests
 
         public Task SaveAsync(CancellationToken ct = default)
         {
+            ct.ThrowIfCancellationRequested();   // like EF Core
             Saves++;
             return Task.CompletedTask;
         }
@@ -166,6 +180,7 @@ public sealed class NotificationDeliveryServiceTests
         public List<OutlookMessage> Sent { get; } = [];
         public string? FailFor { get; init; }
         public bool Cancel { get; init; }
+        public Action? OnSent { get; init; }
 
         public Task SendAsync(OutlookMessage message, CancellationToken ct = default)
         {
@@ -175,6 +190,7 @@ public sealed class NotificationDeliveryServiceTests
                 throw new NotificationDeliveryException("Mail server is down.");
 
             Sent.Add(message);
+            OnSent?.Invoke();
             return Task.CompletedTask;
         }
     }

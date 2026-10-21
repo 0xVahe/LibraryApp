@@ -25,9 +25,10 @@ public sealed class NotificationDeliveryService(
         foreach (var notification in claimed)
         {
             await DeliverAsync(notification, settings.RetryDelays, ct);
-            // One save per email, so a later failure does not undo it. If this save fails, the email goes out again
-            // when the lease ends.
-            await store.SaveAsync(ct);
+            // One save per email, so a later failure does not undo it. Not cancelled when the app stops: the email is
+            // already out, and an unsaved Sent would send it again when the lease ends. The host's shutdown timeout and
+            // the database command timeout still bound it.
+            await store.SaveAsync(CancellationToken.None);
         }
 
         return claimed.Count;
