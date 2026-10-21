@@ -125,6 +125,18 @@ public sealed class NotificationServiceTests
         public Task<Notification?> FindOwnedAsync(Guid notificationId, Guid staffMemberId, CancellationToken ct = default) =>
             Task.FromResult(Items.SingleOrDefault(n => n.Id == notificationId && n.StaffMemberId == staffMemberId));
 
+        public Task AddAsync(Notification notification, CancellationToken ct = default)
+        {
+            Items.Add(notification);
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> ExistsForEventAsync(Guid eventId, NotificationType type, NotificationChannel channel, CancellationToken ct = default) =>
+            Task.FromResult(Items.Any(n => n.EventId == eventId && n.Type == type && n.Channel == channel));
+
+        public Task<bool> ExistsForLoanAsync(Guid loanId, NotificationType type, NotificationChannel channel, DateOnly localDate, CancellationToken ct = default) =>
+            Task.FromResult(Items.Any(n => n.LoanId == loanId && n.Type == type && n.Channel == channel && n.LocalDate == localDate));
+
         public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default)
         {
             T result = await operation(ct);
