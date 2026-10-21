@@ -36,6 +36,7 @@ public static class Scenario
     public static IReadOnlyList<Endpoint> Endpoints(DateOnly today)
     {
         var book = CatalogSeedIds.Book(1);
+        var itCategory = CatalogSeedIds.Category(3);   // "IT & Software Engineering", two subcategories
         var anna = StaffSeedIds.StaffMembers.AnnaPetrosyan;
         var yearAgo = today.AddYears(-1);
 
@@ -43,6 +44,9 @@ public static class Scenario
         [
             // Catalog
             new("Search books", "api/books?search=the&page=1&pageSize=20", Caller.StaffMember, TypicalLimitMs),
+            // The Catalog page on a category chip: a top-level category (with its subcategories) and available copies only.
+            new("Books of a category, available", $"api/books?categoryId={itCategory}&available=true&page=1&pageSize=20",
+                Caller.StaffMember, TypicalLimitMs),
             new("Book details", $"api/books/{book}", Caller.StaffMember, TypicalLimitMs),
             new("Copies of a book", $"api/books/{book}/copies", Caller.Librarian, TypicalLimitMs),
             new("Categories", "api/categories", Caller.StaffMember, TypicalLimitMs),

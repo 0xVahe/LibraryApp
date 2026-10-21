@@ -197,9 +197,9 @@ NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,0
 
 | Command | What it does |
 |---|---|
-| `seed [--total 10000]` | Adds synthetic returned loans (built by `Loan.Issue` and `Loan.Return`, spread over the last year, no overlapping loans of a copy) until the database holds the target number of loans. A second run adds nothing. No audit rows and no events are written. |
+| `seed [--total 10000]` | Adds synthetic returned loans (built by `Loan.Issue` and `Loan.Return`, spread over the last year in the free time of each copy, so they never overlap another loan of the same copy, the loans already in the database included) until the database holds the target number of loans. A second run adds nothing. No audit rows and no events are written. At the end it counts in the database the added loans that overlap another loan of their copy; exit code 1 when there is one. |
 | `clean` | Removes the loans added by `seed` (their ids start with `be7c0000-0000-0000-0000-`). |
-| `run [--base-url http://localhost:5055] [--iterations 50] [--warmup 5]` | Signs in with the seeded accounts (Administrator, Librarian, Staff Member), calls 16 read endpoints of every module, the three reports included, one at a time, and writes the report. Exit code 0: every endpoint within its limit; 1: a limit exceeded or a call failed; 2: the run could not be done. |
+| `run [--base-url http://localhost:5055] [--iterations 50] [--warmup 5]` | Signs in with the seeded accounts (Administrator, Librarian, Staff Member), calls 17 read endpoints of every module, the three reports included, one at a time, and writes the report. Exit code 0: every endpoint within its limit; 1: a limit exceeded or a call failed; 2: the run could not be done. |
 
 The database is the one of `ConnectionStrings__LibraryDb` (environment or `.env`), or `--connection`. Only a local SQL Server and a local API are accepted unless `--allow-remote` is given. The seeded password of the test accounts is used unless `--password` or `LIBRARYAPP_BENCHMARK_PASSWORD` is set.
 

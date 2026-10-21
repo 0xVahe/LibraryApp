@@ -95,7 +95,8 @@ public sealed record RunReport(
         {
             Line($"| Database | {db.Server} |");
             Line($"| SQL Server | {db.Version} |");
-            Line($"| Loans | {N(db.Loans)} in total, {N(db.OpenLoans)} open, {N(db.BenchmarkLoans)} added by the benchmark seed |");
+            Line($"| Loans | {N(db.Loans)} in total, {N(db.OpenLoans)} open, {N(db.BenchmarkLoans)} added by the benchmark seed, " +
+                 $"{N(db.OverlappingBenchmarkLoans)} of them overlapping another loan of the same copy |");
             Line($"| Other rows | {N(db.Books)} books, {N(db.Copies)} copies, {N(db.StaffMembers)} staff members, {N(db.Reservations)} reservations, " +
                  $"{N(db.PenaltyRecords)} penalty records, {N(db.Notifications)} notifications |");
         }

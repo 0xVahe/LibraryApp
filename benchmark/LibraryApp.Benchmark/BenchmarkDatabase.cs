@@ -86,8 +86,17 @@ public sealed class BenchmarkDatabase
         if (members.Count == 0 || copies.Count == 0)
             throw new BenchmarkException($"{Description} has no staff members or no copies: start the API in Development once so it seeds them.");
 
+        var now = DateTime.UtcNow;
+        var busy = (await db.Loans.AsNoTracking()
+                .Select(l => new { l.BookCopyId, l.IssuedAtUtc, l.ReturnedAtUtc })
+                .ToListAsync())
+            .GroupBy(l => l.BookCopyId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<(DateTime From, DateTime To)>)g.Select(l => (l.IssuedAtUtc, l.ReturnedAtUtc ?? now)).ToList());
+
         var nextNumber = await NextNumberAsync(db);
-        var loans = SyntheticLoans.Create(missing, nextNumber, members, copies, DateTime.UtcNow);
+        var loans = SyntheticLoans.Create(missing, nextNumber, members, copies, busy, now);
 
         db.ChangeTracker.AutoDetectChangesEnabled = false;
         foreach (var batch in loans.Chunk(BatchSize))
@@ -97,9 +106,10 @@ public sealed class BenchmarkDatabase
             db.ChangeTracker.Clear();
         }
 
+        var overlapping = await OverlappingAsync(db);
         Console.WriteLine($"{Description}: added {missing} returned loans ({members.Count} staff members, {copies.Count} copies); " +
-                          $"{existing + missing} loans in total.");
-        return 0;
+                          $"{existing + missing} loans in total; benchmark loans overlapping another loan of the same copy: {overlapping}.");
+        return overlapping == 0 ? 0 : 1;
     }
 
     public async Task<int> CleanAsync()
@@ -125,6 +135,7 @@ public sealed class BenchmarkDatabase
             await db.Loans.CountAsync(),
             await db.Loans.CountAsync(l => l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue),
             benchmarkLoans,
+            await OverlappingAsync(db),
             await db.Books.CountAsync(),
             await db.BookCopies.CountAsync(),
             await db.StaffMembers.CountAsync(),
@@ -134,6 +145,22 @@ public sealed class BenchmarkDatabase
     }
 
     private const string IsBenchmarkLoan = "CONVERT(char(36), [Id]) LIKE @prefix";
+
+    /// <summary>
+    /// Benchmark loans whose time overlaps another loan of the same copy (an open loan counts until now). 0 after a
+    /// correct seed; checked in the database, so it covers the loans that were there before the seed too.
+    /// </summary>
+    private static async Task<int> OverlappingAsync(LibraryDbContext db)
+    {
+        var table = LoansTable(db);
+        var sql =
+            "SELECT COUNT(DISTINCT a.[Id]) AS [Value] FROM " + table + " a JOIN " + table + " b " +
+            "ON a.[BookCopyId] = b.[BookCopyId] AND a.[Id] <> b.[Id] " +
+            "AND a.[IssuedAtUtc] < ISNULL(b.[ReturnedAtUtc], SYSUTCDATETIME()) " +
+            "AND b.[IssuedAtUtc] < ISNULL(a.[ReturnedAtUtc], SYSUTCDATETIME()) " +
+            "WHERE CONVERT(char(36), a.[Id]) LIKE @prefix";
+        return (await db.Database.SqlQueryRaw<int>(sql, PrefixParameter()).ToListAsync()).Single();
+    }
 
     private static SqlParameter PrefixParameter() => new("@prefix", IdPrefix + "%");
 
@@ -168,6 +195,7 @@ public sealed record DatabaseSnapshot(
     int Loans,
     int OpenLoans,
     int BenchmarkLoans,
+    int OverlappingBenchmarkLoans,
     int Books,
     int Copies,
     int StaffMembers,
