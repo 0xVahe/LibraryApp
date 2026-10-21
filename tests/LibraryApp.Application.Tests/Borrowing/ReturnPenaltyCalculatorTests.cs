@@ -28,7 +28,7 @@ public sealed class ReturnPenaltyCalculatorTests
 
     /// <summary>
     /// The daily job may mark a loan Overdue on its due date (a due time just after midnight, a catch-up run). With
-    /// NextLocalDay the dates alone say "not late"; the stored Overdue status still makes the return late (BQ-BA-03).
+    /// NextLocalDay the dates alone say "not late"; the stored Overdue status still makes the return late.
     /// </summary>
     [Fact]
     public void A_loan_already_marked_overdue_returned_on_its_due_date_gets_a_zero_point_record()

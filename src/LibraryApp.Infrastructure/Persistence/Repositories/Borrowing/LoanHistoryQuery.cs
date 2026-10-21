@@ -13,6 +13,9 @@ public sealed class LoanHistoryQuery(LibraryDbContext db) : ILoanHistoryQuery
         Guid? staffMemberId,
         IReadOnlyCollection<Guid>? bookCopyIds,
         LoanStatus? status,
+        DateTime? issuedFromUtc,
+        DateTime? issuedToUtc,
+        DateTime overdueIfDueBeforeUtc,
         PageRequest page,
         CancellationToken ct = default)
     {
@@ -26,8 +29,22 @@ public sealed class LoanHistoryQuery(LibraryDbContext db) : ILoanHistoryQuery
         if (bookCopyIds is not null)
             query = query.Where(loan => bookCopyIds.Contains(loan.BookCopyId));
 
-        if (status is { } wanted)
-            query = query.Where(loan => loan.Status == wanted);
+        // The effective status: an Active loan past the overdue rule counts as Overdue before the daily job marks it.
+        DateTime cutoff = overdueIfDueBeforeUtc;
+        query = status switch
+        {
+            LoanStatus.Overdue => query.Where(loan =>
+                loan.Status == LoanStatus.Overdue || (loan.Status == LoanStatus.Active && loan.DueAtUtc < cutoff)),
+            LoanStatus.Active => query.Where(loan => loan.Status == LoanStatus.Active && loan.DueAtUtc >= cutoff),
+            { } wanted => query.Where(loan => loan.Status == wanted),
+            null => query,
+        };
+
+        if (issuedFromUtc is { } from)
+            query = query.Where(loan => loan.IssuedAtUtc >= from);
+
+        if (issuedToUtc is { } to)
+            query = query.Where(loan => loan.IssuedAtUtc <= to);
 
         int total = await query.CountAsync(ct);
 
@@ -44,7 +61,7 @@ public sealed class LoanHistoryQuery(LibraryDbContext db) : ILoanHistoryQuery
                 loan.DueAtUtc,
                 loan.ReturnedAtUtc,
                 loan.RenewalCount,
-                loan.Status))
+                loan.Status == LoanStatus.Active && loan.DueAtUtc < cutoff ? LoanStatus.Overdue : loan.Status))
             .ToListAsync(ct);
 
         return new PagedResult<LoanHistoryItemDto>(items, total, page.Page, page.PageSize);

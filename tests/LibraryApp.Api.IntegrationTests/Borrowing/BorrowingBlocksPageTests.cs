@@ -16,9 +16,9 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-19: the Borrowing blocks of other groups' pages by the UI guide (Part 1 "Group 3", demo <c>my-library.html</c>,
+/// The Borrowing blocks of other groups' pages by the UI guide (Part 1 "Group 3", demo <c>my-library.html</c>,
 /// <c>staff-member.html</c>): <c>OverdueBanner</c>, <c>MyLoans</c> with Renew (BOR-04), <c>MyReservations</c> with Cancel
-/// (BOR-12), <c>MyPenalties</c> (BR-BOR-6) and <c>StaffBorrowingSummary</c> on Group 2's Staff member page. Own data only
+/// (BOR-12), <c>MyPenalties</c> (penalty-point policy) and <c>StaffBorrowingSummary</c> on Group 2's Staff member page. Own data only
 /// (NFR-03). Every test uses its own members and books.
 /// </summary>
 public class BorrowingBlocksPageTests(BorrowingUiHost factory) : IClassFixture<BorrowingUiHost>

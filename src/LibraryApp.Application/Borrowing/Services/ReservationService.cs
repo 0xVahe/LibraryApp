@@ -17,7 +17,7 @@ namespace LibraryApp.Application.Borrowing.Services;
 /// Reservations (BOR-07, BOR-12). Creating one runs in one transaction under the staff lock and the book's queue lock
 /// (<see cref="BorrowingLocks"/>, in that order), so the limits of the employee and the queue positions of the book are
 /// decided one request at a time; the unique index on active reservations is the last line of defence (409).
-/// The input is validated by <c>CreateReservationRequestValidator</c> before the endpoint is reached (SD-15).
+/// The input is validated by <c>CreateReservationRequestValidator</c> before the endpoint is reached.
 /// Cancelling takes the same locks in the same order (<see cref="CancelAsync"/>).
 /// </summary>
 public sealed class ReservationService(
@@ -51,12 +51,12 @@ public sealed class ReservationService(
             await applicationLock.AcquireAsync(BorrowingLocks.Staff(staffMemberId), token);
             await applicationLock.AcquireAsync(BorrowingLocks.Book(bookId), token);
 
-            // Restricted: may borrow one book; reserving follows the setting (BR-MEM-3, BQ-G2-05, BQ-BA-10).
+            // Restricted: may borrow one book; reserving follows the setting (BR-MEM-3).
             StaffMemberStatus status = await staffMembers.GetStatusAsync(staffMemberId, token);
             if (status == StaffMemberStatus.Restricted && !settings.RestrictedMayReserve)
                 throw new DomainException(BorrowingErrors.RestrictedReservationForbidden);
 
-            // Suspended: Staff's reason unless the setting allows reserving (BQ-BA-11); Deactivated: always Staff's reason.
+            // Suspended: Staff's reason unless the setting allows reserving; Deactivated: always Staff's reason.
             if (status != StaffMemberStatus.Suspended || !settings.SuspendedMayReserve)
             {
                 EligibilityResult eligibility = await staffMembers.CanBorrowAsync(staffMemberId, token);
@@ -129,7 +129,7 @@ public sealed class ReservationService(
             Reservation reservation = await reservations.GetForUpdateAsync(reservationId, token)
                 ?? throw new DomainException(BorrowingErrors.ReservationNotFound);
 
-            // The same cancellation as the daily job's for reservations that can never be served (G3-26).
+            // The same cancellation as the daily job's for reservations that can never be served.
             await reservationQueue.CancelUnderLocksAsync(reservation, token);
 
             return reservation;

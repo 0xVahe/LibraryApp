@@ -17,7 +17,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
-/// <summary>The Borrowing seed (SD-17) on the real host in Development, after the Catalog and Staff seed.</summary>
+/// <summary>The Borrowing seed on the real host in Development, after the Catalog and Staff seed.</summary>
 public class BorrowingSeedTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
     private async Task<T> Read<T>(Func<IServiceProvider, Task<T>> read)

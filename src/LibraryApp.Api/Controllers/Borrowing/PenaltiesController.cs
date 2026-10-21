@@ -22,7 +22,11 @@ public sealed class PenaltiesController(IPenaltyAdministrationService penalties)
     private const string Librarians = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian;
 
     /// <summary>A staff member's penalty records, newest first, with paging (default 20, at most 100).</summary>
-    /// <remarks><c>status</c> (Active, Expired, Waived) narrows the list; an unknown staff member gives an empty page.</remarks>
+    /// <remarks>
+    /// Librarian or Library Administrator. <c>status</c> (Active, Expired, Waived) narrows the list; an unknown staff
+    /// member gives an empty page. Each record has its points, reason, expiry (90 days by default) and, when waived, the
+    /// reason of the waiver. 400: an unknown status.
+    /// </remarks>
     [HttpGet]
     [ProducesResponseType<PagedResult<PenaltyDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -36,10 +40,14 @@ public sealed class PenaltiesController(IPenaltyAdministrationService penalties)
 
     /// <summary>Waives an active penalty record with a mandatory reason (BOR-08).</summary>
     /// <remarks>
-    /// The staff member's status is recalculated at once: below <c>Borrowing:Penalties:RestrictedFromPoints</c> they
-    /// become Active, with <c>StaffStatusChanged</c> only on a real change. No reason, or one longer than 500
-    /// characters: 400. Unknown record: 404 <c>borrowing.penalty_not_found</c>. Expired or already waived: 422
-    /// <c>borrowing.penalty_not_active</c>. A concurrent change of the same record: 409, retry.
+    /// Librarian or Library Administrator. The record becomes Waived with the reason and no longer counts. The staff
+    /// member's status is recalculated in the same transaction: below <c>Borrowing:Penalties:RestrictedFromPoints</c>
+    /// they become Active, with <c>StaffStatusChanged</c> only on a real change.
+    /// <para>
+    /// 400: no reason, or one longer than 500 characters. 404 <c>borrowing.penalty_not_found</c>. 422
+    /// <c>borrowing.penalty_not_active</c>: expired or already waived. 409: the record was changed at the same moment,
+    /// retry.
+    /// </para>
     /// </remarks>
     [HttpPost("{id:guid}/waive")]
     [ProducesResponseType<PenaltyDto>(StatusCodes.Status200OK)]

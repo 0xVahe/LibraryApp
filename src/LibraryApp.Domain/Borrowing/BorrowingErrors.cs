@@ -190,6 +190,11 @@ public static class BorrowingErrors
         "borrowing.penalty_reason_required",
         "A reason is required for the penalty.");
 
+    /// <summary>The loan history was asked for an issue period that ends before it starts (BOR-10).</summary>
+    public static readonly Error HistoryPeriodInvalid = Error.Validation(
+        "borrowing.history_period_invalid",
+        "The start of the issue period must not be after its end.");
+
     /// <summary>
     /// A waiver requires an explanation.
     /// </summary>
@@ -227,7 +232,7 @@ public static class BorrowingErrors
         "borrowing.restricted_renewal_forbidden",
         "A Restricted employee cannot renew a loan.");
 
-    /// <summary>BQ-BA-11: a Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
+    /// <summary>A Suspended employee cannot renew unless <c>Borrowing:Loans:SuspendedMayRenew</c> allows it.</summary>
     public static readonly Error SuspendedRenewalForbidden = Error.BusinessRule(
         "borrowing.suspended_renewal_forbidden",
         "A Suspended employee cannot renew a loan.");

@@ -10,7 +10,7 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
 {
     public void Configure(EntityTypeBuilder<Loan> builder)
     {
-        // Concurrency token: two changes of the same loan at the same time give a 409 (G3-02).
+        // Concurrency token: two changes of the same loan at the same time give a 409.
         builder.Property(x => x.RowVersion).IsRowVersion();
 
         // Optional note recorded during a return.
@@ -18,11 +18,11 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
             .HasMaxLength(Loan.ReturnNoteMaxLength)
             .IsRequired(false);
         
-        // References to other modules: ids and foreign keys only, no navigation properties (SD-13).
+        // References to other modules: ids and foreign keys only, no navigation properties.
         builder.HasOne<BookCopy>().WithMany().HasForeignKey(x => x.BookCopyId);
         builder.HasOne<StaffMember>().WithMany().HasForeignKey(x => x.StaffMemberId);
 
-        // One open loan per copy (G3-04). LoanStatus: Active = 1, Overdue = 2.
+        // One open loan per copy. LoanStatus: Active = 1, Overdue = 2.
         builder.HasIndex(x => x.BookCopyId)
             .IsUnique()
             .HasFilter("[Status] IN (1, 2)")

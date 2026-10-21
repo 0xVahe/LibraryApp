@@ -33,7 +33,7 @@ public sealed record BorrowedBook(Guid BookId, string Title, string? Authors, Bo
 
 /// <summary>
 /// An open loan. <c>Due</c> is the local (Asia/Yerevan) date; <c>IsOverdue</c>: marked Overdue, or past the overdue rule
-/// before the daily job marked it (BQ-BA-05); <c>OverdueWorkingDays</c>: working days since the due date (BOR-05), 0 when
+/// before the daily job marked it; <c>OverdueWorkingDays</c>: working days since the due date (BOR-05), 0 when
 /// not overdue; <c>DaysLeft</c>: calendar days until the due date, negative when it has passed.
 /// </summary>
 public sealed record LoanLine(
@@ -89,6 +89,9 @@ public sealed record ReservationLine(
     DateOnly? ReadyUntil,
     DateOnly Reserved)
 {
+    /// <summary>The barcode of the copy held at the desk while ReadyForPickup (demo <c>staff-member.html</c>), otherwise null.</summary>
+    public string? Barcode { get; init; }
+
     /// <summary>"Pick up before 18 Oct 2026 at the library desk" or "Reserved 2 Oct 2026 · you are 2nd in the queue".</summary>
     public string Text(bool toMember) => Status == ReservationStatus.ReadyForPickup && ReadyUntil is { } until
         ? $"{(toMember ? "Pick up" : "Held")} before {Texts.Date(until)} at the library desk"
@@ -103,6 +106,7 @@ public sealed record PenaltyLine(Guid PenaltyId, BorrowedBook Book, int Points, 
 /// </summary>
 public sealed class StaffBorrowingReader(
     IBorrowingReadService borrowing,
+    IReservationService reservationService,
     ICatalogService catalog,
     IStaffMemberService staffMembers,
     IWorkingDayCalendar calendar,
@@ -142,7 +146,13 @@ public sealed class StaffBorrowingReader(
                      .Distinct())
             books[bookId] = Describe(bookId, await catalog.GetBookAsync(bookId, ct));
 
-        Guid[] copyIds = summary.ActiveLoans.Select(l => l.BookCopyId).Distinct().ToArray();
+        // The held copy of a ReadyForPickup reservation: the cross-module summary has no copy id, Borrowing's own read has.
+        var heldCopies = new Dictionary<Guid, Guid>();
+        foreach (OpenReservationInfo ready in summary.Reservations.Where(r => r.Status == ReservationStatus.ReadyForPickup))
+            if ((await reservationService.GetAsync(ready.ReservationId, ct)).CopyId is { } copyId)
+                heldCopies[ready.ReservationId] = copyId;
+
+        Guid[] copyIds = summary.ActiveLoans.Select(l => l.BookCopyId).Concat(heldCopies.Values).Distinct().ToArray();
         Dictionary<Guid, string> barcodes = copyIds.Length == 0
             ? []
             : (await catalog.GetCopiesAsync(copyIds, ct)).ToDictionary(c => c.Id, c => c.Barcode);
@@ -160,7 +170,10 @@ public sealed class StaffBorrowingReader(
         }).ToList();
 
         var reservations = summary.Reservations.Select(r => new ReservationLine(r.ReservationId, books[r.BookId], r.Status,
-            r.QueuePosition, r.ReadyUntilUtc is { } until ? clock.ToLocalDate(until) : null, clock.ToLocalDate(r.CreatedAtUtc))).ToList();
+            r.QueuePosition, r.ReadyUntilUtc is { } until ? clock.ToLocalDate(until) : null, clock.ToLocalDate(r.CreatedAtUtc))
+        {
+            Barcode = heldCopies.TryGetValue(r.ReservationId, out Guid held) ? barcodes.GetValueOrDefault(held) : null,
+        }).ToList();
 
         var penalties = summary.ActivePenalties.Select(p => new PenaltyLine(p.PenaltyId, books[p.BookId], p.Points, p.Reason,
             clock.ToLocalDate(p.ExpiresAtUtc))).ToList();

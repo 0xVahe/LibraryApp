@@ -4,8 +4,13 @@ namespace LibraryApp.Application.Common;
 /// One page of a list (SD-14). Every list endpoint returns this shape; <see cref="TotalCount"/> counts all matching
 /// items, not only this page.
 /// </summary>
+/// <param name="Items">The items of this page, in the order of the list.</param>
+/// <param name="TotalCount">All matching items, on every page.</param>
+/// <param name="Page">The page number, from 1.</param>
+/// <param name="PageSize">Items per page (default 20, at most 100).</param>
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize)
 {
+    /// <summary>The number of pages; 0 when nothing matches.</summary>
     public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
 
     public static PagedResult<T> Empty(PageRequest request) => new([], 0, request.Page, request.PageSize);

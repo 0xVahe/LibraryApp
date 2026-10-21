@@ -758,7 +758,7 @@ public sealed class LoanReturnPenaltyTests : LoanReturnEndpointTests
 
     /// <summary>
     /// A loan already marked Overdue is returned on its due-date local day: with NextLocalDay the dates say "not late",
-    /// but the stored status makes it late — one 0-point record, no PenaltyApplied, no status change (BQ-BA-03).
+    /// but the stored status makes it late — one 0-point record, no PenaltyApplied, no status change.
 
     [Fact]
     public async Task Returning_an_overdue_loan_on_its_due_date_records_zero_points()
