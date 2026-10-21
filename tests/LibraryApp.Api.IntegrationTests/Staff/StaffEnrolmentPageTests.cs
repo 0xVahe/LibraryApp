@@ -22,6 +22,25 @@ public class StaffEnrolmentPageTests(ApiHostFactory factory) : IClassFixture<Api
         "EmployeeId,FirstName,LastName,CorporateEmail,Department,Position,LineManagerEmail,Category,Role\r\n";
 
     [Theory]
+    [InlineData(NewPage)]
+    [InlineData(ImportPage)]
+    public async Task Csv_recovery_uses_a_fresh_get_and_warns_that_the_server_outcome_is_unknown(string path)
+    {
+        using var client = await ClientAsync();
+        var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+
+        var recovery = Regex.Match(html, "<a\\b[^>]*>Reload import form</a>").Value;
+        Assert.Contains("href=\"/staff/import\"", recovery);
+        Assert.Contains("An interrupted request may still complete on the server; its outcome is unknown.", html);
+        Assert.Contains("Check Staff members before importing again.", html);
+        Assert.DoesNotContain("disabled", InputTag(html, "CsvFile"));
+        Assert.Contains("data-import-template", html);
+        Assert.Contains("hidden data-import-recovery", html);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Library_staff_can_open_the_enrol_form_with_real_lookups(bool administrator)
