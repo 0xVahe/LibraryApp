@@ -76,6 +76,7 @@ public sealed class StaffEnrolledEventHandlerTests
         RegisterRecordingHandler<ReservationReady, ReservationReadyEventHandler>(services, invocations);
         RegisterRecordingHandler<PenaltyApplied, PenaltyAppliedEventHandler>(services, invocations);
         RegisterRecordingHandler<StaffStatusChanged, StaffStatusChangedEventHandler>(services, invocations);
+        RegisterRecordingHandler<StaffPasswordChanged, StaffPasswordChangedEventHandler>(services, invocations);
 
         using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
@@ -91,6 +92,7 @@ public sealed class StaffEnrolledEventHandlerTests
             new ReservationReady(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), occurredAtUtc.AddDays(3)),
             new PenaltyApplied(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 1, 1, "Late return"),
             new StaffStatusChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid(), StaffMemberStatus.Active, StaffMemberStatus.Restricted, "Penalty threshold", null),
+            new StaffPasswordChanged(Guid.NewGuid(), occurredAtUtc, Guid.NewGuid()),
         };
 
         foreach (var domainEvent in events)
@@ -128,6 +130,7 @@ public sealed class StaffEnrolledEventHandlerTests
         ReservationReady value => PublishAsync<ReservationReady>(bus, value),
         PenaltyApplied value => PublishAsync<PenaltyApplied>(bus, value),
         StaffStatusChanged value => PublishAsync<StaffStatusChanged>(bus, value),
+        StaffPasswordChanged value => PublishAsync<StaffPasswordChanged>(bus, value),
         _ => throw new ArgumentOutOfRangeException(nameof(domainEvent), domainEvent.GetType().Name),
     };
 
