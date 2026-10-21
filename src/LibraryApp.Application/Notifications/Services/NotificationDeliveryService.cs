@@ -24,7 +24,7 @@ public sealed class NotificationDeliveryService(
 
         foreach (var notification in claimed)
         {
-            await DeliverAsync(notification, ct);
+            await DeliverAsync(notification, settings.RetryDelays, ct);
             // One save per email, so a later failure does not undo it. If this save fails, the email goes out again
             // when the lease ends.
             await store.SaveAsync(ct);
@@ -33,7 +33,7 @@ public sealed class NotificationDeliveryService(
         return claimed.Count;
     }
 
-    private async Task DeliverAsync(Notification notification, CancellationToken ct)
+    private async Task DeliverAsync(Notification notification, TimeSpan[] retryDelays, CancellationToken ct)
     {
         try
         {
@@ -43,11 +43,15 @@ public sealed class NotificationDeliveryService(
         }
         catch (NotificationDeliveryException ex)
         {
-            // A failed email stays Failed; it is not sent again.
-            notification.MarkFailed(ex.Message, null);
+            // NOT-08: the n-th failure waits RetryDelays[n-1]; after the last delay there is no retry (null).
+            int failedBefore = notification.Attempts;
+            DateTime? nextAttempt = failedBefore < retryDelays.Length ? clock.UtcNow + retryDelays[failedBefore] : null;
+            notification.MarkFailed(ex.Message, nextAttempt);
 
             // Ids only: the recipient is personal data (NFR-06).
-            logger.LogError("Notification {NotificationId} not delivered: {Error}", notification.Id, ex.Message);
+            logger.LogError(
+                "Notification {NotificationId} not delivered (attempt {Attempt}), next attempt {NextAttemptAtUtc}: {Error}",
+                notification.Id, notification.Attempts, nextAttempt?.ToString("O") ?? "none", ex.Message);
         }
     }
 }

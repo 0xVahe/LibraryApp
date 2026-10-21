@@ -31,19 +31,52 @@ public sealed class NotificationDeliveryServiceTests
         Assert.Equal(Now, store.Notifications[0].SentAtUtc);
     }
 
-    [Fact]
-    public async Task Failed_email_stays_failed()
+    [Theory]
+    [InlineData(0, 5)]
+    [InlineData(1, 15)]
+    [InlineData(2, 60)]
+    public async Task Failed_email_gets_its_next_retry(int failedBefore, int delayMinutes)
     {
-        var store = new FakeStore(NewNotification());
-        var sender = new FakeSender { FailFor = "anna@ameriabank.am" };
+        var notification = NewNotification();
+        for (int i = 0; i < failedBefore; i++)
+            notification.MarkFailed("Earlier failure.", Now);
+        var store = new FakeStore(notification);
 
-        await Service(store, sender).DeliverPendingAsync();
+        await Service(store, new FakeSender { FailFor = "anna@ameriabank.am" }).DeliverPendingAsync();
 
-        var notification = store.Notifications[0];
         Assert.Equal(NotificationStatus.Failed, notification.Status);
-        Assert.Equal(1, notification.Attempts);
-        Assert.Null(notification.NextAttemptAtUtc);
+        Assert.Equal(failedBefore + 1, notification.Attempts);
+        Assert.Equal(Now.AddMinutes(delayMinutes), notification.NextAttemptAtUtc);
         Assert.Equal("Mail server is down.", notification.LastError);
+    }
+
+    [Fact]
+    public async Task After_the_last_retry_the_email_stays_failed()
+    {
+        var notification = NewNotification();
+        for (int i = 0; i < 3; i++)
+            notification.MarkFailed("Earlier failure.", Now);
+        var store = new FakeStore(notification);
+
+        await Service(store, new FakeSender { FailFor = "anna@ameriabank.am" }).DeliverPendingAsync();
+
+        Assert.Equal(NotificationStatus.Failed, notification.Status);
+        Assert.Equal(4, notification.Attempts);
+        Assert.Null(notification.NextAttemptAtUtc);
+    }
+
+    [Fact]
+    public async Task A_retry_that_succeeds_marks_the_email_sent()
+    {
+        var notification = NewNotification();
+        notification.MarkFailed("Earlier failure.", Now);
+        var store = new FakeStore(notification);
+
+        await Service(store, new FakeSender()).DeliverPendingAsync();
+
+        Assert.Equal(NotificationStatus.Sent, notification.Status);
+        Assert.Equal(Now, notification.SentAtUtc);
+        Assert.Null(notification.NextAttemptAtUtc);
     }
 
     [Fact]
@@ -95,6 +128,7 @@ public sealed class NotificationDeliveryServiceTests
             PollInterval = TimeSpan.FromSeconds(5),
             BatchSize = 20,
             Lease = TimeSpan.FromMinutes(15),
+            RetryDelays = [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60)],
         },
     });
 
