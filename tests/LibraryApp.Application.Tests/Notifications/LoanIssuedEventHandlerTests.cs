@@ -17,7 +17,7 @@ public sealed class LoanIssuedEventHandlerTests
     private static readonly Guid StaffId = Guid.NewGuid();
 
     [Fact]
-    public async Task Passes_the_book_title_the_yerevan_due_date_and_the_loan_to_the_creator_for_both_channels()
+    public async Task Creates_the_loan_confirmation_on_both_channels_and_the_calendar_item_on_outlook_with_the_book_and_yerevan_due_date()
     {
         var fixture = new Fixture();
         // 21:00 UTC on 12 Oct is 01:00 on 13 Oct in Yerevan: the email shows the local date.
@@ -25,14 +25,22 @@ public sealed class LoanIssuedEventHandlerTests
 
         await fixture.Handler.HandleAsync(domainEvent, CancellationToken.None);
 
-        var call = Assert.Single(fixture.Creator.Calls);
-        Assert.Equal(NotificationType.LoanConfirmation, call.Type);
-        Assert.Equal(StaffId, call.StaffMemberId);
-        Assert.Equal(domainEvent.EventId, call.EventId);
-        Assert.Equal(domainEvent.LoanId, call.LoanId);
-        Assert.Equal([NotificationChannel.Outlook, NotificationChannel.InApp], call.Channels);
-        Assert.Equal("Clean Code", call.Values[NotificationPlaceholders.BookTitle]);
-        Assert.Equal("13.10.2026", call.Values[NotificationPlaceholders.DueDate]);
+        Assert.Equal(2, fixture.Creator.Calls.Count);
+
+        var confirmation = fixture.Creator.Calls.Single(c => c.Type == NotificationType.LoanConfirmation);
+        Assert.Equal([NotificationChannel.Outlook, NotificationChannel.InApp], confirmation.Channels);
+
+        var calendar = fixture.Creator.Calls.Single(c => c.Type == NotificationType.DueDateCalendarItem);
+        Assert.Equal([NotificationChannel.Outlook], calendar.Channels);
+
+        Assert.All(fixture.Creator.Calls, call =>
+        {
+            Assert.Equal(StaffId, call.StaffMemberId);
+            Assert.Equal(domainEvent.EventId, call.EventId);   // one event, two types
+            Assert.Equal(domainEvent.LoanId, call.LoanId);
+            Assert.Equal("Clean Code", call.Values[NotificationPlaceholders.BookTitle]);
+            Assert.Equal("13.10.2026", call.Values[NotificationPlaceholders.DueDate]);
+        });
     }
 
     [Fact]
