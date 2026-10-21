@@ -162,7 +162,7 @@ Scheduled jobs:
 | Job (`Jobs:Schedules:<name>`) | RunAt | Working days only | What it does | Requirement |
 |---|---|---|---|---|
 | `Borrowing` | 00:30 | no | Active loans past the overdue rule (`Borrowing:Loans:OverdueFrom`) → Overdue with `LoanOverdue`; penalty records past 90 days → Expired; staff status recalculated: Active below `RestrictedFromPoints`, Suspended for `SuspensionDays` from the record that made `SuspendedFromPoints`, then Restricted while the points stay at or above `RestrictedFromPoints`; ReadyForPickup reservations past `ReadyUntilUtc` (the end of the last pickup working day) → Expired, the held copy goes to the next Waiting reservation with `ReservationReady` or becomes Available; no message about the expiry itself; Waiting reservations of a book deleted in Catalog → Cancelled; Waiting and ReadyForPickup reservations of a Deactivated staff member → Cancelled, a held copy goes to the next Waiting reservation or becomes Available | BOR-06, BOR-11, policy table, BQ-BA-01, BQ-BA-12, BQ-BA-13, BQ-G1-09, BQ-G2-03, BR-MEM-4 |
-
+| `notifications-due-reminders` | 09:00 | yes | Open loans due in 2 working days (a due date on a day off is reminded with the next working day) → DueSoonReminder; loans overdue 5, 10, 15, ... working days → OverdueNotice, line manager in CC after 14 working days. Each is stored in-app and as a Pending email for the delivery job; a loan that already has the same type that day is skipped. Loans of Deactivated staff are left out | NOT-05|
 ## Tests
 
 ```bash

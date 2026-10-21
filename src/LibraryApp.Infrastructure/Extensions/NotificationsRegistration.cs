@@ -39,6 +39,10 @@ public static class NotificationsRegistrationExtensions
         services.AddScoped<INotificationDeliveryService, NotificationDeliveryService>();
         services.AddHostedService<NotificationDeliveryJob>();
 
+        // 09:00 due-soon and overdue reminders on working days (NOT-05); schedule in Jobs:Schedules.
+        services.AddScoped<IReminderRepository, ReminderRepository>();
+        services.AddDailyJob<DueReminderJob>(DueReminderJob.Name);
+
         return services;
     }
 }
