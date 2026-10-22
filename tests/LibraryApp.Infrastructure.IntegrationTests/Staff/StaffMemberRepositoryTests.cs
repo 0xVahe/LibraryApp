@@ -1,3 +1,5 @@
+using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.IntegrationTests.Persistence;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
@@ -40,6 +42,28 @@ public class StaffMemberRepositoryTests(StaffSeederFixture fixture) : IClassFixt
         Assert.Equal("Anna Petrosyan", byId.FullName);
         Assert.Equal(byId, byEmail);
         Assert.Null(await repository.FindByEmployeeIdAsync("EMP-00000", CancellationToken.None));
+        Assert.Empty(db.ChangeTracker.Entries());
+    }
+    
+    [Fact]
+    public async Task GetContacts_reads_name_emails_and_status_and_leaves_out_unknown_ids()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        var repository = new StaffMemberRepository(db);
+        var anna = StaffSeedData.People.Single(x => x.StaffMemberId == StaffSeedIds.StaffMembers.AnnaPetrosyan);
+        var lilit = StaffSeedData.People.Single(x => x.StaffMemberId == StaffSeedIds.StaffMembers.LilitGrigoryan);
+        var hayk = StaffSeedData.People.Single(x => x.StaffMemberId == StaffSeedIds.StaffMembers.HaykManukyan);
+
+        var contacts = await repository.GetContactsAsync(
+            [anna.StaffMemberId, lilit.StaffMemberId, hayk.StaffMemberId, Guid.NewGuid()], CancellationToken.None);
+
+        Assert.Equal(3, contacts.Count);
+        Assert.Equal(
+            new StaffContact(anna.StaffMemberId, "Anna Petrosyan", anna.Email, anna.LineManagerEmail, anna.Status),
+            contacts[anna.StaffMemberId]);
+        Assert.Null(contacts[lilit.StaffMemberId].LineManagerEmail);
+        Assert.Equal(StaffMemberStatus.Deactivated, contacts[hayk.StaffMemberId].Status);
         Assert.Empty(db.ChangeTracker.Entries());
     }
 }
