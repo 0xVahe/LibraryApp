@@ -71,7 +71,8 @@ internal sealed class FakeStaffMemberRepository : IStaffMemberRepository
         IReadOnlyDictionary<Guid, StaffContact> contacts = ids
             .Where(_members.ContainsKey)
             .ToDictionary(id => id, id => new StaffContact(
-                id, $"{_members[id].FirstName} {_members[id].LastName}", _members[id].CorporateEmail, _members[id].LineManagerEmail));
+                id, $"{_members[id].FirstName} {_members[id].LastName}", _members[id].CorporateEmail,
+                _members[id].LineManagerEmail, _members[id].Status));
         return Task.FromResult(contacts);
     }
     

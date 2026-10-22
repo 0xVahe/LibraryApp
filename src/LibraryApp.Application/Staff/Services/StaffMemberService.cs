@@ -68,12 +68,6 @@ public sealed class StaffMemberService(IStaffMemberRepository staffMembers, IOpt
             ? await staffMembers.FindByCorporateEmailAsync(value.ToLowerInvariant(), ct)
             : await staffMembers.FindByEmployeeIdAsync(value, ct);
     }
-    
-    public async Task<StaffContact?> GetContactAsync(Guid staffMemberId, CancellationToken ct = default)
-    {
-        var contacts = await staffMembers.GetContactsAsync([staffMemberId], ct);
-        return contacts.GetValueOrDefault(staffMemberId);
-    }
 
     public async Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
         IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default)

@@ -52,6 +52,6 @@ public sealed class StaffMemberRepository(LibraryDbContext db) : IStaffMemberRep
         await db.StaffMembers
             .AsNoTracking()
             .Where(x => ids.Contains(x.Id))
-            .Select(x => new StaffContact(x.Id, x.FirstName + " " + x.LastName, x.CorporateEmail, x.LineManagerEmail))
-            .ToDictionaryAsync(x => x.Id, ct);
+            .Select(x => new StaffContact(x.Id, x.FirstName + " " + x.LastName, x.CorporateEmail, x.LineManagerEmail, x.Status))
+            .ToDictionaryAsync(x => x.StaffMemberId, ct);
 }

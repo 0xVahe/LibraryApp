@@ -404,11 +404,6 @@ public sealed class LoanLostServiceTests
             CancellationToken ct = default) =>
             throw new NotSupportedException();
 
-        public Task<StaffContact?> GetContactAsync(
-            Guid staffMemberId, 
-            CancellationToken ct = default) => 
-            throw new NotSupportedException();
-
         public Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
             IReadOnlyCollection<Guid> staffMemberIds, 
             CancellationToken ct = default) => 

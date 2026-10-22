@@ -280,31 +280,28 @@ public class StaffMemberServiceTests
         Assert.Null(await _service.FindAsync(value));
     }
     
-    
-    // ---- GetContactAsync / GetContactsAsync (Notifications) ----
+    // ---- GetContactsAsync (Notifications, X-08) ----
 
     [Fact]
-    public async Task GetContact_returns_name_email_and_line_manager_email()
+    public async Task GetContacts_returns_name_emails_and_status()
     {
         var anna = _repository.Add(lineManager: "Mariam.Avetisyan@AmeriaBank.am");
 
-        var contact = await _service.GetContactAsync(anna.Id);
+        var contacts = await _service.GetContactsAsync([anna.Id]);
 
-        Assert.Equal(new StaffContact(anna.Id, "Anna Petrosyan", anna.CorporateEmail, "mariam.avetisyan@ameriabank.am"), contact);
+        Assert.Equal(
+            new StaffContact(anna.Id, "Anna Petrosyan", anna.CorporateEmail, "mariam.avetisyan@ameriabank.am", StaffMemberStatus.Active),
+            contacts[anna.Id]);
     }
 
     [Fact]
-    public async Task GetContact_returns_null_for_an_unknown_id()
-    {
-        Assert.Null(await _service.GetContactAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task GetContact_returns_a_Deactivated_member()
+    public async Task GetContacts_includes_a_Deactivated_member_with_the_status()
     {
         var member = _repository.Add(StaffMemberStatus.Deactivated);
 
-        Assert.Equal(member.Id, (await _service.GetContactAsync(member.Id))?.Id);
+        var contacts = await _service.GetContactsAsync([member.Id]);
+
+        Assert.Equal(StaffMemberStatus.Deactivated, contacts[member.Id].Status);
     }
 
     [Fact]
