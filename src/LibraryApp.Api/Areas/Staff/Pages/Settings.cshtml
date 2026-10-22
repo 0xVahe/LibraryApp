@@ -46,18 +46,15 @@
                                        aria-invalid="@Model.Invalid("department-edit", "Name")" aria-describedby="department-@department.Id-error">
                             </div>
                             <button class="btn btn-secondary btn-sm" type="submit">Save</button>
-                            <button class="btn btn-secondary btn-sm" type="submit" asp-page-handler="CancelDepartmentEdit">Cancel</button>
+                            <a class="btn btn-secondary btn-sm" href="@Model.SettingsUrl(editCategoryId: Model.EditingCategoryId, addCategory: Model.ShowCategoryForm)">Cancel</a>
                         </div>
                         <span class="error-text" id="department-@department.Id-error">@Model.ErrorFor("department-edit", "Name")</span>
                     </form>
                 }
                 else
                 {
-                    <span class="grow"><span class="title">@department.Name</span> <span class="small muted">@department.StaffCount staff</span></span>
-                    <form method="post" asp-page-handler="EditDepartment">
-                        <input type="hidden" name="id" value="@department.Id">
-                        <button class="btn btn-secondary btn-sm" type="submit">Rename</button>
-                    </form>
+                    <span class="grow"><span class="title">@department.Name</span> <span class="small muted">@department.StaffCount staff member@(department.StaffCount == 1 ? "" : "s")</span></span>
+                    <a class="btn btn-secondary btn-sm" href="@Model.SettingsUrl(editDepartmentId: department.Id, editCategoryId: Model.EditingCategoryId, addCategory: Model.ShowCategoryForm)">Rename</a>
                 }
             </li>
         }
@@ -102,16 +99,13 @@
         </div>
         <div class="form-actions field-wide">
             <button class="btn btn-primary" type="submit">Add category</button>
-            <button class="btn btn-secondary" type="submit" asp-page-handler="CancelCategoryForm">Cancel</button>
+            <a class="btn btn-secondary" href="@Model.SettingsUrl(editDepartmentId: Model.EditingDepartmentId, editCategoryId: Model.EditingCategoryId)">Cancel</a>
         </div>
     </form>
     }
     else
     {
-        <form method="post" asp-page-handler="ShowCategoryForm" class="mb-16">
-            <input type="hidden" name="editingCategoryId" value="@Model.EditingCategoryId">
-            <button class="btn btn-primary" type="submit">Add category</button>
-        </form>
+        <a class="btn btn-primary mb-16" href="@Model.SettingsUrl(editDepartmentId: Model.EditingDepartmentId, editCategoryId: Model.EditingCategoryId, addCategory: true)">Add category</a>
     }
     <table class="table">
         <thead>
@@ -130,8 +124,8 @@
             @if (editing)
             {
                 <tr>
-                    <td colspan="5" data-label="">
-                        <form class="form form-2 settings-category-edit" method="post" asp-page-handler="UpdateCategory" novalidate>
+                    <td colspan="5">
+                        <form class="form form-2" method="post" asp-page-handler="UpdateCategory" novalidate>
                             <input type="hidden" name="id" value="@category.Id">
                             <input type="hidden" name="showCategoryForm" value="@Model.ShowCategoryForm.ToString().ToLowerInvariant()">
                             <div class="field">
@@ -160,7 +154,7 @@
                             </div>
                             <div class="form-actions field-wide">
                                 <button class="btn btn-secondary btn-sm" type="submit">Save</button>
-                                <button class="btn btn-secondary btn-sm" type="submit" asp-page-handler="CancelCategoryEdit">Cancel</button>
+                                <a class="btn btn-secondary btn-sm" href="@Model.SettingsUrl(editDepartmentId: Model.EditingDepartmentId, addCategory: Model.ShowCategoryForm)">Cancel</a>
                             </div>
                         </form>
                     </td>
@@ -182,11 +176,7 @@
                     @category.MaxRenewals
                 </td>
                 <td data-label="Actions" class="actions">
-                    <form method="post" asp-page-handler="EditCategory">
-                        <input type="hidden" name="id" value="@category.Id">
-                        <input type="hidden" name="showCategoryForm" value="@Model.ShowCategoryForm.ToString().ToLowerInvariant()">
-                        <button class="btn btn-secondary btn-sm" type="submit">Edit</button>
-                    </form>
+                    <a class="btn btn-secondary btn-sm" href="@Model.SettingsUrl(editDepartmentId: Model.EditingDepartmentId, editCategoryId: category.Id, addCategory: Model.ShowCategoryForm)">Edit</a>
                 </td>
             </tr>
             }

@@ -37,7 +37,29 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
 
     public string? Invalid(string form, string field) => ErrorFor(form, field) is not null ? "true" : null;
 
-    public async Task OnGetAsync(CancellationToken ct) => await LoadAsync(ct);
+    public async Task OnGetAsync(Guid? editDepartmentId, Guid? editCategoryId, bool addCategory, CancellationToken ct)
+    {
+        EditingDepartmentId = editDepartmentId;
+        EditingCategoryId = editCategoryId;
+        ShowCategoryForm = addCategory;
+
+        if (EditingDepartmentId is Guid departmentId)
+            DepartmentEditInput = new UpsertDepartmentRequest((await departments.GetAsync(departmentId, ct)).Name);
+        await LoadEditingCategoryAsync(ct);
+        await LoadAsync(ct);
+    }
+
+    public string SettingsUrl(Guid? editDepartmentId = null, Guid? editCategoryId = null, bool addCategory = false)
+    {
+        var query = new List<string>();
+        if (editDepartmentId is Guid departmentId)
+            query.Add($"editDepartmentId={departmentId}");
+        if (editCategoryId is Guid categoryId)
+            query.Add($"editCategoryId={categoryId}");
+        if (addCategory)
+            query.Add("addCategory=true");
+        return query.Count == 0 ? "/settings" : $"/settings?{string.Join("&", query)}";
+    }
 
     public async Task<IActionResult> OnPostCreateDepartmentAsync(UpsertDepartmentRequest request, CancellationToken ct)
     {
@@ -87,16 +109,6 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         }
     }
 
-    public async Task<IActionResult> OnPostEditDepartmentAsync(Guid id, CancellationToken ct)
-    {
-        EditingDepartmentId = id;
-        DepartmentEditInput = new UpsertDepartmentRequest((await departments.GetAsync(id, ct)).Name);
-        await LoadAsync(ct);
-        return Page();
-    }
-
-    public IActionResult OnPostCancelDepartmentEdit() => RedirectToPage();
-
     public async Task<IActionResult> OnPostCreateCategoryAsync(
         UpsertStaffCategoryRequest request,
         Guid? editingCategoryId,
@@ -124,8 +136,11 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         {
             await LoadEditingCategoryAsync(ct);
             await LoadAsync(ct);
-            AddCategoryErrorToField(exception);
-            return this.DomainError(exception);
+            var hasFieldError = AddCategoryErrorToField(exception);
+            var result = this.DomainError(exception);
+            if (hasFieldError)
+                ModelState.Remove(string.Empty);
+            return result;
         }
     }
 
@@ -155,8 +170,11 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         catch (DomainException exception)
         {
             await LoadAsync(ct);
-            AddCategoryErrorToField(exception);
-            return this.DomainError(exception);
+            var hasFieldError = AddCategoryErrorToField(exception);
+            var result = this.DomainError(exception);
+            if (hasFieldError)
+                ModelState.Remove(string.Empty);
+            return result;
         }
     }
 
@@ -165,39 +183,6 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         Departments = await departments.ListForSettingsAsync(ct);
         Categories = await categories.GetListAsync(ct);
         Response.Headers.CacheControl = "no-store";
-    }
-
-    public async Task<IActionResult> OnPostEditCategoryAsync(Guid id, bool showCategoryForm, CancellationToken ct)
-    {
-        EditingCategoryId = id;
-        ShowCategoryForm = showCategoryForm;
-        await LoadEditingCategoryAsync(ct);
-        await LoadAsync(ct);
-        return Page();
-    }
-
-    public async Task<IActionResult> OnPostCancelCategoryEditAsync(bool showCategoryForm, CancellationToken ct)
-    {
-        ShowCategoryForm = showCategoryForm;
-        await LoadAsync(ct);
-        return Page();
-    }
-
-    public async Task<IActionResult> OnPostShowCategoryFormAsync(Guid? editingCategoryId, CancellationToken ct)
-    {
-        ShowCategoryForm = true;
-        EditingCategoryId = editingCategoryId;
-        await LoadEditingCategoryAsync(ct);
-        await LoadAsync(ct);
-        return Page();
-    }
-
-    public async Task<IActionResult> OnPostCancelCategoryFormAsync(Guid? editingCategoryId, CancellationToken ct)
-    {
-        EditingCategoryId = editingCategoryId;
-        await LoadEditingCategoryAsync(ct);
-        await LoadAsync(ct);
-        return Page();
     }
 
     private async Task LoadEditingCategoryAsync(CancellationToken ct)
@@ -220,7 +205,7 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         ModelState.AddModelError(nameof(UpsertStaffCategoryRequest.Name), StaffErrors.CategoryNameRequired.Message);
     }
 
-    private void AddCategoryErrorToField(DomainException exception)
+    private bool AddCategoryErrorToField(DomainException exception)
     {
         var field = exception.Error.Code switch
         {
@@ -232,5 +217,6 @@ public sealed class SettingsModel(IDepartmentService departments, IStaffCategory
         };
         if (field is not null)
             ModelState.AddModelError(field, exception.Error.Message);
+        return field is not null;
     }
 }
