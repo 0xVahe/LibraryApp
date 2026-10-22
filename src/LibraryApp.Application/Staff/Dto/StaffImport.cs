@@ -1,11 +1,5 @@
 namespace LibraryApp.Application.Staff.Dto;
 
-public static class StaffImportLimits
-{
-    public const int MaximumRows = 200;
-    public const long MaximumFileBytes = 1_000_000;
-}
-
 /// <summary>A logical CSV record. RowNumber is the physical line where the record begins.</summary>
 public sealed record StaffImportCsvRow(
     int RowNumber,
