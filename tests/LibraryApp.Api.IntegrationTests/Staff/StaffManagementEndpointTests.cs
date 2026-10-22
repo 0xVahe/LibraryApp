@@ -148,6 +148,20 @@ public class StaffManagementEndpointTests(StaffManagementFactory factory) : ICla
             : Request() with { CorporateEmail = original.CorporateEmail.ToUpperInvariant() };
         await AssertError(await Client().PostAsJsonAsync(Route, duplicate), HttpStatusCode.Conflict, code);
     }
+    
+    [Fact]
+    public async Task Parallel_enrolments_with_the_same_email_return_one_201_and_one_409()
+    {
+        var email = Request().CorporateEmail;
+
+        var responses = await Task.WhenAll(
+            Client().PostAsJsonAsync(Route, Request() with { CorporateEmail = email }),
+            Client().PostAsJsonAsync(Route, Request() with { CorporateEmail = email }));
+
+        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Created);
+        await AssertError(Assert.Single(responses, x => x.StatusCode != HttpStatusCode.Created),
+            HttpStatusCode.Conflict, "staff.email_taken");
+    }
 
     [Theory]
     [InlineData("Short1")]
