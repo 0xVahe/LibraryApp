@@ -1,9 +1,23 @@
+using System.Text.Json;
 using LibraryApp.Application.Staff.Options;
 
 namespace LibraryApp.Application.Tests.Staff;
 
 public sealed class StaffOptionsValidatorTests
 {
+    [Fact]
+    public void The_values_of_appsettings_are_valid()
+    {
+        using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "appsettings.json")),
+            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        var options = Assert.IsType<StaffOptions>(settings.RootElement.GetProperty(StaffOptions.SectionName)
+            .Deserialize<StaffOptions>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true }));
+
+        var result = new StaffOptionsValidator().Validate(null, options);
+
+        Assert.True(result.Succeeded, result.FailureMessage);
+    }
+
     private static StaffOptions Valid() => new()
     {
         Import = new() { MaxRows = 3, MaxFileBytes = 4096 },
