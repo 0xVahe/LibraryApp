@@ -23,10 +23,32 @@ public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
     {
         await using var db = NewContext();
 
-        var claimed = await new NotificationDeliveryStore(db).ClaimPendingAsync(Now, LeaseUntil, 20);
+        var claimed = await new NotificationDeliveryStore(db).ClaimDueAsync(Now, LeaseUntil, 20);
 
         Assert.Equal(new[] { _older, _newer }, claimed.Select(n => n.Id));
         Assert.All(claimed, n => Assert.Equal(LeaseUntil, n.NextAttemptAtUtc));
+    }
+
+    [Fact]
+    public async Task Claims_a_failed_email_when_its_retry_is_due()
+    {
+        var due = New(Guid.NewGuid(), NotificationChannel.Outlook, Now.AddHours(-4));
+        due.MarkFailed("Mail server is down.", Now);
+        var later = New(Guid.NewGuid(), NotificationChannel.Outlook, Now.AddHours(-4));
+        later.MarkFailed("Mail server is down.", Now.AddMinutes(1));
+        await using (var setup = NewContext())
+        {
+            setup.Notifications.AddRange(due, later);
+            await setup.SaveChangesAsync();
+        }
+
+        await using var db = NewContext();
+        var claimed = await new NotificationDeliveryStore(db).ClaimDueAsync(Now, LeaseUntil, 20);
+
+        // The Failed email without a retry time (seeded) and the one due later are not claimed.
+        Assert.Equal(new[] { due.Id, _older, _newer }, claimed.Select(n => n.Id));
+        Assert.Equal(NotificationStatus.Failed, claimed[0].Status);
+        Assert.Equal(LeaseUntil, claimed[0].NextAttemptAtUtc);
     }
 
     [Fact]
@@ -34,7 +56,7 @@ public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
     {
         await using var db = NewContext();
 
-        var claimed = await new NotificationDeliveryStore(db).ClaimPendingAsync(Now, LeaseUntil, 1);
+        var claimed = await new NotificationDeliveryStore(db).ClaimDueAsync(Now, LeaseUntil, 1);
 
         Assert.Equal(_older, Assert.Single(claimed).Id);
     }
@@ -43,13 +65,13 @@ public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
     public async Task Claimed_email_is_not_claimed_again_until_the_lease_ends()
     {
         await using (var first = NewContext())
-            await new NotificationDeliveryStore(first).ClaimPendingAsync(Now, LeaseUntil, 20);
+            await new NotificationDeliveryStore(first).ClaimDueAsync(Now, LeaseUntil, 20);
 
         await using var db = NewContext();
         var store = new NotificationDeliveryStore(db);
 
-        Assert.Empty(await store.ClaimPendingAsync(Now.AddMinutes(1), Now.AddMinutes(16), 20));
-        Assert.Equal(2, (await store.ClaimPendingAsync(LeaseUntil, LeaseUntil.AddMinutes(15), 20)).Count);
+        Assert.Empty(await store.ClaimDueAsync(Now.AddMinutes(1), Now.AddMinutes(16), 20));
+        Assert.Equal(2, (await store.ClaimDueAsync(LeaseUntil, LeaseUntil.AddMinutes(15), 20)).Count);
     }
 
     [Fact]
@@ -65,15 +87,15 @@ public sealed class NotificationDeliveryStoreTests : IAsyncLifetime
         await first.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var transaction = await first.Database.BeginTransactionAsync();
-            firstClaim = await new NotificationDeliveryStore(first).ClaimPendingAsync(Now, LeaseUntil, 1);
-            secondClaim = await new NotificationDeliveryStore(second).ClaimPendingAsync(Now, LeaseUntil, 20);
+            firstClaim = await new NotificationDeliveryStore(first).ClaimDueAsync(Now, LeaseUntil, 1);
+            secondClaim = await new NotificationDeliveryStore(second).ClaimDueAsync(Now, LeaseUntil, 20);
             await transaction.CommitAsync();
         });
 
         // Rows the first instance is still reading are skipped, not waited for: the second instance may get fewer
         // rows, never the same one. Whatever it skipped is claimed by the next round.
         await using var third = NewContext();
-        var nextRound = await new NotificationDeliveryStore(third).ClaimPendingAsync(Now, LeaseUntil, 20);
+        var nextRound = await new NotificationDeliveryStore(third).ClaimDueAsync(Now, LeaseUntil, 20);
 
         Assert.Equal(_older, Assert.Single(firstClaim).Id);
         Assert.DoesNotContain(secondClaim, n => n.Id == _older);

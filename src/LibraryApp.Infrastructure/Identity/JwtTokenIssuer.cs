@@ -30,6 +30,8 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IClock clock) :
             claims.Add(new Claim(LibraryClaimTypes.PasswordChangeRequired, bool.TrueString));
         if (account.StaffMemberId is { } staffMemberId)
             claims.Add(new Claim(LibraryClaimTypes.StaffMemberId, staffMemberId.ToString()));
+        if (!string.IsNullOrWhiteSpace(account.DisplayName))
+            claims.Add(new Claim(JwtRegisteredClaimNames.Name, account.DisplayName));
         if (!account.MustChangePassword)
             claims.AddRange(account.Roles.Select(role => new Claim(LibraryClaimTypes.Role, role)));
 

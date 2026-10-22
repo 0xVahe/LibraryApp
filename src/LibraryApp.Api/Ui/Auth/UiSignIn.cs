@@ -31,7 +31,7 @@ public sealed class UiSignIn(
     [
         JwtRegisteredClaimNames.Sub,
         JwtRegisteredClaimNames.Email,
-        JwtRegisteredClaimNames.Name,   // used by the user chip once the access token carries it
+        JwtRegisteredClaimNames.Name,   // "First Last" of the staff member, shown in the user chip
         LibraryClaimTypes.Role,
         LibraryClaimTypes.StaffMemberId,
         LibraryClaimTypes.PasswordChangeRequired,

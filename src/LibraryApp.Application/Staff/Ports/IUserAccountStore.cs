@@ -2,7 +2,10 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Staff.Ports;
 
-/// <summary>Login account plus its StaffMember (null if the account has none; AuthService then rejects the login).</summary>
+/// <summary>
+/// Login account plus its StaffMember (null if the account has none; AuthService then rejects the login).
+/// <paramref name="DisplayName"/> is the member's "First Last", null without a staff profile.
+/// </summary>
 public sealed record LoginAccount(
     Guid UserId,
     string Email,
@@ -10,7 +13,8 @@ public sealed record LoginAccount(
     StaffMemberStatus? StaffStatus,
     IReadOnlyList<string> Roles,
     string SecurityStamp,
-    bool MustChangePassword = false);
+    bool MustChangePassword = false,
+    string? DisplayName = null);
 
 /// <summary>Hides ASP.NET Core Identity from the Application layer.</summary>
 public interface IUserAccountStore

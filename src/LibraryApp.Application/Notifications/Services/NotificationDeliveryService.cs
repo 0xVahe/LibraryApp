@@ -20,20 +20,32 @@ public sealed class NotificationDeliveryService(
     {
         DeliveryOptions settings = options.Value.Delivery;
         DateTime now = clock.UtcNow;
-        var claimed = await store.ClaimPendingAsync(now, now + settings.Lease, settings.BatchSize, ct);
+        DateTime leaseUntil = now + settings.Lease;
+        var claimed = await store.ClaimDueAsync(now, leaseUntil, settings.BatchSize, ct);
 
-        foreach (var notification in claimed)
+        for (int i = 0; i < claimed.Count; i++)
         {
-            await DeliverAsync(notification, ct);
-            // One save per email, so a later failure does not undo it. If this save fails, the email goes out again
-            // when the lease ends.
-            await store.SaveAsync(ct);
+            // After the lease another instance may claim the rest; leave it to the next round instead of sending twice.
+            if (clock.UtcNow >= leaseUntil)
+            {
+                logger.LogWarning(
+                    "Delivery round stopped: the lease ended with {Left} claimed emails not sent; Lease is too short for one batch",
+                    claimed.Count - i);
+                break;
+            }
+
+            var notification = claimed[i];
+            await DeliverAsync(notification, settings.RetryDelays, ct);
+            // One save per email, so a later failure does not undo it. Not cancelled when the app stops: the email is
+            // already out, and an unsaved Sent would send it again when the lease ends. The host's shutdown timeout and
+            // the database command timeout still bound it.
+            await store.SaveAsync(CancellationToken.None);
         }
 
         return claimed.Count;
     }
 
-    private async Task DeliverAsync(Notification notification, CancellationToken ct)
+    private async Task DeliverAsync(Notification notification, TimeSpan[] retryDelays, CancellationToken ct)
     {
         try
         {
@@ -43,11 +55,15 @@ public sealed class NotificationDeliveryService(
         }
         catch (NotificationDeliveryException ex)
         {
-            // A failed email stays Failed; it is not sent again.
-            notification.MarkFailed(ex.Message, null);
+            // NOT-08: the n-th failure waits RetryDelays[n-1]; after the last delay there is no retry (null).
+            int failedBefore = notification.Attempts;
+            DateTime? nextAttempt = failedBefore < retryDelays.Length ? clock.UtcNow + retryDelays[failedBefore] : null;
+            notification.MarkFailed(ex.Message, nextAttempt);
 
             // Ids only: the recipient is personal data (NFR-06).
-            logger.LogError("Notification {NotificationId} not delivered: {Error}", notification.Id, ex.Message);
+            logger.LogError(
+                "Notification {NotificationId} not delivered (attempt {Attempt}), next attempt {NextAttemptAtUtc}: {Error}",
+                notification.Id, notification.Attempts, nextAttempt?.ToString("O") ?? "none", ex.Message);
         }
     }
 }

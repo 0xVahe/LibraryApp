@@ -3,6 +3,7 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -57,6 +58,17 @@ public class JwtRegistrationTests
         });
 
         Assert.Throws<OptionsValidationException>(() => services.GetRequiredService<IOptions<JwtOptions>>().Value);
+    }
+
+    [Fact]
+    public void Jwt_registration_sets_no_default_scheme()
+    {
+        using var services = Services(ValidSettings);
+        var options = services.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
+
+        Assert.Null(options.DefaultScheme);
+        Assert.Null(options.DefaultAuthenticateScheme);
+        Assert.Null(options.DefaultChallengeScheme);
     }
 
     [Fact]
