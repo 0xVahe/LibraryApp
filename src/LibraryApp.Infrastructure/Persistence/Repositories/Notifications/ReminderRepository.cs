@@ -1,14 +1,12 @@
 using LibraryApp.Application.Notifications.Ports;
-using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Notifications;
-using LibraryApp.Domain.Staff;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Infrastructure.Persistence.Repositories.Notifications;
 
 /// <summary>
-/// <see cref="IReminderRepository"/>: loans, staff and books are read in one query without tracking (read only, never
-/// written); notifications are only added.
+/// <see cref="IReminderRepository"/>: reads only the Notifications tables (templates and stored notifications) without
+/// tracking; notifications are only added.
 /// </summary>
 public sealed class ReminderRepository(LibraryDbContext db) : IReminderRepository
 {
@@ -19,19 +17,6 @@ public sealed class ReminderRepository(LibraryDbContext db) : IReminderRepositor
             .Where(t => t.IsActive && types.Contains(t.Type))
             .Select(t => new ReminderTemplate(t.Type, t.Subject, t.BodyTemplate))
             .ToListAsync(ct);
-
-    public Task<IReadOnlyList<ReminderLoan>> GetOpenLoansDueAsync(
-        DateTime dueFromUtc,
-        DateTime dueBeforeUtc,
-        CancellationToken ct = default) =>
-        GetLoansAsync(
-            db.Loans.Where(loan => (loan.Status == LoanStatus.Active || loan.Status == LoanStatus.Overdue)
-                                   && loan.DueAtUtc >= dueFromUtc
-                                   && loan.DueAtUtc < dueBeforeUtc),
-            ct);
-
-    public Task<IReadOnlyList<ReminderLoan>> GetOverdueLoansAsync(CancellationToken ct = default) =>
-        GetLoansAsync(db.Loans.Where(loan => loan.Status == LoanStatus.Overdue), ct);
 
     public async Task<IReadOnlySet<(Guid LoanId, NotificationType Type)>> GetLoanNotificationsOnAsync(
         DateOnly localDate,
@@ -67,21 +52,4 @@ public sealed class ReminderRepository(LibraryDbContext db) : IReminderRepositor
     }
 
     public void Add(Notification notification) => db.Notifications.Add(notification);
-
-    private async Task<IReadOnlyList<ReminderLoan>> GetLoansAsync(IQueryable<Loan> loans, CancellationToken ct) => await (
-            from loan in loans.AsNoTracking()
-            join staff in db.StaffMembers.AsNoTracking() on loan.StaffMemberId equals staff.Id
-            where staff.Status != StaffMemberStatus.Deactivated
-            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
-            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
-            orderby loan.DueAtUtc, loan.Id
-            select new ReminderLoan(
-                loan.Id,
-                staff.Id,
-                staff.FirstName + " " + staff.LastName,
-                staff.CorporateEmail,
-                staff.LineManagerEmail,
-                book.Title,
-                loan.DueAtUtc))
-            .ToListAsync(ct);
 }

@@ -46,6 +46,7 @@ public static class NotificationsRegistrationExtensions
 
         // 09:00 due-soon and overdue reminders on working days (NOT-05); schedule in Jobs:Schedules.
         services.AddScoped<IReminderRepository, ReminderRepository>();
+        services.AddScoped<IReminderLoanReader, ReminderLoanReader>();
         services.AddDailyJob<DueReminderJob>(DueReminderJob.Name);
 
         return services;

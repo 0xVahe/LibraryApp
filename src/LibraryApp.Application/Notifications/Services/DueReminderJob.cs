@@ -21,12 +21,14 @@ namespace LibraryApp.Application.Notifications.Services;
 /// </list>
 /// A reminder is due until the loan has it, not only on its exact day: a day the job did not run (or failed) is caught
 /// up at the next run, with one reminder for the latest step.
+/// The loans, recipients and book titles come from the modules that own them (<see cref="IReminderLoanReader"/>).
 /// Each reminder is stored as an in-app notification (delivered when stored) and a Pending Outlook notification, which the
 /// delivery job sends (NOT-03). A loan that already has the same type today is skipped (NOT-06), so a run that is
 /// repeated stores and sends nothing twice. A run in which a reminder failed throws at the end, so the daily job runner
 /// tries it again.
 /// </summary>
 public sealed class DueReminderJob(
+    IReminderLoanReader loans,
     IReminderRepository reminders,
     INotificationTemplateRenderer renderer,
     IUnitOfWork unitOfWork,
@@ -53,7 +55,7 @@ public sealed class DueReminderJob(
             await reminders.GetLoanNotificationsOnAsync(today, Types, ct);
 
         IReadOnlyList<ReminderLoan> dueSoon = await DueSoonLoansAsync(today, ct);
-        IReadOnlyList<ReminderLoan> overdue = await reminders.GetOverdueLoansAsync(ct);
+        IReadOnlyList<ReminderLoan> overdue = await loans.GetOverdueLoansAsync(ct);
         IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly> lastSent =
             await reminders.GetLastLoanNotificationDatesAsync(
                 dueSoon.Concat(overdue).Select(loan => loan.LoanId).ToHashSet(), Types, today, ct);
@@ -96,8 +98,11 @@ public sealed class DueReminderJob(
     private Task<IReadOnlyList<ReminderLoan>> DueSoonLoansAsync(DateOnly today, CancellationToken ct)
     {
         DateOnly lastDate = calendar.AddWorkingDays(today, _settings.DueSoonWorkingDays);
-        return reminders.GetOpenLoansDueAsync(
-            clock.StartOfLocalDayUtc(today.AddDays(1)), clock.StartOfLocalDayUtc(lastDate.AddDays(1)), ct);
+        List<DateOnly> dates = [];
+        for (DateOnly date = today.AddDays(1); date <= lastDate; date = date.AddDays(1))
+            dates.Add(date);
+
+        return loans.GetLoansDueOnAsync(dates, ct);
     }
 
     private IEnumerable<Reminder> DueSoon(

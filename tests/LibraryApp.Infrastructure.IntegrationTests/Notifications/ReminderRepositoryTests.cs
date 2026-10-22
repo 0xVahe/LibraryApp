@@ -10,16 +10,14 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryApp.Infrastructure.IntegrationTests.Notifications;
 
 /// <summary>
-/// NOT-05 data: open loans due 10 (marked Overdue), 20 and 30 October (the last one of a deactivated employee), a
-/// returned loan due 10 October, the default templates (from the model) with OverdueNotice made inactive, and two
-/// DueSoonReminder notifications of the loan due 20 October, on 15 and 19 October.
+/// NOT-05 data: loans due 10 and 20 October (the notifications point to a loan), the default templates (from the model)
+/// with OverdueNotice made inactive, and two DueSoonReminder notifications of the loan due 20 October, on 15 and
+/// 19 October.
 /// </summary>
 public sealed class ReminderDatabase : IAsyncLifetime
 {
     public static readonly Guid DueOct10 = Guid.NewGuid();
     public static readonly Guid DueOct20 = Guid.NewGuid();
-    public static readonly Guid DeactivatedDueOct30 = Guid.NewGuid();
-    public static readonly Guid ReturnedDueOct10 = Guid.NewGuid();
     public static readonly DateOnly EarlierNotified = new(2026, 10, 15);
     public static readonly DateOnly Notified = new(2026, 10, 19);
 
@@ -47,18 +45,9 @@ public sealed class ReminderDatabase : IAsyncLifetime
         db.Books.Add(new Book(bookId, "Clean Code", "9780132350884", 2008, "en", null, categoryId, null));
 
         StaffMember active = NewStaff(db, departmentId, staffCategoryId, "FIN-001", "manager@ameriabank.am");
-        StaffMember left = NewStaff(db, departmentId, staffCategoryId, "FIN-002", null);
-        left.Deactivate();
-
-        Loan returned = NewLoan(db, bookId, active, ReturnedDueOct10, Due(2026, 10, 10));
-        returned.Return(new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc));
-        Loan overdueLoan = NewLoan(db, bookId, active, DueOct10, Due(2026, 10, 10));
-        overdueLoan.MarkOverdue(new DateTime(2026, 10, 11, 0, 0, 0, DateTimeKind.Utc));
         db.Loans.AddRange(
-            overdueLoan,
-            NewLoan(db, bookId, active, DueOct20, Due(2026, 10, 20)),
-            NewLoan(db, bookId, left, DeactivatedDueOct30, Due(2026, 10, 30)),
-            returned);
+            NewLoan(db, bookId, active, DueOct10, Due(2026, 10, 10)),
+            NewLoan(db, bookId, active, DueOct20, Due(2026, 10, 20)));
 
         // The default templates are part of the model (HasData), so they exist already: at most one active per type.
         NotificationTemplate overdue = await db.NotificationTemplates.SingleAsync(t => t.Type == NotificationType.OverdueNotice);
@@ -117,47 +106,6 @@ public sealed class ReminderDatabase : IAsyncLifetime
 public sealed class ReminderRepositoryTests(ReminderDatabase database) : IClassFixture<ReminderDatabase>
 {
     private static readonly NotificationType[] Types = [NotificationType.DueSoonReminder, NotificationType.OverdueNotice];
-
-    [Fact]
-    public async Task Open_loans_in_the_range_with_staff_and_book()
-    {
-        await using var db = database.NewContext();
-        var repository = new ReminderRepository(db);
-
-        var loans = await repository.GetOpenLoansDueAsync(
-            new DateTime(2026, 10, 20, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 10, 21, 0, 0, 0, DateTimeKind.Utc));
-
-        var loan = Assert.Single(loans);
-        Assert.Equal(ReminderDatabase.DueOct20, loan.LoanId);
-        Assert.Equal("Anna Petrosyan", loan.EmployeeName);
-        Assert.Equal("fin-001@example.com", loan.CorporateEmail);
-        Assert.Equal("manager@ameriabank.am", loan.LineManagerEmail);
-        Assert.Equal("Clean Code", loan.BookTitle);
-    }
-
-    [Fact]
-    public async Task Overdue_loans_are_the_ones_Borrowing_marked_Overdue_not_returned_or_only_past_due()
-    {
-        await using var db = database.NewContext();
-        var repository = new ReminderRepository(db);
-
-        var loans = await repository.GetOverdueLoansAsync();
-
-        Assert.Equal(ReminderDatabase.DueOct10, Assert.Single(loans).LoanId);
-    }
-
-    [Fact]
-    public async Task Loans_of_staff_who_left_the_bank_are_left_out()
-    {
-        await using var db = database.NewContext();
-        var repository = new ReminderRepository(db);
-
-        var loans = await repository.GetOpenLoansDueAsync(
-            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc));
-
-        Assert.DoesNotContain(loans, loan => loan.LoanId == ReminderDatabase.DeactivatedDueOct30);
-        Assert.Equal([ReminderDatabase.DueOct10, ReminderDatabase.DueOct20], loans.Select(loan => loan.LoanId));
-    }
 
     [Fact]
     public async Task Only_active_templates()
