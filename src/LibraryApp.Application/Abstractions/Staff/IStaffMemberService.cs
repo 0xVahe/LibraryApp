@@ -3,7 +3,7 @@ using LibraryApp.Domain.Staff;
 namespace LibraryApp.Application.Abstractions.Staff;
 
 /// <summary>
-/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1).
+/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1), Notifications (Group 4).
 /// <para>
 /// The loan limit is checked by Borrowing, which owns the loans: it compares its active loan count with
 /// <see cref="LendingRules.MaxLoans"/> and reports <see cref="StaffErrors.LoanLimitReached"/>.
@@ -46,4 +46,12 @@ public interface IStaffMemberService
     /// Deactivated members are found too: whether they may borrow is still decided by <see cref="CanBorrowAsync"/>.
     /// </summary>
     Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Contacts for notifications (X-08), in one query. Unknown ids are left out (no exception); Deactivated members
+    /// are included, with their status. An empty list returns an empty dictionary without a query.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
+        IReadOnlyCollection<Guid> staffMemberIds,
+        CancellationToken ct = default);
 }

@@ -1,12 +1,5 @@
 namespace LibraryApp.Application.Catalog.Dto;
 
-/// <summary>Limits of the book CSV import (CAT-09).</summary>
-public static class BookImportLimits
-{
-    public const int MaximumRows = 500;
-    public const long MaximumFileBytes = 1_000_000;
-}
-
 /// <summary>
 /// One data row of the book CSV, as text (CAT-09). <paramref name="RowNumber"/> is the line where the row begins;
 /// the header is line 1. Empty optional cells are null.

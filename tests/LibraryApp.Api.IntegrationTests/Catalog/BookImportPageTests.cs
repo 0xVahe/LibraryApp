@@ -4,12 +4,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;
 
@@ -122,13 +124,14 @@ public class BookImportPageTests(ApiHostFactory factory) : IClassFixture<ApiHost
     {
         using var client = await SignedInAsync(StaffSeedIds.StaffMembers.AramSargsyan);
 
-        using var response = await UploadAsync(client, new string('x', (int)BookImportLimits.MaximumFileBytes + 1));
+        var limits = factory.Services.GetRequiredService<IOptions<CatalogImportOptions>>().Value;
+        using var response = await UploadAsync(client, new string('x', (int)limits.MaxFileBytes + 1));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var html = WebUtility.HtmlDecode(await response.Content.ReadAsStringAsync());
         Assert.Contains("Nothing was imported.", html);
         Assert.Contains("<td data-label=\"Field\">File</td>", ErrorTable(html));
-        Assert.Contains("The file must be 1 MB or smaller.", ErrorTable(html));
+        Assert.Contains($"The file must be {limits.MaxFileSize} or smaller.", ErrorTable(html));
     }
 
     [Fact]

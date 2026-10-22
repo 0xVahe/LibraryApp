@@ -67,6 +67,15 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Catalog (`Catalog`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Import:MaxRows` | 500 | Maximum book rows in one CSV file, excluding the header; positive integer | CAT-09 |
+| `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (the parser reads the file into memory) | CAT-09 |
+
+Both values are required; missing or invalid values prevent startup. The Import books page shows them next to the file field, in decimal sizes (`1000000` as `1 MB`). The API accepts the file limit plus 100000 bytes for the multipart envelope; the Import books page accepts up to five times the file limit, so a file over the limit gets a row error instead of an error page. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit. The cover storage (`Covers:BaseUrl`) is described in [Catalog covers](#catalog-covers-catalogcovers).
+
 ### Staff (`Staff`)
 
 | Key | Value | Meaning | Requirement |
@@ -277,7 +286,7 @@ Razor Pages live in the API host (UI guide in the team docs): the shared shell i
 - **Two ways to sign in, chosen by path.** `/api/*` accepts only the JWT; every other path accepts only the UI cookie. The API never accepts the cookie (no cross-site requests), and pages never accept the JWT.
 - **Every page needs a signed-in user** unless its PageModel is `[AllowAnonymous]` (only sign-in, sign-out and the status pages). Library staff pages add `[Authorize(Policy = UiPolicies.LibraryStaff)]`.
 - **Errors.** `/api` answers ProblemDetails; pages show the Error, Not found and Forbidden pages. In a form, catch `DomainException` with `this.DomainError(ex)`; validators run before the handler and fill `ModelState`.
-- **Session.** The cookie ends with the access token (`Jwt:AccessTokenMinutes`) and is checked against the account's security stamp every `Ui:SecurityStampValidationInterval` (default 5 minutes): a password change or a deactivation ends it.
+- **Session.** The cookie ends with the access token (`Jwt:AccessTokenMinutes`) and is checked against the account's security stamp every `Ui:SecurityStampValidationInterval` (default 5 minutes): a password change or a deactivation ends it. The name in the header is the one at sign-in; after a rename it changes with the next sign-in.
 - **Known limitation.** An access token (JWT) stays valid until it expires, even after a password change or a deactivation; token revocation is not in the requirements.
 - **Styles.** `wwwroot/css/site.css` is the UI demo's `design/styles.css` plus the fonts and the shell's additions; it is a shared file (changes by pull request with Integration Owner review). The pages send a Content-Security-Policy without inline scripts or styles, so a `style=""` copied from the demo has no effect: use the spacing helpers at the end of `site.css` instead (`style="margin-bottom: 16px"` → `class="mb-16"`, `gap: 8px` → `gap-8`, `min-width: 160px` → `min-w-160`, the padded button row under a table → `card-foot`).
 - **Page tests** sign a seeded user in with `UiTestClient.SignedInAsync(factory, email, password)` (`tests/LibraryApp.Api.IntegrationTests/Ui`).

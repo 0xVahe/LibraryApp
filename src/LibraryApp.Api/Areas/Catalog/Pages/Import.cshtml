@@ -39,7 +39,7 @@ else if (Model.FormError is { } formError)
         <div class="field">
             <label for="csv-file">CSV file</label>
             <input id="csv-file" type="file" name="Csv" accept=".csv,text/csv" required aria-describedby="csv-hint">
-            <span id="csv-hint" class="hint">UTF-8, comma separated, at most @BookImportLimits.MaximumRows books and 1 MB. If one row has an error, no book is added.</span>
+            <span id="csv-hint" class="hint">UTF-8, comma separated, at most @Model.Limits.MaxRows books and @Model.Limits.MaxFileSize. If one row has an error, no book is added.</span>
         </div>
         <div class="form-actions">
             <button class="btn btn-primary" type="submit">Import books</button>
