@@ -236,10 +236,14 @@ public sealed class ReportingService(
             .ToList();
 
         return new InventoryStatusReportDto(
+            clock.LocalToday,
+            clock.UtcNow,
             categoryId,
             category,
-            clock.UtcNow,
             statuses.Sum(item => item.Copies),
+            statuses
+                .Where(item => item.Status is not (BookCopyStatus.Lost or BookCopyStatus.Withdrawn))
+                .Sum(item => item.Copies),
             statuses);
     }
 }

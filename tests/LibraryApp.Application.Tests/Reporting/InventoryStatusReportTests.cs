@@ -51,11 +51,26 @@ public sealed class InventoryStatusReportTests
         InventoryStatusReportDto report = await CreateService().GetInventoryStatusAsync(null);
 
         Assert.Equal(6, report.TotalCopies);
+        Assert.Equal(6, report.CopiesInCollection);
         InventoryStatusItemDto available = report.Statuses.Single(item => item.Status == BookCopyStatus.Available);
         Assert.Equal(4, available.Copies);
         Assert.Equal(3, available.Conditions.Single(item => item.Condition == BookCopyCondition.Good).Copies);
         Assert.Equal(1, available.Conditions.Single(item => item.Condition == BookCopyCondition.Poor).Copies);
         Assert.Equal(2, report.Statuses.Single(item => item.Status == BookCopyStatus.OnLoan).Copies);
+    }
+
+    [Fact]
+    public async Task Copies_in_the_collection_leave_out_Lost_and_Withdrawn_ones()
+    {
+        _repository.Counts.Add(new CopyCountData(BookCopyStatus.Available, BookCopyCondition.Good, 4));
+        _repository.Counts.Add(new CopyCountData(BookCopyStatus.UnderRepair, BookCopyCondition.Poor, 1));
+        _repository.Counts.Add(new CopyCountData(BookCopyStatus.Lost, BookCopyCondition.Good, 2));
+        _repository.Counts.Add(new CopyCountData(BookCopyStatus.Withdrawn, BookCopyCondition.Fair, 3));
+
+        InventoryStatusReportDto report = await CreateService().GetInventoryStatusAsync(null);
+
+        Assert.Equal(10, report.TotalCopies);
+        Assert.Equal(5, report.CopiesInCollection);
     }
 
     [Fact]
@@ -81,6 +96,7 @@ public sealed class InventoryStatusReportTests
         Assert.Null(report.CategoryId);
         Assert.Null(report.Category);
         Assert.Null(_repository.LastCategoryId);
+        Assert.Equal(DateOnly.FromDateTime(Now), report.AsOfDate);
         Assert.Equal(Now, report.GeneratedAtUtc);
     }
 

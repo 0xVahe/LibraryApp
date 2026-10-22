@@ -56,6 +56,12 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
         return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
     }
 
+    /// <summary>REP-05: copies by status and condition, for the whole library or one category.</summary>
+    /// <param name="categoryId">A category; its subcategories are included. Empty: the whole library.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">Every status with its copies per condition, also with 0 copies.</response>
+    /// <response code="400"><c>reporting.invalid_category_id</c>: an empty id.</response>
+    /// <response code="404"><c>reporting.category_not_found</c>: no such category.</response>
     [HttpGet("inventory-status")]
     [ProducesResponseType<InventoryStatusReportDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
