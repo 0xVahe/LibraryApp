@@ -9,8 +9,8 @@ using LibraryApp.Domain.Notifications;
 namespace LibraryApp.Application.Notifications.EventHandlers;
 
 /// <summary>
-/// Creates the DueDateCalendarItem notification with the new due date when a loan is renewed (NOT-01). The .ics file
-/// itself (NOT-07) is not attached here: emails cannot carry attachments yet.
+/// Creates the DueDateCalendarItem notification with the new due date when a loan is renewed (NOT-01). The email carries the
+/// updated calendar item (.ics, NOT-07): same UID as at the issue, higher SEQUENCE, so Outlook moves the event.
 /// </summary>
 public sealed class LoanRenewedEventHandler(
     INotificationCreator creator,
@@ -35,8 +35,11 @@ public sealed class LoanRenewedEventHandler(
                 NotificationPlaceholders.FormatDate(clock.ToLocalDate(domainEvent.NewDueAtUtc)),
         };
 
+        string calendarItem = CalendarItemBuilder.Build(
+            domainEvent.LoanId, book.Title, clock.ToLocalDate(domainEvent.NewDueAtUtc), domainEvent.RenewalCount, clock.UtcNow);
+
         await creator.CreateAsync(
             NotificationType.DueDateCalendarItem, domainEvent.StaffMemberId, domainEvent.EventId, Channels, values,
-            domainEvent.LoanId, ct: ct);
+            domainEvent.LoanId, calendarItem: calendarItem, ct: ct);
     }
 }

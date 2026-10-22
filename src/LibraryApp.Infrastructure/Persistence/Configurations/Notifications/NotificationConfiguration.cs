@@ -12,6 +12,7 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
     {
         builder.Property(x => x.Subject).HasMaxLength(Notification.SubjectMaxLength).IsRequired();   // G4-07
         builder.Property(x => x.Body).HasMaxLength(-1).IsRequired();                                  // nvarchar(max)
+        builder.Property(x => x.CalendarItem).HasMaxLength(-1);                                       // nvarchar(max), NOT-07
         builder.Property(x => x.RecipientEmail).IsRequired();
         builder.Property(x => x.LastError).HasMaxLength(Notification.LastErrorMaxLength);
 

@@ -36,6 +36,20 @@ public sealed class LoanRenewedEventHandlerTests
     }
 
     [Fact]
+    public async Task The_email_carries_the_updated_calendar_item_with_the_same_uid_and_the_renewal_count_as_sequence()
+    {
+        var fixture = new Fixture();
+        var domainEvent = fixture.Event(newDueAtUtc: new DateTime(2026, 10, 12, 21, 0, 0, DateTimeKind.Utc));
+
+        await fixture.Handler.HandleAsync(domainEvent, CancellationToken.None);
+
+        var ics = Assert.Single(fixture.Creator.Calls).CalendarItem!.Split("\r\n");
+        Assert.Contains($"UID:loan-{domainEvent.LoanId:D}@library.ameriabank", ics);   // the UID of the issue: Outlook moves the event
+        Assert.Contains("DTSTART;VALUE=DATE:20261013", ics);                           // the new due date, Yerevan day
+        Assert.Contains($"SEQUENCE:{domainEvent.RenewalCount}", ics);
+    }
+
+    [Fact]
     public async Task Unknown_book_is_reported_and_nothing_is_created()
     {
         var fixture = new Fixture();
@@ -79,7 +93,8 @@ public sealed class LoanRenewedEventHandlerTests
         Guid EventId,
         IReadOnlyCollection<NotificationChannel> Channels,
         IReadOnlyDictionary<string, string> Values,
-        Guid? LoanId);
+        Guid? LoanId,
+        string? CalendarItem);
 
     private sealed class RecordingCreator : INotificationCreator
     {
@@ -87,9 +102,9 @@ public sealed class LoanRenewedEventHandlerTests
 
         public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
             IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values,
-            Guid? loanId = null, bool ccLineManager = false, CancellationToken ct = default)
+            Guid? loanId = null, bool ccLineManager = false, string? calendarItem = null, CancellationToken ct = default)
         {
-            Calls.Add(new CreatorCall(type, staffMemberId, eventId, channels, values, loanId));
+            Calls.Add(new CreatorCall(type, staffMemberId, eventId, channels, values, loanId, calendarItem));
             return Task.CompletedTask;
         }
     }
