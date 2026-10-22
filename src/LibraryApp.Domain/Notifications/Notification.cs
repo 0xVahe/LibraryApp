@@ -57,6 +57,12 @@ public sealed class Notification : Entity
 
     public string? LastError { get; private set; }
 
+    /// <summary>
+    /// The calendar item (iCalendar text, .ics) that goes with the email as an attachment (NOT-07), or null. Only Outlook
+    /// notifications of a loan due date carry one; it is built when the notification is created, so a retry sends the same file.
+    /// </summary>
+    public string? CalendarItem { get; private set; }
+
     // For EF Core only.
     private Notification()
     {
@@ -79,7 +85,8 @@ public sealed class Notification : Entity
         DateTime createdAtUtc,
         DateOnly localDate,
         Guid? loanId = null,
-        Guid? eventId = null)
+        Guid? eventId = null,
+        string? calendarItem = null)
     {
         if (staffMemberId == Guid.Empty || loanId == Guid.Empty || eventId == Guid.Empty)
             throw new DomainException(NotificationErrors.InvalidReferenceId);
@@ -112,6 +119,7 @@ public sealed class Notification : Entity
             Body = body,
             CreatedAtUtc = createdAtUtc,
             LocalDate = localDate,
+            CalendarItem = string.IsNullOrWhiteSpace(calendarItem) ? null : calendarItem,
             Attempts = 0,
         };
     }

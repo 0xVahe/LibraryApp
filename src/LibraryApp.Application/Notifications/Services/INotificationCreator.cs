@@ -17,6 +17,8 @@ public interface INotificationCreator
     /// type for this loan on the same Yerevan day is skipped (NOT-06, G4-02).
     /// With <paramref name="ccLineManager"/> the recipient's line manager is put in CC of the Outlook row (when the
     /// recipient has one); in-app rows have no CC.
+    /// With <paramref name="calendarItem"/> (iCalendar text, see <see cref="CalendarItemBuilder"/>) the Outlook row carries the
+    /// calendar item as an attachment (NOT-07); in-app rows have none.
     /// {{EmployeeName}} is added from the recipient; <paramref name="values"/> carries the other placeholders.
     /// </summary>
     /// <exception cref="Domain.Common.DomainException">The recipient or the active template does not exist.</exception>
@@ -31,5 +33,6 @@ public interface INotificationCreator
         IReadOnlyDictionary<string, string> values,
         Guid? loanId = null,
         bool ccLineManager = false,
+        string? calendarItem = null,
         CancellationToken ct = default);
 }

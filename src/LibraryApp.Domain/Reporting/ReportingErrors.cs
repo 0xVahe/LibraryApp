@@ -18,4 +18,14 @@ public static class ReportingErrors
         Error.Validation(
             "reporting.invalid_date_range",
             "A valid date range is required, with the start date on or before the end date.");
+
+    public static readonly Error InvalidCategoryId =
+        Error.Validation(
+            "reporting.invalid_category_id",
+            "Category ID cannot be empty.");
+
+    public static readonly Error CategoryNotFound =
+        Error.NotFound(
+            "reporting.category_not_found",
+            "The category does not exist.");
 }

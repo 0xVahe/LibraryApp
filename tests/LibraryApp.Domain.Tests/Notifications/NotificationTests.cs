@@ -17,7 +17,8 @@ public sealed class NotificationTests
         string body = "<p>Please return the book.</p>",
         DateTime? createdAtUtc = null,
         Guid? loanId = null,
-        Guid? eventId = null)
+        Guid? eventId = null,
+        string? calendarItem = null)
     {
         return Notification.Create(
             id: Guid.NewGuid(),
@@ -31,10 +32,28 @@ public sealed class NotificationTests
             createdAtUtc: createdAtUtc ?? CreatedAtUtc,
             localDate: LocalDate,
             loanId: loanId,
-            eventId: eventId);
+            eventId: eventId,
+            calendarItem: calendarItem);
     }
 
     // ---------- Create ----------
+
+    [Fact]
+    public void Create_keeps_the_calendar_item_for_the_email_attachment()
+    {
+        var notification = Create(calendarItem: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n");
+
+        Assert.Equal("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", notification.CalendarItem);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_without_a_calendar_item_has_none(string? calendarItem)
+    {
+        Assert.Null(Create(calendarItem: calendarItem).CalendarItem);
+    }
 
     [Fact]
     public void Create_makes_a_pending_notification_with_no_attempts()

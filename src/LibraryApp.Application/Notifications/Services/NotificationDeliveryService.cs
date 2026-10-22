@@ -50,7 +50,10 @@ public sealed class NotificationDeliveryService(
         try
         {
             await sender.SendAsync(
-                new OutlookMessage(notification.RecipientEmail, notification.CcEmail, notification.Subject, notification.Body), ct);
+                new OutlookMessage(
+                    notification.RecipientEmail, notification.CcEmail, notification.Subject, notification.Body,
+                    CalendarAttachment(notification)),
+                ct);
             notification.MarkSent(clock.UtcNow);
         }
         catch (NotificationDeliveryException ex)
@@ -66,4 +69,10 @@ public sealed class NotificationDeliveryService(
                 notification.Id, notification.Attempts, nextAttempt?.ToString("O") ?? "none", ex.Message);
         }
     }
+
+    /// <summary>The calendar item of a notification (NOT-07) as the attachment <c>due-date.ics</c>, or none.</summary>
+    private static IReadOnlyList<OutlookAttachment>? CalendarAttachment(Notification notification) =>
+        notification.CalendarItem is { } calendarItem
+            ? [new OutlookAttachment("due-date.ics", "text/calendar; method=PUBLISH; charset=utf-8", calendarItem)]
+            : null;
 }
