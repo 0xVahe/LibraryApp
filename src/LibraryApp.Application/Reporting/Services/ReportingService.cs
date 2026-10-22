@@ -6,6 +6,7 @@ using LibraryApp.Application.Reporting.Options;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Caching.Memory;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Reporting;
 
@@ -199,5 +200,46 @@ public sealed class ReportingService(
             .ToList();
 
         return new ReadingActivityByDepartmentReportDto(from, to, clock.UtcNow, items);
+    }
+
+    public async Task<InventoryStatusReportDto> GetInventoryStatusAsync(
+        Guid? categoryId,
+        CancellationToken ct = default)
+    {
+        if (categoryId == Guid.Empty)
+        {
+            throw new DomainException(ReportingErrors.InvalidCategoryId);
+        }
+
+        string? category = null;
+        if (categoryId is Guid id)
+        {
+            category = await repository.GetCategoryNameAsync(id, ct)
+                       ?? throw new DomainException(ReportingErrors.CategoryNotFound);
+        }
+
+        IReadOnlyList<CopyCountData> counts = await repository.GetCopyCountsAsync(categoryId, ct);
+        Dictionary<(BookCopyStatus, BookCopyCondition), int> copies =
+            counts.ToDictionary(row => (row.Status, row.Condition), row => row.Copies);
+
+        // Every status and condition is listed, also the ones without copies.
+        List<InventoryStatusItemDto> statuses = Enum.GetValues<BookCopyStatus>()
+            .Select(status =>
+            {
+                List<InventoryConditionItemDto> conditions = Enum.GetValues<BookCopyCondition>()
+                    .Select(condition => new InventoryConditionItemDto(
+                        condition, copies.GetValueOrDefault((status, condition))))
+                    .ToList();
+
+                return new InventoryStatusItemDto(status, conditions.Sum(item => item.Copies), conditions);
+            })
+            .ToList();
+
+        return new InventoryStatusReportDto(
+            categoryId,
+            category,
+            clock.UtcNow,
+            statuses.Sum(item => item.Copies),
+            statuses);
     }
 }

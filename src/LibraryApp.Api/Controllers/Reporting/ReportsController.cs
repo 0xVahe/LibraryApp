@@ -55,4 +55,15 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     {
         return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
     }
+
+    [HttpGet("inventory-status")]
+    [ProducesResponseType<InventoryStatusReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<InventoryStatusReportDto>> GetInventoryStatus(
+        [FromQuery] Guid? categoryId,
+        CancellationToken ct)
+    {
+        return Ok(await reporting.GetInventoryStatusAsync(categoryId, ct));
+    }
 }

@@ -1,4 +1,5 @@
 using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Reporting.Ports;
 
@@ -10,7 +11,12 @@ public interface IReportingReadRepository
     Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<IReadOnlyList<DepartmentEmployeesData>> GetDepartmentEmployeesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+    Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default);
+    Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default);
 }
+
+/// <summary>REP-05: copies of one status and condition (only the combinations that have copies).</summary>
+public sealed record CopyCountData(BookCopyStatus Status, BookCopyCondition Condition, int Copies);
 
 /// <summary>REP-04: every department with its employees who have not left the bank.</summary>
 public sealed record DepartmentEmployeesData(Guid DepartmentId, string Department, int Employees);

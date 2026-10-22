@@ -204,6 +204,12 @@ public sealed class ReadingActivityByDepartmentReportTests
         public Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(
             DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>Asia/Yerevan is UTC+4 all year (no daylight saving).</summary>
