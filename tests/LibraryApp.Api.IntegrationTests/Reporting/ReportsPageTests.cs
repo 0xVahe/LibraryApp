@@ -91,6 +91,42 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         Assert.DoesNotContain("selected=\"selected\"", html);
     }
 
+    [Fact]
+    public async Task Top_books_and_categories_for_the_current_month()
+    {
+        string html = await GetAsync(Librarian, Route);
+
+        Assert.Contains("id=\"period-title\"", html);
+        Assert.Contains("Showing 1 ", html);
+        Assert.Contains("id=\"books-title\"", html);
+        Assert.Contains("id=\"categories-title\"", html);
+        Assert.Contains("Top 10 · ", html);
+        Assert.Contains("Top 5 · ", html);
+    }
+
+    [Fact]
+    public async Task Chosen_period_is_shown_and_kept_by_the_overdue_filter()
+    {
+        var it = StaffSeedIds.Departments.InformationTechnology;
+
+        string html = await GetAsync(Librarian, $"{Route}?departmentId={it}&from=2026-09-01&to=2026-09-30");
+
+        Assert.Contains("Showing 1 Sep 2026 – 30 Sep 2026.", html);
+        Assert.Contains("value=\"2026-09-01\"", html);
+        Assert.Contains("<input type=\"hidden\" name=\"from\" value=\"2026-09-01\" />", html);
+        Assert.Contains($"<input type=\"hidden\" name=\"departmentId\" value=\"{it}\" />", html);
+    }
+
+    [Fact]
+    public async Task Reversed_period_shows_an_error_instead_of_the_tops()
+    {
+        string html = await GetAsync(Librarian, $"{Route}?from=2026-10-31&to=2026-10-01");
+
+        Assert.Contains("id=\"period-error\"", html);
+        Assert.Contains("aria-invalid=\"true\"", html);
+        Assert.DoesNotContain("id=\"books-title\"", html);
+    }
+
     private async Task<string> GetAsync(string email, string path)
     {
         using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);

@@ -9,6 +9,7 @@ using LibraryApp.Application.Reporting.Services;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -48,6 +49,25 @@ public sealed class IndexModel(
 
     public OverdueLoansReportDto Overdue { get; private set; } = null!;
 
+    [BindProperty(SupportsGet = true)]
+    public DateOnly? From { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public DateOnly? To { get; set; }
+
+    /// <summary>The period of the reports below the period form; the current month by default.</summary>
+    public DateOnly PeriodFrom { get; private set; }
+
+    public DateOnly PeriodTo { get; private set; }
+
+    public string? PeriodError { get; private set; }
+
+    public TopBooksAndCategoriesReportDto? Top { get; private set; }
+
+    public int TopBooksLimit => options.Value.TopBooksLimit;
+
+    public int TopCategoriesLimit => options.Value.TopCategoriesLimit;
+
     public PagedResult<OverdueLoanItemDto> OverduePage =>
         new(Overdue.Items, Overdue.TotalCount, Overdue.Page, Overdue.PageSize);
 
@@ -71,6 +91,20 @@ public sealed class IndexModel(
         if (range.Value is null)
             Days = null;
         Overdue = await reports.GetOverdueLoansAsync(DepartmentId, range.Value is null ? null : range.Min, range.Max, new PageRequest(page), ct);
+
+        // REP-03 for the chosen period; a reversed period is shown next to the form instead of the reports.
+        DateOnly today = clock.LocalToday;
+        DateOnly monthStart = new(today.Year, today.Month, 1);
+        PeriodFrom = From ?? monthStart;
+        PeriodTo = To ?? monthStart.AddMonths(1).AddDays(-1);
+        try
+        {
+            Top = await reports.GetTopBooksAndCategoriesAsync(PeriodFrom, PeriodTo, ct);
+        }
+        catch (DomainException ex) when (ex.Error.Kind == ErrorKind.Validation)
+        {
+            PeriodError = ex.Error.Message;
+        }
     }
 
     public static string Count(int value, string noun) =>

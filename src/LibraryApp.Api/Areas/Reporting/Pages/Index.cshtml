@@ -11,4 +11,9 @@
     <div>
         <partial name="_OverdueLoans" model="Model" />
     </div>
+    <partial name="_ReportPeriod" model="Model" />
+    @if (Model.Top is not null)
+    {
+        <partial name="_TopBooks" model="Model" />
+    }
 </div>

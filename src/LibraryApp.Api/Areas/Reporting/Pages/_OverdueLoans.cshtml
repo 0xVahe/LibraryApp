@@ -31,6 +31,11 @@
                 }
             </select>
         </div>
+        @if (Model.From is { } from && Model.To is { } to)
+        {
+            <input type="hidden" name="from" value="@from.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+            <input type="hidden" name="to" value="@to.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+        }
         <button class="btn btn-primary" type="submit">Filter</button>
     </form>
     @if (report.Items.Count == 0)
