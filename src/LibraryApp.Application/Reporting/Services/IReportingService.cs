@@ -23,4 +23,9 @@ public interface IReportingService
         DateOnly from,
         DateOnly to,
         CancellationToken ct = default);
+
+    Task<PenaltyReportDto> GetPenaltiesByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
 }

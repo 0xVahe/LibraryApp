@@ -200,4 +200,41 @@ public sealed class ReportingService(
 
         return new ReadingActivityByDepartmentReportDto(from, to, clock.UtcNow, items);
     }
+
+    public async Task<PenaltyReportDto> GetPenaltiesByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        if (from == default || to == default || from > to)
+        {
+            throw new DomainException(ReportingErrors.InvalidDateRange);
+        }
+
+        DateTime nowUtc = clock.UtcNow;
+        DateTime fromUtc = clock.StartOfLocalDayUtc(from);
+        DateTime toUtc = clock.EndOfLocalDayUtc(to);
+        IReadOnlyList<DepartmentEmployeesData> departments = await repository.GetDepartmentEmployeesAsync(ct);
+        Dictionary<Guid, DepartmentPenaltiesData> penalties =
+            (await repository.GetDepartmentPenaltiesAsync(fromUtc, toUtc, nowUtc, ct))
+            .ToDictionary(row => row.DepartmentId);
+
+        // Every department is listed, also the ones without penalties in the period.
+        List<DepartmentPenaltiesDto> items = departments
+            .Select(department =>
+            {
+                penalties.TryGetValue(department.DepartmentId, out DepartmentPenaltiesData? row);
+                return new DepartmentPenaltiesDto(
+                    department.DepartmentId,
+                    department.Department,
+                    row?.Penalties ?? 0,
+                    row?.IssuedPoints ?? 0,
+                    row?.WaivedPoints ?? 0,
+                    row?.ActivePoints ?? 0);
+            })
+            .OrderBy(item => item.Department)
+            .ToList();
+
+        return new PenaltyReportDto(from, to, nowUtc, items);
+    }
 }
