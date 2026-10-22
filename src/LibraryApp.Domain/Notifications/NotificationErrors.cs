@@ -51,6 +51,28 @@ public static class NotificationErrors
     public static readonly Error TemplateNotFound =
         Error.NotFound("notifications.template_not_found", "There is no active template for this notification type.");
 
+    /// <summary>No template has this id (NOT-09).</summary>
+    public static readonly Error TemplateDoesNotExist =
+        Error.NotFound("notifications.template_does_not_exist", "The notification template does not exist.");
+
+    /// <summary>A placeholder is not written as {{Name}} (NOT-09); the raw braces would reach the employee.</summary>
+    public static readonly Error TemplateMalformedPlaceholder =
+        Error.Validation("notifications.template_malformed_placeholder",
+            "The template has a malformed placeholder; use {{Name}} with letters, digits or _ only.");
+
+    /// <summary>
+    /// The template uses a placeholder that has no value for its type (NOT-09): sending would fail, so it is refused when
+    /// the template is saved. The names are in the extensions.
+    /// </summary>
+    public static readonly Error TemplateUnknownPlaceholder =
+        Error.Validation("notifications.template_unknown_placeholder",
+            "The template uses a placeholder that is not available for this notification type.");
+
+    /// <summary>The active template cannot be deleted (NOT-09): the type would be left without one and could not be sent.</summary>
+    public static readonly Error TemplateActiveCannotBeDeleted =
+        Error.BusinessRule("notifications.template_active_cannot_be_deleted",
+            "The active template cannot be deleted. Activate another template of this type first.");
+
     public static readonly Error TemplateSubjectRequired =
         Error.Validation("notifications.template_subject_required", "A template subject is required.");
 
