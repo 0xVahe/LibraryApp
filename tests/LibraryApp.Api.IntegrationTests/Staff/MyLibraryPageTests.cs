@@ -204,5 +204,8 @@ public sealed class MyLibraryPageFactory : ApiHostFactory
 
         public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
             inner.GetLoansDueOnAsync(localDate, ct);
+
+        public Task<IReadOnlyList<OpenLoanInfo>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+            inner.GetOverdueLoansAsync(ct);
     }
 }
