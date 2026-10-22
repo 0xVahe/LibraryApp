@@ -3,7 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LibraryApp.Application.Staff.Ports;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Staff;
+using LibraryApp.Infrastructure.Persistence;
+using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Reporting;
@@ -35,8 +39,17 @@ public sealed class PurchaseCandidatesEndpointTests(ApiHostFactory factory)
     }
 
     [Fact]
-    public async Task Administrator_gets_the_books_longest_queue_first_within_the_limit()
+    public async Task Administrator_gets_the_seeded_queue_with_the_book_details_and_the_limit()
     {
+        // Borrowing's seed: book 1 has 2 Waiting reservations; book 15 has only a ReadyForPickup one (not a queue).
+        int copies;
+        using (var scope = factory.Services.CreateScope())
+        {
+            copies = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().BookCopies.CountAsync(copy =>
+                copy.BookId == CatalogSeedIds.Book(1)
+                && copy.Status != BookCopyStatus.Lost && copy.Status != BookCopyStatus.Withdrawn);
+        }
+
         using var client = CreateAuthenticatedClient(StaffRoles.LibraryAdministrator);
         using var response = await client.GetAsync(Route);
 
@@ -45,13 +58,20 @@ public sealed class PurchaseCandidatesEndpointTests(ApiHostFactory factory)
         Assert.NotNull(json);
         JsonElement root = json.RootElement;
 
+        Assert.True(DateOnly.TryParse(root.GetProperty("asOfDate").GetString(), out _));
         Assert.True(root.TryGetProperty("generatedAtUtc", out _));
-        List<int> queues = root.GetProperty("books").EnumerateArray()
-            .Select(book => book.GetProperty("waitingReservations").GetInt32())
-            .ToList();
-        Assert.InRange(queues.Count, 0, 10);   // Reporting:PurchaseCandidatesLimit
-        Assert.All(queues, queue => Assert.True(queue > 0));
-        Assert.Equal(queues.OrderByDescending(queue => queue), queues);
+        Assert.Equal(10, root.GetProperty("limit").GetInt32());   // Reporting:PurchaseCandidatesLimit in appsettings.json
+
+        SeedBook seeded = CatalogSeedData.Books.Single(book => book.Number == 1);
+        JsonElement book = Assert.Single(root.GetProperty("books").EnumerateArray());
+        Assert.Equal(CatalogSeedIds.Book(1), book.GetProperty("bookId").GetGuid());
+        Assert.Equal(seeded.Title, book.GetProperty("title").GetString());
+        Assert.Equal(seeded.Isbn, book.GetProperty("isbn").GetString());
+        Assert.Equal(
+            CatalogSeedData.Categories.Single(category => category.Id == CatalogSeedIds.Category(seeded.CategoryNumber)).Name,
+            book.GetProperty("category").GetString());
+        Assert.Equal(2, book.GetProperty("waitingReservations").GetInt32());
+        Assert.Equal(copies, book.GetProperty("copies").GetInt32());
     }
 
     private HttpClient CreateAuthenticatedClient(string role)

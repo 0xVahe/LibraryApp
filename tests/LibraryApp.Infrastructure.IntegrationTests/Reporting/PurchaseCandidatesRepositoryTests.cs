@@ -11,13 +11,15 @@ using Microsoft.Extensions.Options;
 namespace LibraryApp.Infrastructure.IntegrationTests.Reporting;
 
 /// <summary>
-/// REP-07 data, Waiting reservations per book: Clean Code 3 (copies: 1 Available, 1 Lost), Refactoring 3 (no copies),
-/// Effective Java 1 (plus 1 Cancelled), a deleted book 4; Domain-Driven Design has no reservation.
+/// REP-07 data, Waiting reservations per book: Clean Code 3 (copies: Available, OnLoan, UnderRepair, Lost, Withdrawn),
+/// Refactoring 3 (no copies), another edition of Refactoring 3, Effective Java 1 (plus a ReadyForPickup, an Expired and
+/// a Cancelled one), a deleted book 4; Domain-Driven Design has no reservation.
 /// </summary>
 public sealed class PurchaseCandidatesDatabase : IAsyncLifetime
 {
     public static readonly Guid CleanCodeId = Guid.NewGuid();
     public static readonly Guid RefactoringId = Guid.NewGuid();
+    public static readonly Guid RefactoringFirstEditionId = Guid.NewGuid();
     public static readonly Guid EffectiveJavaId = Guid.NewGuid();
     public static readonly Guid DeletedBookId = Guid.NewGuid();
     public static readonly Guid DomainDrivenDesignId = Guid.NewGuid();
@@ -50,15 +52,17 @@ public sealed class PurchaseCandidatesDatabase : IAsyncLifetime
         db.Books.AddRange(
             new Book(CleanCodeId, "Clean Code", "9780132350884", 2008, "en", null, categoryId, null),
             new Book(RefactoringId, "Refactoring", "9780134757599", 2018, "en", null, categoryId, null),
+            new Book(RefactoringFirstEditionId, "Refactoring", "9780201485677", 1999, "en", null, categoryId, null),
             new Book(EffectiveJavaId, "Effective Java", "9780134685991", 2018, "en", null, categoryId, null),
             new Book(DomainDrivenDesignId, "Domain-Driven Design", "9780321125217", 2003, "en", null, categoryId, null),
             deleted);
 
-        db.BookCopies.Add(new BookCopy(Guid.NewGuid(), CleanCodeId, "PC-CLEAN-001", BookCopyCondition.Good, null));
-        var lost = new BookCopy(Guid.NewGuid(), CleanCodeId, "PC-CLEAN-002", BookCopyCondition.Good, null);
-        lost.ChangeStatus(BookCopyStatus.Lost);
-        db.BookCopies.Add(lost);
-        db.BookCopies.Add(new BookCopy(Guid.NewGuid(), EffectiveJavaId, "PC-JAVA-001", BookCopyCondition.Good, null));
+        AddCopy(db, CleanCodeId, "PC-CLEAN-001", BookCopyStatus.Available);
+        AddCopy(db, CleanCodeId, "PC-CLEAN-002", BookCopyStatus.OnLoan);
+        AddCopy(db, CleanCodeId, "PC-CLEAN-003", BookCopyStatus.UnderRepair);
+        AddCopy(db, CleanCodeId, "PC-CLEAN-004", BookCopyStatus.Lost);
+        AddCopy(db, CleanCodeId, "PC-CLEAN-005", BookCopyStatus.Withdrawn);
+        Guid javaCopy = AddCopy(db, EffectiveJavaId, "PC-JAVA-001", BookCopyStatus.Available);
 
         List<Guid> staff = Enumerable.Range(1, 5)
             .Select(number => NewStaff(db, departmentId, staffCategoryId, $"FIN-{number:000}"))
@@ -66,11 +70,18 @@ public sealed class PurchaseCandidatesDatabase : IAsyncLifetime
 
         AddWaiting(db, CleanCodeId, staff.Take(3));
         AddWaiting(db, RefactoringId, staff.Take(3));
+        AddWaiting(db, RefactoringFirstEditionId, staff.Take(3));
         AddWaiting(db, EffectiveJavaId, staff.Take(1));
         AddWaiting(db, DeletedBookId, staff.Take(4));
-        var cancelled = Reservation.Create(Guid.NewGuid(), EffectiveJavaId, staff[4], CreatedAtUtc, 2);
+        // Not in the queue: ready for pickup, expired and cancelled reservations.
+        var ready = Reservation.Create(Guid.NewGuid(), EffectiveJavaId, staff[1], CreatedAtUtc, 2);
+        ready.MarkReady(javaCopy, CreatedAtUtc.AddDays(3));
+        var expired = Reservation.Create(Guid.NewGuid(), EffectiveJavaId, staff[2], CreatedAtUtc, 3);
+        expired.MarkReady(javaCopy, CreatedAtUtc.AddDays(1));
+        expired.Expire(CreatedAtUtc.AddDays(2));
+        var cancelled = Reservation.Create(Guid.NewGuid(), EffectiveJavaId, staff[4], CreatedAtUtc, 4);
         cancelled.Cancel();
-        db.Reservations.Add(cancelled);
+        db.Reservations.AddRange(ready, expired, cancelled);
 
         await db.SaveChangesAsync();
     }
@@ -79,6 +90,15 @@ public sealed class PurchaseCandidatesDatabase : IAsyncLifetime
     {
         await using var db = NewContext();
         await db.Database.EnsureDeletedAsync();
+    }
+
+    private static Guid AddCopy(LibraryDbContext db, Guid bookId, string barcode, BookCopyStatus status)
+    {
+        var copy = new BookCopy(Guid.NewGuid(), bookId, barcode, BookCopyCondition.Good, null);
+        if (status != BookCopyStatus.Available)
+            copy.ChangeStatus(status);
+        db.BookCopies.Add(copy);
+        return copy.Id;
     }
 
     private static void AddWaiting(LibraryDbContext db, Guid bookId, IEnumerable<Guid> staffIds)
@@ -113,16 +133,32 @@ public sealed class PurchaseCandidatesRepositoryTests(PurchaseCandidatesDatabase
     : IClassFixture<PurchaseCandidatesDatabase>
 {
     [Fact]
-    public async Task Books_with_the_longest_waiting_queues_first_and_a_tie_by_title()
+    public async Task Books_with_the_longest_waiting_queues_first_and_a_tie_by_title_then_ISBN()
     {
         await using var db = database.NewContext();
 
         var books = await Repository(db, limit: 10).GetPurchaseCandidatesAsync();
 
         Assert.Equal(
-            [PurchaseCandidatesDatabase.CleanCodeId, PurchaseCandidatesDatabase.RefactoringId, PurchaseCandidatesDatabase.EffectiveJavaId],
+            [
+                PurchaseCandidatesDatabase.CleanCodeId,
+                PurchaseCandidatesDatabase.RefactoringId,               // 9780134757599
+                PurchaseCandidatesDatabase.RefactoringFirstEditionId,   // 9780201485677
+                PurchaseCandidatesDatabase.EffectiveJavaId,
+            ],
             books.Select(book => book.BookId));
-        Assert.Equal([3, 3, 1], books.Select(book => book.WaitingReservations));   // the Cancelled reservation is not counted
+        Assert.Equal([3, 3, 3, 1], books.Select(book => book.WaitingReservations));
+    }
+
+    [Fact]
+    public async Task Only_Waiting_reservations_are_counted()
+    {
+        await using var db = database.NewContext();
+
+        var books = await Repository(db, limit: 10).GetPurchaseCandidatesAsync();
+
+        // Effective Java also has a ReadyForPickup, an Expired and a Cancelled reservation.
+        Assert.Equal(1, books.Single(book => book.BookId == PurchaseCandidatesDatabase.EffectiveJavaId).WaitingReservations);
     }
 
     [Fact]
@@ -147,7 +183,7 @@ public sealed class PurchaseCandidatesRepositoryTests(PurchaseCandidatesDatabase
         Assert.Equal("Clean Code", cleanCode.Title);
         Assert.Equal("9780132350884", cleanCode.Isbn);
         Assert.Equal("Technology", cleanCode.Category);
-        Assert.Equal(1, cleanCode.Copies);   // the Lost copy is not counted
+        Assert.Equal(3, cleanCode.Copies);   // Available, OnLoan and UnderRepair; not Lost or Withdrawn
         Assert.Equal(0, books.Single(book => book.BookId == PurchaseCandidatesDatabase.RefactoringId).Copies);
     }
 

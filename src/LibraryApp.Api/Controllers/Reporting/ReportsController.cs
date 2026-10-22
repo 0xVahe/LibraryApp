@@ -73,6 +73,12 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
         return Ok(await reporting.GetInventoryStatusAsync(categoryId, ct));
     }
 
+    /// <summary>
+    /// REP-07: the books with the longest reservation queues, longest first; at most
+    /// <c>Reporting:PurchaseCandidatesLimit</c>. Administrator only.
+    /// </summary>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">The books with their waiting reservations and the copies the library still has.</response>
     [HttpGet("purchase-candidates")]
     [Authorize(Roles = StaffRoles.LibraryAdministrator)]
     [ProducesResponseType<PurchaseCandidatesReportDto>(StatusCodes.Status200OK)]

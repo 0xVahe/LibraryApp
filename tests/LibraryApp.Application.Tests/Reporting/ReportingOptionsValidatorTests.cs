@@ -58,6 +58,25 @@ public sealed class ReportingOptionsValidatorTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(100)]
+    public void Accepts_a_purchase_candidates_limit_from_1_to_100(int limit)
+    {
+        var options = new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5,
+            PurchaseCandidatesLimit = limit
+        };
+
+        var result = new ReportingOptionsValidator()
+            .Validate(null, options);
+
+        Assert.False(result.Failed);
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(101)]

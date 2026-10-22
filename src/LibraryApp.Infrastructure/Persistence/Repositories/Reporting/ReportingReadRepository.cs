@@ -162,10 +162,12 @@ public sealed class ReportingReadRepository(
                 where !book.IsDeleted
                 join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
                 group reservation by new { book.Id, book.Title, book.Isbn, Category = category.Name } into grouped
-                orderby grouped.Count() descending, grouped.Key.Title
+                orderby grouped.Count() descending, grouped.Key.Title, grouped.Key.Isbn
                 select new { grouped.Key.Id, grouped.Key.Title, grouped.Key.Isbn, grouped.Key.Category, Waiting = grouped.Count() })
             .Take(options.Value.PurchaseCandidatesLimit)
             .ToListAsync(ct);
+        if (queues.Count == 0)
+            return [];
 
         List<Guid> bookIds = queues.Select(queue => queue.Id).ToList();
         Dictionary<Guid, int> copies = await db.BookCopies.AsNoTracking()

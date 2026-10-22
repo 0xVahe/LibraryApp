@@ -250,6 +250,7 @@ public sealed class ReportingService(
     public async Task<PurchaseCandidatesReportDto> GetPurchaseCandidatesAsync(CancellationToken ct = default)
     {
         IReadOnlyList<PurchaseCandidateItemDto> books = await repository.GetPurchaseCandidatesAsync(ct);
-        return new PurchaseCandidatesReportDto(clock.UtcNow, books);
+        return new PurchaseCandidatesReportDto(
+            clock.LocalToday, clock.UtcNow, options.Value.PurchaseCandidatesLimit, books);
     }
 }

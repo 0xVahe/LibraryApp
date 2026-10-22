@@ -35,11 +35,11 @@ public sealed class PurchaseCandidatesReportTests
                 DashboardCacheMinutes = 5,
                 TopBooksLimit = 10,
                 TopCategoriesLimit = 5,
-                PurchaseCandidatesLimit = 10
+                PurchaseCandidatesLimit = 7
             }));
 
     [Fact]
-    public async Task Lists_the_books_from_the_repository_in_its_order_with_the_generation_time()
+    public async Task Lists_the_books_from_the_repository_in_its_order_with_the_date_and_the_limit()
     {
         _repository.Candidates.Add(new PurchaseCandidateItemDto(
             Guid.NewGuid(), "Clean Code", "9780132350884", "Technology", 4, 1));
@@ -48,7 +48,9 @@ public sealed class PurchaseCandidatesReportTests
 
         PurchaseCandidatesReportDto report = await CreateService().GetPurchaseCandidatesAsync();
 
+        Assert.Equal(DateOnly.FromDateTime(Now), report.AsOfDate);
         Assert.Equal(Now, report.GeneratedAtUtc);
+        Assert.Equal(7, report.Limit);   // Reporting:PurchaseCandidatesLimit, stated in the report
         Assert.Equal(["Clean Code", "Effective Java"], report.Books.Select(book => book.Title));
         Assert.Equal(4, report.Books[0].WaitingReservations);
         Assert.Equal(1, report.Books[0].Copies);
