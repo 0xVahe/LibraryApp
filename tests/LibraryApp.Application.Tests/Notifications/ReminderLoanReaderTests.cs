@@ -221,5 +221,9 @@ public sealed class ReminderLoanReaderTests
 
         public Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
+            IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 }

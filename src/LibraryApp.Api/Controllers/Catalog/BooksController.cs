@@ -1,3 +1,4 @@
+using LibraryApp.Api.Catalog;
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
@@ -107,9 +108,10 @@ public sealed class BooksController(
         return NoContent();
     }
 
-    /// <summary>Imports up to 500 books from a CSV file (CAT-09). All rows are saved together, or none are.</summary>
+    /// <summary>Imports books from a CSV file (CAT-09). All rows are saved together, or none are.</summary>
     /// <remarks>
-    /// Upload multipart/form-data with the <c>file</c> field: UTF-8, comma separated, at most 1 MB, a header line first.
+    /// Upload multipart/form-data with the <c>file</c> field: UTF-8, comma separated, a header line first, within the
+    /// <c>Catalog:Import</c> settings (500 book rows and 1 MB by default).
     /// Columns: Title, Isbn, PublicationYear, Language (hy, en or ru), Category, Authors (names separated by ';'),
     /// and the optional Description, Publisher and CoverImagePath (a path in the cover storage, checked like on the book
     /// form). Category, publisher and author names must already exist.
@@ -125,8 +127,7 @@ public sealed class BooksController(
     [HttpPost("import")]
     [Authorize(Roles = Writers)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(BookImportLimits.MaximumFileBytes + 100_000)]
-    [RequestFormLimits(MultipartBodyLengthLimit = BookImportLimits.MaximumFileBytes + 100_000)]
+    [CatalogImportRequestLimits]
     [ProducesResponseType<BookImportResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
