@@ -1,0 +1,11 @@
+@page "/reports"
+@model IndexModel
+@{
+    ViewData["Title"] = "Reports";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Reports", "Read-only figures from the catalog, staff and loans. Dates are Asia/Yerevan days, both ends included."))' />
+
+<div class="stack-lg">
+    <partial name="_Dashboard" model="Model" />
+</div>

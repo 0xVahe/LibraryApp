@@ -1,0 +1,18 @@
+@model IndexModel
+@{
+    var d = Model.Dashboard;
+}
+<section aria-labelledby="dashboard-title">
+    <div class="row-between mb-16">
+        <div class="row"><h2 id="dashboard-title">Dashboard</h2><span class="badge badge-grey">Librarian · Admin</span></div>
+        <p class="small muted">Live · generated @Model.Generated(d.GeneratedAtUtc) · refreshed every @Model.CacheMinutes minutes</p>
+    </div>
+    <div class="grid grid-3" role="group" aria-label="Library figures">
+        <div class="card stat" id="books-stat"><span class="small muted">Books · copies</span><span class="stat-value">@d.TotalBooks <span class="small muted">· @d.TotalCopies copies</span></span></div>
+        <div class="card stat" id="readers-stat"><span class="small muted">Active readers</span><span class="stat-value">@d.ActiveReaders</span></div>
+        <div class="card stat" id="loans-stat"><span class="small muted">Active loans</span><span class="stat-value">@d.ActiveLoans</span></div>
+        <div class="card stat" id="overdue-stat"><span class="small muted">Overdue</span><span class="stat-value">@d.OverdueLoans <span class="badge badge-red">@IndexModel.Percent(d.OverduePercentage)</span></span></div>
+        <div class="card stat" id="restricted-stat"><span class="small muted">Restricted staff</span><span class="stat-value">@d.RestrictedEmployees</span></div>
+        <div class="card stat" id="suspended-stat"><span class="small muted">Suspended staff</span><span class="stat-value">@d.SuspendedEmployees</span></div>
+    </div>
+</section>
