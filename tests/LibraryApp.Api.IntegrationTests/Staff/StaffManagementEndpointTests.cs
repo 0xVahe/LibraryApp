@@ -10,7 +10,6 @@ using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Identity;
-using LibraryApp.Infrastructure.Messaging;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
@@ -26,7 +25,7 @@ public sealed class StaffManagementFactory : ApiHostFactory, IAsyncLifetime
     protected override void ConfigureTestServices(IServiceCollection services)
     {
         services.AddScoped<IUserValidator<AppUser>, FailingRoleUserValidator>();
-        services.AddScoped<IEventBus, FailingEnrollmentEventBus>();
+        services.DecorateEventBus<FailingEnrollmentEventBus>();
     }
 
     public new async Task InitializeAsync()
@@ -48,11 +47,11 @@ public sealed class FailingRoleUserValidator : IUserValidator<AppUser>
             : IdentityResult.Success);
 }
 
-public sealed class FailingEnrollmentEventBus(LibraryDbContext db, EventTypeRegistry registry) : IEventBus
+public sealed class FailingEnrollmentEventBus(IEventBus inner, LibraryDbContext db) : IEventBus
 {
     public async Task PublishAsync<TEvent>(TEvent domainEvent, CancellationToken ct = default) where TEvent : class, IDomainEvent
     {
-        await new OutboxEventBus(db, registry).PublishAsync(domainEvent, ct);
+        await inner.PublishAsync(domainEvent, ct);
         if (db.ChangeTracker.Entries<StaffMember>().Any(x => x.Entity.CorporateEmail.StartsWith("event-failure.")))
             throw new InvalidOperationException("Simulated event failure after account and member creation.");
     }

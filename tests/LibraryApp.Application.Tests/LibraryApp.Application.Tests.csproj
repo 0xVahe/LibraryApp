@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\src\LibraryApp.Api\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LibraryApp.Application\LibraryApp.Application.csproj" />
     <ProjectReference Include="..\..\src\LibraryApp.Domain\LibraryApp.Domain.csproj" />
   </ItemGroup>

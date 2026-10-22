@@ -2,11 +2,12 @@ using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Application.Staff.Validators;
-using LibraryApp.Domain.Staff;
 using LibraryApp.Application.Tests.Fakes;
+using LibraryApp.Domain.Staff;
 using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Staff;
@@ -25,13 +26,40 @@ public sealed class StaffImportServiceTests
         var repository = new FakeRepository();
         var caller = new FakeCurrentUser();
         var service = new StaffImportService(new FakeParser(rows), management, new EnrolStaffMemberRequestValidator(),
-            new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions())), repository, new FakeAccounts(), caller);
+            new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions())), repository, new FakeAccounts(), caller,
+            Options.Create(new StaffOptions { Import = new() { MaxRows = 200, MaxFileBytes = 1_000_000 } }));
 
         var error = await Assert.ThrowsAsync<StaffImportException>(() => service.ImportAsync(Stream.Null));
 
         Assert.Contains(error.Errors, item => item.RowNumber == 3 && item.Field == nameof(StaffImportCsvRow.EmployeeId));
         Assert.Contains(error.Errors, item => item.RowNumber == 3 && item.Field == nameof(StaffImportCsvRow.CorporateEmail));
         Assert.Equal(0, management.BatchCalls);
+    }
+
+    [Theory]
+    [InlineData(2, false)]
+    [InlineData(3, true)]
+    public async Task The_service_enforces_the_configured_row_limit_before_enrolling(int rowCount, bool exceedsLimit)
+    {
+        var rows = Enumerable.Range(0, rowCount).Select(i => Row(i + 2, $"EMP-{i}", $"user{i}@ameriabank.am")).ToArray();
+        var management = new FakeManagementService();
+        var service = new StaffImportService(new FakeParser(rows), management, new EnrolStaffMemberRequestValidator(),
+            new CorporateEmailPolicy(Options.Create(new CorporateEmailOptions())), new FakeRepository(),
+            new FakeAccounts(), new FakeCurrentUser(),
+            Options.Create(new StaffOptions { Import = new() { MaxRows = 2, MaxFileBytes = 4096 } }));
+
+        if (exceedsLimit)
+        {
+            var error = await Assert.ThrowsAsync<StaffCsvFormatException>(() => service.ImportAsync(Stream.Null));
+            Assert.Equal(4, error.RowNumber);
+            Assert.Contains("at most 2 data rows", error.Message);
+            Assert.Equal(0, management.BatchCalls);
+        }
+        else
+        {
+            await service.ImportAsync(Stream.Null);
+            Assert.Equal(1, management.BatchCalls);
+        }
     }
 
     private static StaffImportCsvRow Row(int number, string employeeId, string email) =>

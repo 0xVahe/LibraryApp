@@ -1,0 +1,51 @@
+@page "/notifications"
+@model IndexModel
+@{
+    ViewData["Title"] = "Notifications";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Notifications", "Messages from the library about your loans, reservations and account."))' />
+
+<nav class="tabs" aria-label="Notifications">
+    <a href="@UiNavigation.Notifications" aria-current="@(Model.Unread ? null : "page")">All</a>
+    <a href="@IndexModel.UnreadPath" aria-current="@(Model.Unread ? "page" : null)">Unread</a>
+</nav>
+
+<section class="card" aria-labelledby="notifications-title">
+    <div class="card-head">
+        <div><h2 id="notifications-title">@(Model.Unread ? "Unread" : "All notifications")</h2><p class="small muted">Unread first, then the newest.</p></div>
+    </div>
+    @if (Model.Result.Items.Count == 0)
+    {
+        <p class="muted">@(Model.Unread ? "No unread notifications." : "No notifications yet.")</p>
+    }
+    else
+    {
+        <ul class="list">
+            @foreach (var notification in Model.Result.Items)
+            {
+                <li>
+                    <span class="@(notification.IsRead ? "read" : "unread")" aria-hidden="true"></span>
+                    <div class="grow">
+                        <span class="title">@if (!notification.IsRead) {<span class="visually-hidden">Unread: </span>}@notification.Subject</span>
+                        <p class="small muted"><partial name="/Areas/Notifications/Pages/_NotificationDate.cshtml" model="notification.CreatedAtUtc" /></p>
+                    </div>
+                    @if (notification.IsRead)
+                    {
+                        <span class="badge badge-grey">Read</span>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="Read">
+                            <input type="hidden" name="id" value="@notification.NotificationId" />
+                            <input type="hidden" name="unread" value="@(Model.Unread ? "true" : "false")" />
+                            <input type="hidden" name="page" value="@Model.Result.Page" />
+                            <button class="btn btn-secondary btn-sm" type="submit">Mark as read<span class="visually-hidden">: @notification.Subject</span></button>
+                        </form>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+<partial name="/Pages/Shared/_Pager.cshtml" model="PagerModel.From(Model.Result, Request)" />
