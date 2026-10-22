@@ -33,10 +33,6 @@ public class ApiHostFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Jobs:Enabled", "false");                 // daily jobs never run during API tests
         builder.UseSetting("Jwt:SigningKey", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         builder.UseSetting("LoginRateLimit:PermitLimit", "1000");
-        builder.UseSetting("Staff:Import:MaxRows", "200");
-        builder.UseSetting("Staff:Import:MaxFileBytes", "1000000");
-        builder.UseSetting("Staff:RestrictedLimits:MaxLoans", "1");
-        builder.UseSetting("Staff:RestrictedLimits:MaxRenewals", "0");
         builder.ConfigureServices(services => services.AddSingleton<ILogEventSink>(Logs));
         builder.ConfigureServices(ConfigureTestServices);
     }
