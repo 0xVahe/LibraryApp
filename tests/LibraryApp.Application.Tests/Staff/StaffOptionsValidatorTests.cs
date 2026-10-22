@@ -29,6 +29,18 @@ public sealed class StaffOptionsValidatorTests
         Assert.True(new StaffOptionsValidator().Validate(null, Valid()).Succeeded);
 
     [Fact]
+    public void Restricted_renewal_error_cites_the_fixed_business_rules()
+    {
+        var options = Valid();
+        options.RestrictedLimits.MaxRenewals = 1;
+
+        var result = new StaffOptionsValidator().Validate(null, options);
+
+        Assert.Contains("BR-MEM-3", result.FailureMessage);
+        Assert.Contains("BR-BOR-1", result.FailureMessage);
+    }
+
+    [Fact]
     public void Missing_settings_name_every_required_key()
     {
         var result = new StaffOptionsValidator().Validate(null, new StaffOptions());
