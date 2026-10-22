@@ -38,6 +38,7 @@ public class OutlookMimeMessageTests
         Assert.Equal("text/calendar", attachment.ContentType.MimeType);
         Assert.Equal("PUBLISH", attachment.ContentType.Parameters["method"]);
         using var content = new MemoryStream();
+        Assert.NotNull(attachment.Content);
         attachment.Content.DecodeTo(content);
         Assert.Equal(ics, System.Text.Encoding.UTF8.GetString(content.ToArray()));
         Assert.Equal("<p>Hello</p>", mime.HtmlBody);   // the body is still there
