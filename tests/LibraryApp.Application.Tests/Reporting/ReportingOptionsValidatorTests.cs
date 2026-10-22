@@ -17,7 +17,8 @@ public sealed class ReportingOptionsValidatorTests
         {
             DashboardCacheMinutes = cacheMinutes,
             TopBooksLimit = booksLimit,
-            TopCategoriesLimit = categoriesLimit
+            TopCategoriesLimit = categoriesLimit,
+            PurchaseCandidatesLimit = 10
         };
 
         var result = new ReportingOptionsValidator()
@@ -46,12 +47,34 @@ public sealed class ReportingOptionsValidatorTests
         {
             DashboardCacheMinutes = cacheMinutes,
             TopBooksLimit = booksLimit,
-            TopCategoriesLimit = categoriesLimit
+            TopCategoriesLimit = categoriesLimit,
+            PurchaseCandidatesLimit = 10
         };
 
         var result = new ReportingOptionsValidator()
             .Validate(null, options);
 
         Assert.True(result.Failed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public void Rejects_an_invalid_purchase_candidates_limit(int limit)
+    {
+        var options = new ReportingOptions
+        {
+            DashboardCacheMinutes = 5,
+            TopBooksLimit = 10,
+            TopCategoriesLimit = 5,
+            PurchaseCandidatesLimit = limit
+        };
+
+        var result = new ReportingOptionsValidator()
+            .Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains("Reporting:PurchaseCandidatesLimit", result.FailureMessage);
     }
 }

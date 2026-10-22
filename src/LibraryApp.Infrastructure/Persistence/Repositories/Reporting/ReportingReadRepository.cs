@@ -152,4 +152,33 @@ public sealed class ReportingReadRepository(
             select new CopyCountData(grouped.Key.Status, grouped.Key.Condition, grouped.Count()))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default)
+    {
+        var queues = await (
+                from reservation in db.Reservations.AsNoTracking()
+                where reservation.Status == ReservationStatus.Waiting
+                join book in db.Books.AsNoTracking() on reservation.BookId equals book.Id
+                where !book.IsDeleted
+                join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+                group reservation by new { book.Id, book.Title, book.Isbn, Category = category.Name } into grouped
+                orderby grouped.Count() descending, grouped.Key.Title
+                select new { grouped.Key.Id, grouped.Key.Title, grouped.Key.Isbn, grouped.Key.Category, Waiting = grouped.Count() })
+            .Take(options.Value.PurchaseCandidatesLimit)
+            .ToListAsync(ct);
+
+        List<Guid> bookIds = queues.Select(queue => queue.Id).ToList();
+        Dictionary<Guid, int> copies = await db.BookCopies.AsNoTracking()
+            .Where(copy => bookIds.Contains(copy.BookId)
+                           && copy.Status != BookCopyStatus.Lost
+                           && copy.Status != BookCopyStatus.Withdrawn)
+            .GroupBy(copy => copy.BookId)
+            .Select(grouped => new { BookId = grouped.Key, Copies = grouped.Count() })
+            .ToDictionaryAsync(row => row.BookId, row => row.Copies, ct);
+
+        return queues
+            .Select(queue => new PurchaseCandidateItemDto(
+                queue.Id, queue.Title, queue.Isbn, queue.Category, queue.Waiting, copies.GetValueOrDefault(queue.Id)))
+            .ToList();
+    }
 }

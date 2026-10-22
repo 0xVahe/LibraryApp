@@ -13,6 +13,7 @@ public interface IReportingReadRepository
     Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default);
     Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default);
+    Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default);
 }
 
 /// <summary>REP-05: copies of one status and condition (only the combinations that have copies).</summary>

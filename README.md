@@ -126,8 +126,9 @@ Configure reporting in `src/LibraryApp.Api/appsettings.json`.
 | `DashboardCacheMinutes` | 5 | Dashboard cache lifetime in minutes (1–60) | REP-02 / REP-F4 |
 | `TopBooksLimit` | 10 | Maximum top books returned (1–100) | REP-03 |
 | `TopCategoriesLimit` | 5 | Maximum top categories returned (1–100) | REP-03 |
+| `PurchaseCandidatesLimit` | 10 | Maximum purchase candidates returned (1–100) | REP-07 |
 
-All three settings are required. Missing or out-of-range values prevent application startup.
+All four settings are required. Missing or out-of-range values prevent application startup.
 
 ### Notifications (`Notifications`)
 

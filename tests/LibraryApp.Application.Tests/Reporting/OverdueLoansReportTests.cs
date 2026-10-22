@@ -304,6 +304,9 @@ public sealed class OverdueLoansReportTests
 
         public Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class WeekdayCalendar : IWorkingDayCalendar

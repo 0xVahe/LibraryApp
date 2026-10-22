@@ -72,4 +72,10 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     {
         return Ok(await reporting.GetInventoryStatusAsync(categoryId, ct));
     }
+
+    [HttpGet("purchase-candidates")]
+    [Authorize(Roles = StaffRoles.LibraryAdministrator)]
+    [ProducesResponseType<PurchaseCandidatesReportDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PurchaseCandidatesReportDto>> GetPurchaseCandidates(CancellationToken ct) =>
+        Ok(await reporting.GetPurchaseCandidatesAsync(ct));
 }

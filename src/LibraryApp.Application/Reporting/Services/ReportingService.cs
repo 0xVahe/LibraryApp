@@ -246,4 +246,10 @@ public sealed class ReportingService(
                 .Sum(item => item.Copies),
             statuses);
     }
+
+    public async Task<PurchaseCandidatesReportDto> GetPurchaseCandidatesAsync(CancellationToken ct = default)
+    {
+        IReadOnlyList<PurchaseCandidateItemDto> books = await repository.GetPurchaseCandidatesAsync(ct);
+        return new PurchaseCandidatesReportDto(clock.UtcNow, books);
+    }
 }
