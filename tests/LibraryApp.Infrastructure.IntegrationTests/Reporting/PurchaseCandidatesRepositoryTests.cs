@@ -183,8 +183,8 @@ public sealed class PurchaseCandidatesRepositoryTests(PurchaseCandidatesDatabase
         Assert.Equal("Clean Code", cleanCode.Title);
         Assert.Equal("9780132350884", cleanCode.Isbn);
         Assert.Equal("Technology", cleanCode.Category);
-        Assert.Equal(3, cleanCode.Copies);   // Available, OnLoan and UnderRepair; not Lost or Withdrawn
-        Assert.Equal(0, books.Single(book => book.BookId == PurchaseCandidatesDatabase.RefactoringId).Copies);
+        Assert.Equal(3, cleanCode.CopiesInCollection);   // Available, OnLoan and UnderRepair; not Lost or Withdrawn
+        Assert.Equal(0, books.Single(book => book.BookId == PurchaseCandidatesDatabase.RefactoringId).CopiesInCollection);
     }
 
     [Fact]

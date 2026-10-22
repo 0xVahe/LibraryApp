@@ -3,12 +3,11 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LibraryApp.Application.Staff.Ports;
-using LibraryApp.Domain.Catalog;
+using LibraryApp.Application.Reporting.Options;
 using LibraryApp.Domain.Staff;
-using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Reporting;
 
@@ -42,13 +41,7 @@ public sealed class PurchaseCandidatesEndpointTests(ApiHostFactory factory)
     public async Task Administrator_gets_the_seeded_queue_with_the_book_details_and_the_limit()
     {
         // Borrowing's seed: book 1 has 2 Waiting reservations; book 15 has only a ReadyForPickup one (not a queue).
-        int copies;
-        using (var scope = factory.Services.CreateScope())
-        {
-            copies = await scope.ServiceProvider.GetRequiredService<LibraryDbContext>().BookCopies.CountAsync(copy =>
-                copy.BookId == CatalogSeedIds.Book(1)
-                && copy.Status != BookCopyStatus.Lost && copy.Status != BookCopyStatus.Withdrawn);
-        }
+        int limit = factory.Services.GetRequiredService<IOptions<ReportingOptions>>().Value.PurchaseCandidatesLimit;
 
         using var client = CreateAuthenticatedClient(StaffRoles.LibraryAdministrator);
         using var response = await client.GetAsync(Route);
@@ -60,7 +53,7 @@ public sealed class PurchaseCandidatesEndpointTests(ApiHostFactory factory)
 
         Assert.True(DateOnly.TryParse(root.GetProperty("asOfDate").GetString(), out _));
         Assert.True(root.TryGetProperty("generatedAtUtc", out _));
-        Assert.Equal(10, root.GetProperty("limit").GetInt32());   // Reporting:PurchaseCandidatesLimit in appsettings.json
+        Assert.Equal(limit, root.GetProperty("limit").GetInt32());
 
         SeedBook seeded = CatalogSeedData.Books.Single(book => book.Number == 1);
         JsonElement book = Assert.Single(root.GetProperty("books").EnumerateArray());
@@ -71,7 +64,7 @@ public sealed class PurchaseCandidatesEndpointTests(ApiHostFactory factory)
             CatalogSeedData.Categories.Single(category => category.Id == CatalogSeedIds.Category(seeded.CategoryNumber)).Name,
             book.GetProperty("category").GetString());
         Assert.Equal(2, book.GetProperty("waitingReservations").GetInt32());
-        Assert.Equal(copies, book.GetProperty("copies").GetInt32());
+        Assert.Equal(CatalogSeedData.CopiesPerBook[1], book.GetProperty("copiesInCollection").GetInt32());   // none lost or withdrawn
     }
 
     private HttpClient CreateAuthenticatedClient(string role)

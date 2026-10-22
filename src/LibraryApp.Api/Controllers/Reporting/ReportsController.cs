@@ -57,7 +57,7 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     }
 
     /// <summary>REP-05: copies by status and condition, for the whole library or one category.</summary>
-    /// <param name="categoryId">A category; its subcategories are included. Empty: the whole library.</param>
+    /// <param name="categoryId">A category; its subcategories are included. Left out: the whole library.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <response code="200">Every status with its copies per condition, also with 0 copies.</response>
     /// <response code="400"><c>reporting.invalid_category_id</c>: an empty id.</response>

@@ -57,10 +57,9 @@ public sealed class InventoryStatusEndpointTests(ApiHostFactory factory)
         List<JsonElement> statuses = root.GetProperty("statuses").EnumerateArray().ToList();
         Assert.Equal(Enum.GetNames<BookCopyStatus>(), statuses.Select(status => status.GetProperty("status").GetString()));
         Assert.Equal(seededCopies, statuses.Sum(status => status.GetProperty("copies").GetInt32()));
-        Assert.True(CopiesOf(statuses, nameof(BookCopyStatus.Lost)) >= 1);
-        Assert.Equal(
-            seededCopies - CopiesOf(statuses, nameof(BookCopyStatus.Lost)) - CopiesOf(statuses, nameof(BookCopyStatus.Withdrawn)),
-            root.GetProperty("copiesInCollection").GetInt32());
+        Assert.Equal(1, CopiesOf(statuses, nameof(BookCopyStatus.Lost)));
+        Assert.Equal(0, CopiesOf(statuses, nameof(BookCopyStatus.Withdrawn)));
+        Assert.Equal(seededCopies - 1, root.GetProperty("copiesInCollection").GetInt32());
         Assert.All(statuses, status =>
         {
             List<JsonElement> conditions = status.GetProperty("conditions").EnumerateArray().ToList();

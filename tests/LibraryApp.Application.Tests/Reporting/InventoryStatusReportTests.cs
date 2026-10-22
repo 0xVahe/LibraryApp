@@ -96,7 +96,7 @@ public sealed class InventoryStatusReportTests
         Assert.Null(report.CategoryId);
         Assert.Null(report.Category);
         Assert.Null(_repository.LastCategoryId);
-        Assert.Equal(DateOnly.FromDateTime(Now), report.AsOfDate);
+        Assert.Equal(new DateOnly(2026, 10, 16), report.AsOfDate);
         Assert.Equal(Now, report.GeneratedAtUtc);
     }
 

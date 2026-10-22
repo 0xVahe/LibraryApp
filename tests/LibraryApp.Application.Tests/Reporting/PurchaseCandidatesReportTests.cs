@@ -48,12 +48,12 @@ public sealed class PurchaseCandidatesReportTests
 
         PurchaseCandidatesReportDto report = await CreateService().GetPurchaseCandidatesAsync();
 
-        Assert.Equal(DateOnly.FromDateTime(Now), report.AsOfDate);
+        Assert.Equal(new DateOnly(2026, 10, 16), report.AsOfDate);
         Assert.Equal(Now, report.GeneratedAtUtc);
         Assert.Equal(7, report.Limit);   // Reporting:PurchaseCandidatesLimit, stated in the report
         Assert.Equal(["Clean Code", "Effective Java"], report.Books.Select(book => book.Title));
         Assert.Equal(4, report.Books[0].WaitingReservations);
-        Assert.Equal(1, report.Books[0].Copies);
+        Assert.Equal(1, report.Books[0].CopiesInCollection);
     }
 
     [Fact]
