@@ -54,4 +54,48 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         Assert.DoesNotContain("style=\"", html);
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task Overdue_loans_have_filters_and_the_points_rule()
+    {
+        string html = await GetAsync(Librarian, Route);
+
+        Assert.Contains("id=\"overdue-title\"", html);
+        Assert.Contains("<option value=\"\">All departments</option>", html);
+        Assert.Contains("Information Technology", html);
+        Assert.Contains("<option value=\"\">Any working days overdue</option>", html);
+        Assert.Contains("Points so far: 1 per working day overdue, max 10", html);
+        Assert.Contains("action=\"/reports#overdue-title\"", html);
+    }
+
+    [Fact]
+    public async Task Overdue_filter_keeps_the_choice()
+    {
+        var it = StaffSeedIds.Departments.InformationTechnology;
+
+        string html = await GetAsync(Librarian, $"{Route}?departmentId={it}&days=6-10");
+
+        Assert.Contains($"<option value=\"{it}\" selected=\"selected\">", html);
+        Assert.Contains("<option value=\"6-10\" selected=\"selected\">", html);
+    }
+
+    [Fact]
+    public async Task Unknown_filter_values_show_every_loan()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await client.GetAsync($"{Route}?departmentId={Guid.NewGuid()}&days=abc");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        string html = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("selected=\"selected\"", html);
+    }
+
+    private async Task<string> GetAsync(string email, string path)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
+        using var response = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadAsStringAsync();
+    }
 }
