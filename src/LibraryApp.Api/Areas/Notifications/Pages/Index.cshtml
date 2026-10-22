@@ -28,7 +28,7 @@
                     <span class="@(notification.IsRead ? "read" : "unread")" aria-hidden="true"></span>
                     <div class="grow">
                         <span class="title">@if (!notification.IsRead) {<span class="visually-hidden">Unread: </span>}@notification.Subject</span>
-                        <p class="small muted">@Model.LocalTime(notification.CreatedAtUtc)</p>
+                        <p class="small muted"><partial name="/Areas/Notifications/Pages/_NotificationDate.cshtml" model="notification.CreatedAtUtc" /></p>
                     </div>
                     @if (notification.IsRead)
                     {
@@ -40,7 +40,7 @@
                             <input type="hidden" name="id" value="@notification.NotificationId" />
                             <input type="hidden" name="unread" value="@(Model.Unread ? "true" : "false")" />
                             <input type="hidden" name="page" value="@Model.Result.Page" />
-                            <button class="btn btn-secondary btn-sm" type="submit" aria-label="Mark @notification.Subject as read">Mark as read</button>
+                            <button class="btn btn-secondary btn-sm" type="submit">Mark as read<span class="visually-hidden">: @notification.Subject</span></button>
                         </form>
                     }
                 </li>

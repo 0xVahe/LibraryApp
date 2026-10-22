@@ -1,7 +1,6 @@
 using System.Globalization;
 using LibraryApp.Api.Ui.Forms;
 using LibraryApp.Api.Ui.Shared;
-using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Notifications.Dto;
 using LibraryApp.Application.Notifications.Services;
@@ -16,7 +15,7 @@ namespace LibraryApp.Api.Areas.Notifications.Pages;
 /// NOT-04: the caller's in-app notifications, unread first, with "Mark as read". Every role sees only their own (NFR-03):
 /// the service takes the staff member from the signed-in user.
 /// </summary>
-public sealed class IndexModel(INotificationService notifications, IClock clock) : PageModel
+public sealed class IndexModel(INotificationService notifications) : PageModel
 {
     public const string UnreadPath = UiNavigation.Notifications + "?unread=true";
 
@@ -57,5 +56,4 @@ public sealed class IndexModel(INotificationService notifications, IClock clock)
         return page > 1 ? QueryHelpers.AddQueryString(path, PagerModel.PageParameter, page.ToString(CultureInfo.InvariantCulture)) : path;
     }
 
-    public string LocalTime(DateTime utc) => clock.ToLocal(utc).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
 }

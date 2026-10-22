@@ -45,6 +45,9 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
         Assert.DoesNotContain(email, html);
         Assert.DoesNotContain(other, html);
         Assert.True(html.IndexOf(unread, StringComparison.Ordinal) < html.IndexOf(read, StringComparison.Ordinal));
+        Assert.Contains("<time datetime=\"2026-10-01\">1 Oct 2026</time>", html);
+        Assert.Contains($"Mark as read<span class=\"visually-hidden\">: {unread}</span>", html);
+        Assert.DoesNotContain("aria-label=\"Mark", html);
         Assert.Contains("aria-current=\"page\">Notifications", html);
         Assert.DoesNotContain("style=\"", html);
         Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
@@ -117,6 +120,7 @@ public class NotificationsPageTests(ApiHostFactory factory) : IClassFixture<ApiH
         Assert.Contains(subject, html);
         Assert.Contains("id=\"latest-notifications-title\"", html);
         Assert.Contains("href=\"/notifications\">View all", html);
+        Assert.Contains("<time datetime=\"2026-10-01\">1 Oct 2026</time>", html);
     }
 
     private Task<string> CookieAsync(string email) => UiTestClient.CookieAsync(factory, email, StaffSeedData.Password);

@@ -18,6 +18,7 @@
                     <span class="@(notification.IsRead ? "read" : "unread")" aria-hidden="true"></span>
                     <div class="grow">
                         <span class="title">@if (!notification.IsRead) {<span class="visually-hidden">Unread: </span>}@notification.Subject</span>
+                        <p class="small muted"><partial name="/Areas/Notifications/Pages/_NotificationDate.cshtml" model="notification.CreatedAtUtc" /></p>
                     </div>
                 </li>
             }
