@@ -99,4 +99,20 @@ public class JwtTokenIssuerTests
 
         Assert.False(result.IsValid);
     }
+    
+    [Fact]
+    public void Token_carries_the_staff_member_name()
+    {
+        var token = new JsonWebToken(Issuer().Issue(Account with { DisplayName = "Anna Petrosyan" }).Token);
+
+        Assert.Equal("Anna Petrosyan", token.GetClaim(JwtRegisteredClaimNames.Name).Value);
+    }
+
+    [Fact]
+    public void Account_without_a_name_has_no_name_claim()
+    {
+        var token = new JsonWebToken(Issuer().Issue(Account with { StaffMemberId = null, StaffStatus = null }).Token);
+
+        Assert.False(token.TryGetClaim(JwtRegisteredClaimNames.Name, out _));
+    }
 }

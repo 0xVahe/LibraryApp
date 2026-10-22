@@ -41,7 +41,7 @@ public sealed class UserAccountStore(
         var staff = await db.StaffMembers
             .AsNoTracking()
             .Where(x => x.UserId == user.Id)
-            .Select(x => new { x.Id, x.Status })
+            .Select(x => new { x.Id, x.Status, x.FirstName, x.LastName })
             .SingleOrDefaultAsync(ct);
 
         // Correct credentials for a deactivated member reach AuthService's AccountDeactivated error,
@@ -54,7 +54,8 @@ public sealed class UserAccountStore(
 
         var mustChangePassword = (await userManager.GetClaimsAsync(user)).Any(IsPasswordChangeMarker);
         return new LoginAccount(user.Id, user.Email!, staff?.Id, staff?.Status, roles.ToList(),
-            await userManager.GetSecurityStampAsync(user), mustChangePassword);
+            await userManager.GetSecurityStampAsync(user), mustChangePassword,
+            staff is null ? null : $"{staff.FirstName} {staff.LastName}");
     }
 
     public async Task<bool> VerifyCurrentPasswordAsync(Guid userId, string currentPassword, CancellationToken ct)
