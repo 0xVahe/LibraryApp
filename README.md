@@ -67,6 +67,15 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Catalog (`Catalog`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Import:MaxRows` | 500 | Maximum book rows in one CSV file, excluding the header; positive integer | CAT-09 |
+| `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (the parser reads the file into memory) | CAT-09 |
+
+Both values are required; missing or invalid values prevent startup. The Import books page shows them next to the file field, in decimal sizes (`1000000` as `1 MB`). The API accepts the file limit plus 100000 bytes for the multipart envelope; the Import books page accepts up to five times the file limit, so a file over the limit gets a row error instead of an error page. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit. The cover storage (`Covers:BaseUrl`) is described in [Catalog covers](#catalog-covers-catalogcovers).
+
 ### Staff (`Staff`)
 
 | Key | Value | Meaning | Requirement |

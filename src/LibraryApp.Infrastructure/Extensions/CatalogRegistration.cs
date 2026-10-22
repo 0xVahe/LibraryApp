@@ -15,7 +15,8 @@ namespace LibraryApp.Infrastructure.Extensions;
 public static class CatalogRegistrationExtensions
 {
     /// <summary>
-    /// The Catalog module, called from Program.cs: the cover settings, repositories, queries, services and the seeder.
+    /// The Catalog module, called from Program.cs: the cover and import settings, repositories, queries, services and the
+    /// seeder.
     /// Validators are registered automatically (AddValidatorsFromAssembly in AddPlatform).
     /// </summary>
     public static IServiceCollection AddCatalogModule(this IServiceCollection services, IConfiguration configuration)
@@ -25,6 +26,12 @@ public static class CatalogRegistrationExtensions
             .ValidateOnStart();
         services.AddSingleton<IValidateOptions<CatalogCoversOptions>, CatalogCoversOptionsValidator>();
         services.AddSingleton<ICatalogCoverUrlBuilder, CatalogCoverUrlBuilder>();
+
+        // Limits of the book CSV import (CAT-09): required, checked at start.
+        services.AddOptions<CatalogImportOptions>()
+            .Bind(configuration.GetSection(CatalogImportOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<CatalogImportOptions>, CatalogImportOptionsValidator>();
 
         // Search (CAT-05)
         services.AddScoped<IBookSearchQuery, BookSearchQuery>();

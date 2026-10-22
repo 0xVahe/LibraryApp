@@ -20,6 +20,7 @@ public class BookImportServiceTests
     private readonly TestTransaction _transaction = new();
     private readonly TestClock _clock = new(new DateTime(2026, 10, 18, 12, 0, 0, DateTimeKind.Utc));
     private readonly RowsParser _parser = new();
+    private readonly CatalogImportOptions _limits = new() { MaxRows = 500, MaxFileBytes = 1_000_000 };
 
     private readonly Category _it = new(Guid.NewGuid(), "IT & Software Engineering");
     private readonly Publisher _wiley = new(Guid.NewGuid(), "Wiley");
@@ -39,7 +40,8 @@ public class BookImportServiceTests
     {
         var books = new BookService(_books, _authors, _transaction, _transaction, _transaction, _clock);
         return new BookImportService(_parser, books, _books, _categories, _publishers, _authors,
-            new CreateBookRequestValidator(_clock, Options.Create(new CatalogCoversOptions { BaseUrl = "https://images.example.test/" })));
+            new CreateBookRequestValidator(_clock, Options.Create(new CatalogCoversOptions { BaseUrl = "https://images.example.test/" })),
+            Options.Create(_limits));
     }
 
     private static BookCsvRow Row(int rowNumber, string isbn, string title = "Imported Book", string year = "2020",
@@ -172,16 +174,34 @@ public class BookImportServiceTests
         var empty = await ImportErrors();
         Assert.Equal("The CSV must contain at least one book row.", Assert.Single(empty).Message);
 
-        var tooMany = await ImportErrors(Enumerable.Range(2, BookImportLimits.MaximumRows + 1)
+        var tooMany = await ImportErrors(Enumerable.Range(2, _limits.MaxRows + 1)
             .Select(n => Row(n, "9791000000015")).ToArray());
-        Assert.Equal($"A file may contain at most {BookImportLimits.MaximumRows} book rows.", Assert.Single(tooMany).Message);
+        Assert.Equal("A file may contain at most 500 book rows.", Assert.Single(tooMany).Message);
 
         _parser.Rows = [Row(2, "9791000000015")];
         var callsBefore = _parser.Calls;
         var tooBig = await Assert.ThrowsAsync<DomainException>(() =>
-            Service().ImportAsync(Stream.Null, BookImportLimits.MaximumFileBytes + 1));
+            Service().ImportAsync(Stream.Null, _limits.MaxFileBytes + 1));
         Assert.Equal(CatalogErrors.ImportInvalid, tooBig.Error);
+        Assert.Equal("The file must be 1 MB or smaller.", Assert.Single((IReadOnlyList<BookImportError>)tooBig.Extensions["rows"]!).Message);
         Assert.Equal(callsBefore, _parser.Calls);   // refused before the file is read
+    }
+
+    [Fact]
+    public async Task The_limits_come_from_the_Catalog_Import_settings()
+    {
+        _limits.MaxRows = 2;
+        _limits.MaxFileBytes = 500_000;
+
+        var tooMany = await ImportErrors(Row(2, "9791000000015"), Row(3, "9791000000022"), Row(4, "9791000000039"));
+        var error = Assert.Single(tooMany);
+        Assert.Equal((4, "File", "A file may contain at most 2 book rows."), (error.RowNumber, error.Field, error.Message));
+
+        _parser.Rows = [Row(2, "9791000000015")];
+        var tooBig = await Assert.ThrowsAsync<DomainException>(() => Service().ImportAsync(Stream.Null, 500_001));
+        Assert.Equal("The file must be 500 KB or smaller.",
+            Assert.Single((IReadOnlyList<BookImportError>)tooBig.Extensions["rows"]!).Message);
+        await Service().ImportAsync(Stream.Null, 500_000);   // exactly at the limit is accepted
     }
 
     private sealed class RowsParser : IBookCsvParser
