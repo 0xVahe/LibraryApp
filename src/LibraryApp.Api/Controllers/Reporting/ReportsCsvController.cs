@@ -16,19 +16,16 @@ public sealed partial class ReportsController
         [FromQuery] int? maximumDaysOverdue,
         CancellationToken ct)
     {
-        var rows = new List<OverdueLoanItemDto>();
-        int page = 1;
-        OverdueLoansReportDto report;
-        do
-        {
-            report = await reporting.GetOverdueLoansAsync(
-                departmentId, minimumDaysOverdue, maximumDaysOverdue,
-                new PageRequest(page, PageRequest.MaxPageSize), ct);
-            rows.AddRange(report.Items);
-            page++;
-        } while (rows.Count < report.TotalCount);
+        OverdueLoansReportDto report = await reporting.GetAllOverdueLoansAsync(
+            departmentId, minimumDaysOverdue, maximumDaysOverdue, ct);
 
-        string[] headers = ["AsOfDate", "GeneratedAtUtc", "LoanId", "EmployeeId", "EmployeeName", "Department", "LineManagerEmail", "BookTitle", "DueDate", "WorkingDaysOverdue", "PointsSoFar"];
+        var rows = report.Items;
+
+        string[] headers =
+        [
+            "AsOfDate", "GeneratedAtUtc", "LoanId", "EmployeeId", "EmployeeName", "Department", "LineManagerEmail",
+            "BookTitle", "DueDate", "WorkingDaysOverdue", "PointsSoFar"
+        ];
         var data = rows.Select(item => new string?[]
         {
             report.AsOfDate.ToString("yyyy-MM-dd"), report.GeneratedAtUtc.ToString("O"),
@@ -44,12 +41,21 @@ public sealed partial class ReportsController
     public async Task<IActionResult> ExportDashboard(CancellationToken ct)
     {
         DashboardReportDto r = await reporting.GetDashboardAsync(ct);
-        string[] headers = ["AsOfDate", "GeneratedAtUtc", "TotalBooks", "TotalCopies", "ActiveReaders", "ActiveLoans", "OverdueLoans", "OverduePercentage", "RestrictedEmployees", "SuspendedEmployees"];
-        string?[][] data = [[r.AsOfDate.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"),
-            ReportCsvWriter.Value(r.TotalBooks), ReportCsvWriter.Value(r.TotalCopies),
-            ReportCsvWriter.Value(r.ActiveReaders), ReportCsvWriter.Value(r.ActiveLoans),
-            ReportCsvWriter.Value(r.OverdueLoans), ReportCsvWriter.Value(r.OverduePercentage),
-            ReportCsvWriter.Value(r.RestrictedEmployees), ReportCsvWriter.Value(r.SuspendedEmployees)]];
+        string[] headers =
+        [
+            "AsOfDate", "GeneratedAtUtc", "TotalBooks", "TotalCopies", "ActiveReaders", "ActiveLoans", "OverdueLoans",
+            "OverduePercentage", "RestrictedEmployees", "SuspendedEmployees"
+        ];
+        string?[][] data =
+        [
+            [
+                r.AsOfDate.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"),
+                ReportCsvWriter.Value(r.TotalBooks), ReportCsvWriter.Value(r.TotalCopies),
+                ReportCsvWriter.Value(r.ActiveReaders), ReportCsvWriter.Value(r.ActiveLoans),
+                ReportCsvWriter.Value(r.OverdueLoans), ReportCsvWriter.Value(r.OverduePercentage),
+                ReportCsvWriter.Value(r.RestrictedEmployees), ReportCsvWriter.Value(r.SuspendedEmployees)
+            ]
+        ];
         return Csv("dashboard", headers, data);
     }
 
@@ -60,8 +66,16 @@ public sealed partial class ReportsController
     {
         TopBooksAndCategoriesReportDto r = await reporting.GetTopBooksAndCategoriesAsync(from, to, ct);
         string[] headers = ["PeriodStart", "PeriodEnd", "GeneratedAtUtc", "Type", "Id", "Name", "LoanCount"];
-        var books = r.TopBooks.Select(b => new string?[] { r.PeriodStart.ToString("yyyy-MM-dd"), r.PeriodEnd.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"), "Book", b.BookId.ToString(), b.Title, ReportCsvWriter.Value(b.LoanCount) });
-        var categories = r.TopCategories.Select(c => new string?[] { r.PeriodStart.ToString("yyyy-MM-dd"), r.PeriodEnd.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"), "Category", c.CategoryId.ToString(), c.Name, ReportCsvWriter.Value(c.LoanCount) });
+        var books = r.TopBooks.Select(b => new string?[]
+        {
+            r.PeriodStart.ToString("yyyy-MM-dd"), r.PeriodEnd.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"),
+            "Book", b.BookId.ToString(), b.Title, ReportCsvWriter.Value(b.LoanCount)
+        });
+        var categories = r.TopCategories.Select(c => new string?[]
+        {
+            r.PeriodStart.ToString("yyyy-MM-dd"), r.PeriodEnd.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"),
+            "Category", c.CategoryId.ToString(), c.Name, ReportCsvWriter.Value(c.LoanCount)
+        });
         return Csv("top-books-and-categories", headers, books.Concat(categories));
     }
 
@@ -72,7 +86,11 @@ public sealed partial class ReportsController
         [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken ct)
     {
         ReadingActivityByDepartmentReportDto r = await reporting.GetReadingActivityByDepartmentAsync(from, to, ct);
-        string[] headers = ["PeriodStart", "PeriodEnd", "GeneratedAtUtc", "DepartmentId", "Department", "Employees", "LoanCount", "LoansPer10Employees", "TopCategoryId", "TopCategory", "TopCategoryLoanCount"];
+        string[] headers =
+        [
+            "PeriodStart", "PeriodEnd", "GeneratedAtUtc", "DepartmentId", "Department", "Employees", "LoanCount",
+            "LoansPer10Employees", "TopCategoryId", "TopCategory", "TopCategoryLoanCount"
+        ];
         var data = r.Departments.Select(d => new string?[]
         {
             r.PeriodStart.ToString("yyyy-MM-dd"), r.PeriodEnd.ToString("yyyy-MM-dd"), r.GeneratedAtUtc.ToString("O"),
@@ -83,6 +101,10 @@ public sealed partial class ReportsController
         return Csv("reading-activity-by-department", headers, data);
     }
 
-    private FileContentResult Csv(string name, string[] headers, IEnumerable<string?[]> rows) =>
-        File(ReportCsvWriter.Write(headers, rows), "text/csv; charset=utf-8", $"{name}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv");
+    private FileContentResult Csv(string name, string[] headers, IEnumerable<string?[]> rows)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return File(ReportCsvWriter.Write(headers, rows), "text/csv; charset=utf-8",
+            $"{name}-{clock.UtcNow:yyyyMMdd-HHmmss}.csv");
+    }
 }

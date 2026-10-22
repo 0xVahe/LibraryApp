@@ -1,3 +1,4 @@
+using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Services;
@@ -12,7 +13,7 @@ namespace LibraryApp.Api.Controllers.Reporting;
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-public sealed partial class ReportsController(IReportingService reporting) : ControllerBase
+public sealed partial class ReportsController(IReportingService reporting, IClock clock) : ControllerBase
 {
     [HttpGet("overdue-loans")]
     [ProducesResponseType<OverdueLoansReportDto>(StatusCodes.Status200OK)]

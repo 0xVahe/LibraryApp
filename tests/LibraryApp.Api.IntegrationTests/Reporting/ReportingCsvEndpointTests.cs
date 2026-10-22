@@ -3,6 +3,13 @@ using System.Net.Http.Headers;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Domain.Staff;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http.Json;
+using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Reporting.Dto;
+using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
+using LibraryApp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Api.IntegrationTests.Reporting;
 
@@ -122,10 +129,10 @@ public sealed class ReportingCsvEndpointTests(ApiHostFactory factory)
         using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
 
         using var reportResponse = await client.GetAsync(
-        "/api/reports/overdue-loans?page=1&pageSize=1");
+            "/api/reports/overdue-loans?page=1&pageSize=1");
 
         using var exportResponse = await client.GetAsync(
-        "/api/reports/overdue-loans/export");
+            "/api/reports/overdue-loans/export");
 
         Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, exportResponse.StatusCode);
@@ -134,6 +141,78 @@ public sealed class ReportingCsvEndpointTests(ApiHostFactory factory)
 
         Assert.StartsWith("\"AsOfDate\"", csv.TrimStart('\uFEFF'));
         Assert.Contains("\"LoanId\"", csv);
+    }
+
+    [Fact]
+    public async Task Overdue_loans_export_includes_more_than_100_rows_without_duplicates()
+    {
+        const int count = 101;
+
+        var now = factory.Services.GetRequiredService<IClock>().UtcNow;
+        var staffMemberId = factory.Account(StaffRoles.Librarian).StaffMemberId!.Value;
+
+        var expectedIds = new HashSet<Guid>();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+
+            var book = await db.Books.AsNoTracking().FirstAsync();
+
+            for (int i = 0; i < count; i++)
+            {
+                var copyId = Guid.NewGuid();
+                var loanId = Guid.NewGuid();
+
+                db.BookCopies.Add(new BookCopy(
+                    copyId,
+                    book.Id,
+                    $"CSV-REP08-{i:D3}",
+                    BookCopyCondition.Good,
+                    null));
+
+                db.Loans.Add(Loan.Issue(
+                    loanId,
+                    copyId,
+                    staffMemberId,
+                    now.AddDays(-60),
+                    21));
+
+                expectedIds.Add(loanId);
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
+
+        using var jsonResponse = await client.GetAsync(
+            "/api/reports/overdue-loans?page=1&pageSize=100");
+
+        using var csvResponse = await client.GetAsync(
+            "/api/reports/overdue-loans/export");
+
+        Assert.Equal(HttpStatusCode.OK, jsonResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, csvResponse.StatusCode);
+
+        var report = await jsonResponse.Content.ReadFromJsonAsync<OverdueLoansReportDto>();
+
+        Assert.NotNull(report);
+        Assert.True(report.TotalCount >= count);
+
+        var csv = await csvResponse.Content.ReadAsStringAsync();
+
+        var lines = csv.TrimStart('\uFEFF')
+            .Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal(report.TotalCount + 1, lines.Length);
+
+        var csvIds = lines.Skip(1)
+            .Select(line => Guid.Parse(line.Split(',')[2].Trim('"')))
+            .ToHashSet();
+
+        Assert.Equal(report.TotalCount, csvIds.Count);
+        Assert.True(expectedIds.IsSubsetOf(csvIds));
     }
 
     private HttpClient CreateAuthenticatedClient(string role)

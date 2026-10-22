@@ -23,4 +23,10 @@ public interface IReportingService
         DateOnly from,
         DateOnly to,
         CancellationToken ct = default);
+
+    Task<OverdueLoansReportDto> GetAllOverdueLoansAsync(
+        Guid? departmentId,
+        int? minimumDaysOverdue,
+        int? maximumDaysOverdue,
+        CancellationToken ct = default);
 }

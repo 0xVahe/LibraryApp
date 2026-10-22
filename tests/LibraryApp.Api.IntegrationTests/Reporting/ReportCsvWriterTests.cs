@@ -13,6 +13,12 @@ public sealed class ReportCsvWriterTests
     [InlineData("  =SUM(1,2)", "\"'  =SUM(1,2)\"")]
     [InlineData("@SUM(1,2)", "\"'@SUM(1,2)\"")]
     [InlineData("Line1\nLine2", "\"Line1\nLine2\"")]
+    [InlineData("+123", "\"'+123\"")]
+    [InlineData("-123", "\"'-123\"")]
+    [InlineData("\t=SUM(1,2)", "\"'\t=SUM(1,2)\"")]
+    [InlineData("\r=SUM(1,2)", "\"'\r=SUM(1,2)\"")]
+    [InlineData("Line1\r\nLine2", "\"Line1\r\nLine2\"")]
+    [InlineData("", "\"\"")]
     public void Csv_writer_escapes_values(string input, string expected)
     {
         string csv = WriteCsv(["Value"], [[input]]);
@@ -31,8 +37,7 @@ public sealed class ReportCsvWriterTests
     [Fact]
     public void Csv_writer_rejects_incorrect_column_count()
     {
-        var exception = Assert.Throws<TargetInvocationException>(
-            () => WriteBytes(["First", "Second"], [["Only one"]]));
+        var exception = Assert.Throws<TargetInvocationException>(() => WriteBytes(["First", "Second"], [["Only one"]]));
 
         Assert.IsType<ArgumentException>(exception.InnerException);
     }
@@ -55,5 +60,21 @@ public sealed class ReportCsvWriterTests
             "Write", BindingFlags.Public | BindingFlags.Static)!;
 
         return (byte[])method.Invoke(null, [headers, rows])!;
+    }
+
+    [Fact]
+    public void Csv_writer_handles_null_cells()
+    {
+        string csv = WriteCsv(["First", "Second"], [["Hello", null]]);
+
+        Assert.Equal("\"First\",\"Second\"\r\n\"Hello\",\"\"\r\n", csv);
+    }
+
+    [Fact]
+    public void Csv_writer_handles_empty_reports()
+    {
+        string csv = WriteCsv(["Name", "Count"], []);
+
+        Assert.Equal("\"Name\",\"Count\"\r\n", csv);
     }
 }
