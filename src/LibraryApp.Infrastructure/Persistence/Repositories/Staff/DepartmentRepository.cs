@@ -11,6 +11,14 @@ public sealed class DepartmentRepository(LibraryDbContext db) : IDepartmentRepos
         await db.Departments.AsNoTracking().OrderBy(x => x.Name).ThenBy(x => x.Id)
             .Select(x => new DepartmentDto(x.Id, x.Name)).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<DepartmentSettingsDto>> ListForSettingsAsync(CancellationToken ct) =>
+        await db.Departments.AsNoTracking().OrderBy(x => x.Name).ThenBy(x => x.Id)
+            .Select(x => new DepartmentSettingsDto(
+                x.Id,
+                x.Name,
+                db.StaffMembers.Count(member => member.DepartmentId == x.Id)))
+            .ToListAsync(ct);
+
     public Task<Department?> GetByIdAsync(Guid id, CancellationToken ct) =>
         db.Departments.SingleOrDefaultAsync(x => x.Id == id, ct);
 

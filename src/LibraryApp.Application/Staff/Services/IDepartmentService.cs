@@ -6,6 +6,7 @@ namespace LibraryApp.Application.Staff.Services;
 public interface IDepartmentService
 {
     Task<IReadOnlyList<DepartmentDto>> ListAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<DepartmentSettingsDto>> ListForSettingsAsync(CancellationToken ct = default);
     Task<DepartmentDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<DepartmentDto> CreateAsync(UpsertDepartmentRequest request, CancellationToken ct = default);
     Task<DepartmentDto> UpdateAsync(Guid id, UpsertDepartmentRequest request, CancellationToken ct = default);
