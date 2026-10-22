@@ -53,7 +53,7 @@ public sealed class ReservePanelTestController : Controller
 }
 
 /// <summary>
-/// G3-25: <c>ReservePanel</c> by the UI guide (Part 1 "Group 3", demo <c>book.html</c>) and its form, through the UI
+/// <c>ReservePanel</c> by the UI guide (Part 1 "Group 3", demo <c>book.html</c>) and its form, through the UI
 /// cookie of seeded members (BOR-07, BR-BOR-3). Every test uses its own members and books.
 /// </summary>
 public class ReservePanelPageTests(ReservePanelHost factory) : IClassFixture<ReservePanelHost>
@@ -260,7 +260,7 @@ public class ReservePanelPageTests(ReservePanelHost factory) : IClassFixture<Res
         Assert.DoesNotContain(AllOutText, html);
         Assert.Contains(ReserveButton, html);
 
-        // The API accepts it too (BR-BOR-3 forbids only while a copy is Available); Catalog offers the next copy (BQ-G1-10).
+        // The API accepts it too (BR-BOR-3 forbids only while a copy is Available); Catalog offers the next copy.
         string token = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"").Groups[1].Value;
         var post = new HttpRequestMessage(HttpMethod.Post, "/reservations")
         {

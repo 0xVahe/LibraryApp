@@ -10,7 +10,7 @@ using LibraryApp.Application.Borrowing.Options;
 namespace LibraryApp.Application.Tests.Borrowing;
 
 /// <summary>
-/// The shared penalty component (G3-01; reused by the daily job, lost and waive): records, events and the staff status
+/// The shared penalty component (reused by the daily job, lost and waive): records, events and the staff status
 /// from <see cref="PenaltyPolicy"/>, with default settings (Restricted from 5, Suspended from 10, 30 days).
 /// </summary>
 public sealed class PenaltyServiceTests
@@ -83,7 +83,7 @@ public sealed class PenaltyServiceTests
     }
 
     /// <summary>
-    /// After a suspension has ended the employee is Restricted while the points stay at 10 or more (BQ-BA-01); a new
+    /// After a suspension has ended the employee is Restricted while the points stay at 10 or more; a new
     /// penalty does not suspend again, because this operation does not cross the threshold.
     /// </summary>
     [Fact]
@@ -122,13 +122,32 @@ public sealed class PenaltyServiceTests
     }
 
     [Fact]
-    public async Task Every_record_with_points_publishes_PenaltyApplied_with_the_running_total()
+    public async Task One_operation_publishes_one_PenaltyApplied_with_the_sum_and_the_final_total()
     {
         PriorPoints(1);
 
-        await Apply(2, 3);
+        await Service().ApplyAsync(
+            LoanOfStaff(), [new ReturnPenaltyItem(2, "Returned 2 working days late"), new ReturnPenaltyItem(3, "Returned damaged")], Now);
+        _events.Commit();
 
-        Assert.Equal([3, 6], _events.Published.OfType<PenaltyApplied>().Select(e => e.ActivePointsTotal));
+        PenaltyApplied applied = Assert.Single(_events.Published.OfType<PenaltyApplied>());
+        Assert.Equal(5, applied.Points);
+        Assert.Equal(6, applied.ActivePointsTotal);
+        Assert.Equal("Returned 2 working days late; Returned damaged", applied.Reason);
+        Assert.Equal(Now, applied.OccurredAtUtc);
+        Assert.Equal(2, _penalties.Added.Count);
+    }
+
+    [Fact]
+    public async Task A_zero_point_record_adds_neither_points_nor_its_reason_to_the_event()
+    {
+        await Service().ApplyAsync(
+            LoanOfStaff(), [new ReturnPenaltyItem(0, "Returned late, no working day"), new ReturnPenaltyItem(5, "Returned damaged")], Now);
+        _events.Commit();
+
+        PenaltyApplied applied = Assert.Single(_events.Published.OfType<PenaltyApplied>());
+        Assert.Equal((5, 5, "Returned damaged"), (applied.Points, applied.ActivePointsTotal, applied.Reason));
+        Assert.Equal(2, _penalties.Added.Count);
     }
     
     [Fact]

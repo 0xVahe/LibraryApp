@@ -14,7 +14,7 @@
 
     <partial name="_PickupQueueTable" model="Model" />
 
-    @* Group 4's read-only overdue table (Q-G3-07, option A); the desk works before it is merged. *@
+    @* Group 4's read-only overdue table (agreed with Group 4: the table has no actions); the desk works before it is merged. *@
     @if (ViewComponents.SelectComponent("OverdueTable") is not null)
     {
         @await Component.InvokeAsync("OverdueTable")

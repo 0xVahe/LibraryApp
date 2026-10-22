@@ -15,9 +15,9 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-22: "Declare lost" (BOR-09) by the UI guide (Part 1 <c>DeclareLostButton</c>, demo <c>desk.html</c>,
+/// "Declare lost" (BOR-09) by the UI guide (Part 1 <c>DeclareLostButton</c>, demo <c>desk.html</c>,
 /// <c>staff-member.html</c>) — next to "Take back" on the Loan desk (by copy barcode) and per open loan in
-/// <c>StaffBorrowingSummary</c>. The loan and the copy become Lost and the lost points are added (G3-07). Library staff only.
+/// <c>StaffBorrowingSummary</c>. The loan and the copy become Lost and the lost points are added. Library staff only.
 /// Every test uses its own members and books.
 /// </summary>
 public class DeclareLostPageTests(BorrowingUiHost factory) : IClassFixture<BorrowingUiHost>

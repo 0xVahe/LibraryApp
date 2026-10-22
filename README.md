@@ -2,6 +2,27 @@
 
 ASP.NET Core Web API (.NET 8), EF Core 8, SQL Server.
 
+## Architecture
+
+One layered monolith, one database, one repository. Requests flow top-down; Domain references nothing and only Infrastructure talks to the database or the mail server.
+
+| Project | Holds |
+|---|---|
+| `LibraryApp.Api` | Controllers (`Controllers/<Module>/`), authentication, error handling, Swagger, `Program.cs` |
+| `LibraryApp.Application` | Use cases (`<Module>/Services`), DTOs, validators, options; contracts between modules in `Abstractions/` |
+| `LibraryApp.Domain` | Entities, business rules, domain events |
+| `LibraryApp.Infrastructure` | EF Core (`LibraryDbContext`, configurations, migrations, repositories, seed), mail, event bus, daily jobs |
+
+A module is a vertical slice through the four projects (the same module folder in each). Modules talk only through the interfaces in `Application/Abstractions/<Provider>` and through events (`IEventBus`, transactional outbox); they never write to another module's tables. Swagger (`/swagger`, Development) shows every endpoint under "All modules" and one definition per module in "Select a definition". Traceability of every requirement: [docs/traceability.md](docs/traceability.md).
+
+| Module | Owner | Provides to other modules |
+|---|---|---|
+| Catalog | Group 1 | `ICatalogService` |
+| Staff Members | Group 2 | `IStaffMemberService`, login and roles |
+| Borrowing & Return | Group 3 | `IBorrowingReadService`, `ILoanQueryService`, `IReservationQueueService`; loan, reservation and penalty events |
+| Notifications & Reporting | Group 4 | No interface; consumes the INT-07 events. Endpoints `/api/notifications` (in-app), `/api/reports` |
+| Platform | Integration Owner | `IEventBus`, `IUnitOfWork`, `IClock`, `IWorkingDayCalendar`, `IApplicationLock`, `IDailyJob`, error handling, audit log, migrations, CI |
+
 ## Run it
 
 Requirements: Docker Desktop (running).
@@ -182,6 +203,46 @@ Databases left by an interrupted run (for example after stopping the test proces
 ### Writing tests that need a database
 
 Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
+
+## Performance benchmark
+
+NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,000 loans." `benchmark/LibraryApp.Benchmark` is a console application, not a test, and not part of `LibraryApp.sln`: the solution build, `dotnet test`, CI and the Docker image do not build it. A change in `src/` can therefore break it unnoticed; before a measurement, `dotnet build benchmark/LibraryApp.Benchmark -c Release` shows whether it still compiles. It times the running API over HTTP (Kestrel, authentication, database and serialization included) and writes a report to `docs/performance/`.
+
+| Command | What it does |
+|---|---|
+| `seed [--total 10000]` | Adds synthetic returned loans (built by `Loan.Issue` and `Loan.Return`, spread over the last year in the free time of each copy, so they never overlap another loan of the same copy, the loans already in the database included) until the database holds the target number of loans. A second run adds nothing. No audit rows and no events are written. At the end it counts in the database the added loans that overlap another loan of their copy; exit code 1 when there is one. |
+| `clean` | Removes the loans added by `seed` (their ids start with `be7c0000-0000-0000-0000-`). |
+| `run [--base-url http://localhost:5055] [--iterations 50] [--warmup 5]` | Signs in with the seeded accounts (Administrator, Librarian, Staff Member), calls 17 read endpoints of every module, the three reports included, one at a time, and writes the report. Exit code 0: every endpoint within its limit; 1: a limit exceeded or a call failed; 2: the run could not be done. |
+
+The database is the one of `ConnectionStrings__LibraryDb` (environment or `.env`), or `--connection`. Only a local SQL Server and a local API are accepted unless `--allow-remote` is given. The seeded password of the test accounts is used unless `--password` or `LIBRARYAPP_BENCHMARK_PASSWORD` is set.
+
+A run on a separate database keeps the development data unchanged:
+
+```bash
+docker compose up -d sqlserver
+```
+```bash
+export ConnectionStrings__LibraryDb="Server=localhost,1433;Database=LibraryApp_Benchmark;User Id=sa;Password=<MSSQL_SA_PASSWORD>;TrustServerCertificate=True"
+```
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/LibraryApp.Api -c Release --no-launch-profile --urls http://localhost:5155
+```
+In a second terminal with the same `ConnectionStrings__LibraryDb`, once `http://localhost:5155/health/ready` answers 200 (the API has created and seeded the database):
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- seed
+```
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- run --base-url http://localhost:5155
+```
+
+**The report.** File name: `yyyy-MM-dd[_tag]_<commit>[-dirty].md` (Asia/Yerevan date; `-dirty` when the working tree has uncommitted changes, so the measured code is not exactly the commit). It holds the result per endpoint (min, p50, p95, max, mean, the first call before warm-up, errors), the manifest (commit, tag, branch, API address, OS, CPU, memory, .NET, SQL Server version, row counts of the database) and every measured time. An endpoint passes when every call succeeded and its 95th percentile is within its limit. The dashboard report is cached by the application (`Reporting:DashboardCacheMinutes`): its measured calls are cache hits, and its first call shows the uncached time.
+
+**For comparable numbers:**
+- run the API in Release (`-c Release`), with no debugger attached, and wait until `/health/ready` answers;
+- keep the machine otherwise idle: no build, test run, IDE indexing or second API instance at the same time; on a laptop, connect the power supply;
+- commit first, so the report names exactly the measured code (no `-dirty`);
+- compare only reports made on the same machine: the manifest records which one; numbers of a GitHub runner or another computer are not comparable;
+- one report is one sample: when a result is close to a limit, repeat the run.
 
 ## Demo data
 

@@ -21,7 +21,8 @@ public sealed class ReturnPenaltyCalculator(
     /// </param>
     /// <remarks>
     /// A late return always creates a penalty record, also with 0 overdue working days (requirements, section 8: "a return
-    /// from Overdue always creates a PenaltyRecord"; BQ-BA-03) — a 0-point record publishes no PenaltyApplied.
+    /// from Overdue always creates a PenaltyRecord") — a return whose records have 0 points publishes no
+    /// PenaltyApplied.
     /// </remarks>
     public ReturnPenaltyCalculation Calculate(
         DateTime dueAtUtc,

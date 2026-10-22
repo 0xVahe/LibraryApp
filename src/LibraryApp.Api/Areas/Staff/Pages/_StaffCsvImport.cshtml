@@ -9,15 +9,25 @@
         <div class="card-head"><h2 id="import-title">Import from CSV</h2></div>
         <p class="small">Use UTF-8 CSV with department and category names. Up to @StaffSettings.Value.Import.MaxRows data rows, @(StaffFileSizeFormatter.Format(StaffSettings.Value.Import.MaxFileBytes)).</p>
         <p class="hint">All rows are imported together. If any row is invalid, nothing is imported.</p>
-        <form class="form mt-24" method="post" asp-page="./Import" enctype="multipart/form-data" novalidate>
-            <div class="drop">
+        <form class="form mt-24 staff-csv-import" method="post" asp-page="./Import" enctype="multipart/form-data" novalidate data-staff-csv-import>
+            <div class="drop" data-import-file>
                 <label for="csv-file">Choose a CSV file</label>
                 <input id="csv-file" name="CsvFile" type="file" accept=".csv,text/csv"
                        aria-invalid="@(fileInvalid ? "true" : null)" aria-describedby="csv-hint">
                 <span class="hint" id="csv-hint">EmployeeId, FirstName, LastName, CorporateEmail, Department, Position, LineManagerEmail, Category; Role is optional.</span>
             </div>
-            <button class="btn btn-primary" type="submit">Import</button>
-            <a class="link-btn small" asp-page="./Import" asp-page-handler="Template">Download the template</a>
+            <div>
+                <button class="btn btn-primary btn-block" type="submit">
+                    <span class="staff-import-spinner" aria-hidden="true" hidden></span>
+                    <span data-import-label>Import</span>
+                </button>
+                <p class="hint mt-8" role="status" aria-atomic="true" data-import-status></p>
+            </div>
+            <a class="link-btn small" asp-page="./Import" asp-page-handler="Template" data-import-template>Download the template</a>
+            <div hidden data-import-recovery>
+                <p class="small">If the import appears stuck, you can reload this form. An interrupted request may still complete on the server; its outcome is unknown. Check Staff members before importing again.</p>
+                <a class="btn btn-secondary mt-8" asp-page="./Import">Reload import form</a>
+            </div>
         </form>
     </section>
     @if (Model.Count > 0)
@@ -45,3 +55,4 @@
         </section>
     }
 </div>
+<script src="~/js/staff-csv-import.js" asp-append-version="true" defer></script>

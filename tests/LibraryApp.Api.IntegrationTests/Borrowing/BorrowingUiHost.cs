@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// The host for the Borrowing pages and blocks (G3-19): the Catalog and Staff seed without the Borrowing seed (the tests
+/// The host for the Borrowing pages and blocks: the Catalog and Staff seed without the Borrowing seed (the tests
 /// own every loan, reservation and penalty), plus a test controller that renders the blocks the way Group 2's My library
 /// page will.
 /// </summary>

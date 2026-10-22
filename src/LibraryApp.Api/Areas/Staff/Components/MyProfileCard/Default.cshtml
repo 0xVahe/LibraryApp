@@ -1,0 +1,22 @@
+@model LibraryApp.Application.Staff.Dto.MyProfileDto
+@{
+    var initials = string.Concat(Model.FirstName.Take(1).Concat(Model.LastName.Take(1))).ToUpperInvariant();
+}
+<section class="card" aria-labelledby="my-profile-title">
+    <div class="card-head">
+        <h2 class="visually-hidden" id="my-profile-title">My profile</h2>
+        <div class="row">
+            <span class="avatar lg" aria-hidden="true">@initials</span>
+            <div class="text-wrap">
+                <p class="ink"><strong>@Model.FirstName @Model.LastName</strong></p>
+                <p class="small muted">@Model.Position</p>
+            </div>
+        </div>
+    </div>
+    <dl class="dl">
+        <dt>Corporate email</dt><dd class="text-wrap">@Model.CorporateEmail</dd>
+        <dt>Department</dt><dd class="text-wrap">@Model.DepartmentName</dd>
+        <dt>Category</dt><dd class="text-wrap">@Model.StaffCategoryName</dd>
+    </dl>
+    <p class="mt-16"><a class="link-btn" href="@UiNavigation.Profile">Edit profile and password</a></p>
+</section>

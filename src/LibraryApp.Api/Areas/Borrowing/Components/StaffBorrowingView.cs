@@ -33,7 +33,7 @@ public sealed record BorrowedBook(Guid BookId, string Title, string? Authors, Bo
 
 /// <summary>
 /// An open loan. <c>Due</c> is the local (Asia/Yerevan) date; <c>IsOverdue</c>: marked Overdue, or past the overdue rule
-/// before the daily job marked it (BQ-BA-05); <c>OverdueWorkingDays</c>: working days since the due date (BOR-05), 0 when
+/// before the daily job marked it; <c>OverdueWorkingDays</c>: working days since the due date (BOR-05), 0 when
 /// not overdue; <c>DaysLeft</c>: calendar days until the due date, negative when it has passed.
 /// </summary>
 public sealed record LoanLine(

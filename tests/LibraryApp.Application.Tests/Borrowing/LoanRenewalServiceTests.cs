@@ -14,7 +14,7 @@ using LibraryApp.Domain.Staff;
 
 namespace LibraryApp.Application.Tests.Borrowing;
 
-/// <summary>G3-03: BR-BOR-1 refusals one by one and in their order, the renewal itself, NFR-03 and the locks.</summary>
+/// <summary>BR-BOR-1 refusals one by one and in their order, the renewal itself, NFR-03 and the locks.</summary>
 public sealed class LoanRenewalServiceTests
 {
     // 20 October at 12:00 in Yerevan.

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
-/// <summary>The real host reads the Borrowing rule values from appsettings.json (SD-21) and they pass the start check.</summary>
+/// <summary>The real host reads the Borrowing rule values from appsettings.json and they pass the start check.</summary>
 public class BorrowingSettingsTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
     [Fact]

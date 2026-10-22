@@ -11,7 +11,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-24: the Loan history page <c>/staff/{id}/loans</c> by the UI guide (Part 2 "Loan history", demo <c>staff-loans.html</c>):
+/// The Loan history page <c>/staff/{id}/loans</c> by the UI guide (Part 2 "Loan history", demo <c>staff-loans.html</c>):
 /// every loan of the member, also Returned and Lost (BOR-10), filters status and issued from/to, the points of each loan,
 /// the shared pager; library staff only. Every test uses its own members.
 /// </summary>

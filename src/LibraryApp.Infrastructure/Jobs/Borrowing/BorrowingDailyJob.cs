@@ -11,7 +11,7 @@ namespace LibraryApp.Infrastructure.Jobs.Borrowing;
 /// <summary>
 /// Daily Borrowing maintenance:
 /// marks overdue loans, expires held reservations and penalties, recalculates staff standing, and cancels reservations
-/// that can never be served: those of a deleted book and those of a deactivated member (G3-26).
+/// that can never be served: those of a deleted book and those of a deactivated member.
 /// Scheduling and run tracking belong to the shared daily-job runner.
 /// </summary>
 public sealed class BorrowingDailyJob(
@@ -204,7 +204,7 @@ public sealed class BorrowingDailyJob(
             }
         }
 
-        // G3-26, after the pickup expiry: a book deleted in Catalog (BQ-G1-09) can never serve its queue.
+        // After the pickup expiry: a book deleted in Catalog can never serve its queue.
         foreach (Guid bookId in queuedBookIds)
         {
             ct.ThrowIfCancellationRequested();
@@ -246,7 +246,7 @@ public sealed class BorrowingDailyJob(
             }
         }
 
-        // G3-26: a deactivated member never collects a copy; their place and any held copy go to the others.
+        // A deactivated member never collects a copy; their place and any held copy go to the others.
         foreach (Guid staffMemberId in reservingStaffIds)
         {
             ct.ThrowIfCancellationRequested();

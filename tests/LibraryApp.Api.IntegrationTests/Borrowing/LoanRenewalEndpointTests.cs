@@ -19,7 +19,7 @@ using Members = LibraryApp.Infrastructure.Persistence.Seed.Staff.StaffSeedIds.St
 namespace LibraryApp.Api.IntegrationTests.Borrowing;
 
 /// <summary>
-/// G3-03 (BOR-04, BR-BOR-1, NFR-03) through HTTP on SQL Server: who may renew, every refusal with its own code, the new
+/// BOR-04, BR-BOR-1, NFR-03 through HTTP on SQL Server: who may renew, every refusal with its own code, the new
 /// due date by the category's loan days and <c>LoanRenewed</c> in the outbox. The host has no Borrowing seed, and every
 /// test uses its own book, so the tests of the class do not share loans or queues.
 /// </summary>
@@ -99,7 +99,7 @@ public class LoanRenewalEndpointTests(BorrowingDailyJobHost factory) : IClassFix
     [InlineData(27, "suspended")]
     public async Task A_restricted_or_suspended_member_cannot_renew(int book, string state)
     {
-        // Gor Mkrtchyan is seeded Restricted, Sona Vardanyan Suspended (BR-MEM-3; BQ-BA-11, SuspendedMayRenew = false).
+        // Gor Mkrtchyan is seeded Restricted, Sona Vardanyan Suspended (BR-MEM-3; SuspendedMayRenew = false).
         Guid member = state == "restricted" ? Members.GorMkrtchyan : Members.SonaVardanyan;
         Loan loan = await SeedLoanAsync(book, member);
 
