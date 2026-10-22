@@ -33,6 +33,23 @@ public class SmtpOutlookNotificationSenderTests
     }
 
     [Fact]
+    public async Task Sends_the_calendar_item_as_an_attachment()
+    {
+        await using var server = FakeSmtpServer.Start();
+        var message = Message with
+        {
+            Attachments = [new OutlookAttachment("due-date.ics", "text/calendar; method=PUBLISH; charset=utf-8", "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n")],
+        };
+
+        await Sender(server.Port).SendAsync(message);
+
+        var data = await server.ReceivedData;
+        Assert.Contains("multipart/mixed", data);
+        Assert.Contains("Content-Type: text/calendar", data);
+        Assert.Contains("due-date.ics", data);
+    }
+
+    [Fact]
     public async Task Failed_quit_still_counts_as_sent()
     {
         await using var server = FakeSmtpServer.Start(failQuit: true);

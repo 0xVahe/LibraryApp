@@ -44,6 +44,24 @@ public sealed class LoanIssuedEventHandlerTests
     }
 
     [Fact]
+    public async Task Both_outlook_emails_carry_the_calendar_item_of_the_due_date_with_the_loan_uid()
+    {
+        var fixture = new Fixture();
+        // 21:00 UTC on 12 Oct is 01:00 on 13 Oct in Yerevan: the event is on the local date.
+        var domainEvent = fixture.Event(dueAtUtc: new DateTime(2026, 10, 12, 21, 0, 0, DateTimeKind.Utc));
+
+        await fixture.Handler.HandleAsync(domainEvent, CancellationToken.None);
+
+        Assert.All(fixture.Creator.Calls, call => Assert.False(string.IsNullOrEmpty(call.CalendarItem)));
+        Assert.Equal(fixture.Creator.Calls[0].CalendarItem, fixture.Creator.Calls[1].CalendarItem);   // one event, same file
+        var ics = fixture.Creator.Calls[0].CalendarItem!.Split("\r\n");
+        Assert.Contains($"UID:loan-{domainEvent.LoanId:D}@library.ameriabank", ics);
+        Assert.Contains("DTSTART;VALUE=DATE:20261013", ics);
+        Assert.Contains("SEQUENCE:0", ics);
+        Assert.Contains("SUMMARY:Return \"Clean Code\" to the library", ics);
+    }
+
+    [Fact]
     public async Task Unknown_book_is_reported_and_nothing_is_created()
     {
         var fixture = new Fixture();
@@ -87,7 +105,8 @@ public sealed class LoanIssuedEventHandlerTests
         Guid EventId,
         IReadOnlyCollection<NotificationChannel> Channels,
         IReadOnlyDictionary<string, string> Values,
-        Guid? LoanId);
+        Guid? LoanId,
+        string? CalendarItem);
 
     private sealed class RecordingCreator : INotificationCreator
     {
@@ -95,9 +114,9 @@ public sealed class LoanIssuedEventHandlerTests
 
         public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
             IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values,
-            Guid? loanId = null, bool ccLineManager = false, CancellationToken ct = default)
+            Guid? loanId = null, bool ccLineManager = false, string? calendarItem = null, CancellationToken ct = default)
         {
-            Calls.Add(new CreatorCall(type, staffMemberId, eventId, channels, values, loanId));
+            Calls.Add(new CreatorCall(type, staffMemberId, eventId, channels, values, loanId, calendarItem));
             return Task.CompletedTask;
         }
     }
