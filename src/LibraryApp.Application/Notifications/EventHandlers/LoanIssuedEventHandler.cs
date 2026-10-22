@@ -9,8 +9,8 @@ using LibraryApp.Domain.Notifications;
 namespace LibraryApp.Application.Notifications.EventHandlers;
 
 /// <summary>
-/// Creates the LoanConfirmation and the DueDateCalendarItem notifications when a loan is issued (NOT-01). The .ics file
-/// itself (NOT-07) is not attached here: emails cannot carry attachments yet.
+/// Creates the LoanConfirmation and the DueDateCalendarItem notifications when a loan is issued (NOT-01). Both Outlook
+/// emails carry the calendar item of the due date (.ics, NOT-07); it has the UID of the loan, so a renewal updates it.
 /// </summary>
 public sealed class LoanIssuedEventHandler(
     INotificationCreator creator,
@@ -39,12 +39,15 @@ public sealed class LoanIssuedEventHandler(
 
         // One event, two types: the unique index (EventId, Type, Channel) allows it, and both are stored in the same
         // transaction, so a repeated event creates each of them at most once.
+        string calendarItem = CalendarItemBuilder.Build(
+            domainEvent.LoanId, book.Title, clock.ToLocalDate(domainEvent.DueAtUtc), sequence: 0, clock.UtcNow);
+
         await creator.CreateAsync(
             NotificationType.LoanConfirmation, domainEvent.StaffMemberId, domainEvent.EventId, ConfirmationChannels, values,
-            domainEvent.LoanId, ct: ct);
+            domainEvent.LoanId, calendarItem: calendarItem, ct: ct);
 
         await creator.CreateAsync(
             NotificationType.DueDateCalendarItem, domainEvent.StaffMemberId, domainEvent.EventId, CalendarChannels, values,
-            domainEvent.LoanId, ct: ct);
+            domainEvent.LoanId, calendarItem: calendarItem, ct: ct);
     }
 }

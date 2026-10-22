@@ -139,6 +139,19 @@ public sealed class StaffEnrolledEventHandlerTests
     }
 
     [Fact]
+    public async Task The_calendar_item_is_stored_on_the_outlook_row_only()
+    {
+        var fixture = new Fixture();
+        var both = new[] { NotificationChannel.Outlook, NotificationChannel.InApp };
+
+        await fixture.Creator.CreateAsync(NotificationType.Welcome, StaffId, Guid.NewGuid(), both,
+            new Dictionary<string, string>(), calendarItem: "BEGIN:VCALENDAR");
+
+        Assert.Equal("BEGIN:VCALENDAR", fixture.Notifications.Items.Single(n => n.Channel == NotificationChannel.Outlook).CalendarItem);
+        Assert.Null(fixture.Notifications.Items.Single(n => n.Channel == NotificationChannel.InApp).CalendarItem);
+    }
+
+    [Fact]
     public async Task A_different_event_for_the_same_member_creates_its_own_notifications()
     {
         var fixture = new Fixture();
@@ -247,6 +260,12 @@ public sealed class StaffEnrolledEventHandlerTests
 
     private sealed class FakeTemplates(Fixture fixture) : INotificationTemplateRepository
     {
+        public Task<IReadOnlyList<NotificationTemplate>> ListAsync(NotificationType? type, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<NotificationTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
+        public void Add(NotificationTemplate template) => throw new NotSupportedException();
+        public void Remove(NotificationTemplate template) => throw new NotSupportedException();
+        public Task DeactivateOthersAsync(NotificationType type, Guid exceptId, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<NotificationTemplate?> FindActiveAsync(NotificationType type, CancellationToken ct = default) =>
             Task.FromResult(type == NotificationType.Welcome ? fixture.Template : null);
     }

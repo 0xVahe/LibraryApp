@@ -6,6 +6,7 @@ using LibraryApp.Infrastructure.Persistence;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 
 namespace LibraryApp.Infrastructure.Identity;
 
@@ -30,7 +31,7 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
     {
         RequireTransaction(ct);
         var user = new AppUser { Id = userId, Email = email, UserName = email };
-        Ensure(await users.CreateAsync(user, password));
+        await EnsureUniqueAsync(() => users.CreateAsync(user, password));
         Ensure(await users.AddToRoleAsync(user, role));
         if (requirePasswordChange)
             Ensure(await users.AddClaimAsync(user,
@@ -47,7 +48,7 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
         user.EmailConfirmed = false;
         user.SecurityStamp = Guid.NewGuid().ToString();
         // The email, normalized fields and stamp are persisted together in the caller's transaction.
-        Ensure(await users.UpdateAsync(user));
+        await EnsureUniqueAsync(() => users.UpdateAsync(user));
     }
 
     public Task<string> GetRoleAsync(Guid userId, CancellationToken ct) =>
@@ -71,6 +72,22 @@ public sealed class StaffAccountStore(UserManager<AppUser> users, LibraryDbConte
             throw new InvalidOperationException("Account writes must run inside the staff management transaction.");
     }
 
+    // Two requests can both pass the email check; the unique UserNameIndex and EmailIndex then refuse the second
+    // write when Identity saves. Both indexes hold the email, so any unique violation here means the email is taken.
+    private static async Task EnsureUniqueAsync(Func<Task<IdentityResult>> write)
+    {
+        IdentityResult result;
+        try
+        {
+            result = await write();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+        {
+            throw new DomainException(StaffErrors.EmailTaken, ex);
+        }
+        Ensure(result);
+    }
+    
     private static void Ensure(IdentityResult result)
     {
         if (result.Succeeded)

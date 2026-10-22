@@ -29,4 +29,10 @@ public interface IReportingService
         int? minimumDaysOverdue,
         int? maximumDaysOverdue,
         CancellationToken ct = default);
+
+    Task<InventoryStatusReportDto> GetInventoryStatusAsync(
+        Guid? categoryId,
+        CancellationToken ct = default);
+
+    Task<PurchaseCandidatesReportDto> GetPurchaseCandidatesAsync(CancellationToken ct = default);
 }

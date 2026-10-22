@@ -463,6 +463,10 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasMaxLength(-1)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CalendarItem")
+                        .HasMaxLength(-1)
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CcEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -848,7 +852,9 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
+                        .IsUnique()
+                        .HasDatabaseName("EmailIndex")
+                        .HasFilter("[NormalizedEmail] IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
