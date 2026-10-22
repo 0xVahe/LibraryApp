@@ -1,12 +1,15 @@
 using System.Text;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Formatting;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Staff;
 
 /// <summary>RFC 4180-style CSV reader for the HR staff import format.</summary>
-public sealed class StaffCsvParser : IStaffCsvParser
+public sealed class StaffCsvParser(IOptions<StaffOptions> options) : IStaffCsvParser
 {
     private static readonly string[] RequiredHeaders =
     [
@@ -17,7 +20,19 @@ public sealed class StaffCsvParser : IStaffCsvParser
     public async Task<IReadOnlyList<StaffImportCsvRow>> ParseAsync(Stream csv, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(csv);
-        using var reader = new StreamReader(csv, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true,
+        var limits = options.Value.Import;
+        // Count bytes as they arrive: non-seekable streams must obey the same file-size rule.
+        using var contentBuffer = new MemoryStream();
+        var buffer = new byte[8192];
+        int read;
+        while ((read = await csv.ReadAsync(buffer.AsMemory(), ct)) != 0)
+        {
+            if (contentBuffer.Length + read > limits.MaxFileBytes)
+                throw new StaffCsvFormatException(1, "File", $"The file must be {StaffFileSizeFormatter.Format(limits.MaxFileBytes)} or smaller.");
+            await contentBuffer.WriteAsync(buffer.AsMemory(0, read), ct);
+        }
+        contentBuffer.Position = 0;
+        using var reader = new StreamReader(contentBuffer, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true,
             bufferSize: 1024, leaveOpen: true);
         string content;
         try
@@ -64,9 +79,9 @@ public sealed class StaffCsvParser : IStaffCsvParser
             result.Add(new StaffImportCsvRow(record.RowNumber, Value("EmployeeId"), Value("FirstName"),
                 Value("LastName"), Value("CorporateEmail"), Value("Department"), Value("Position"),
                 NullIfEmpty(Value("LineManagerEmail")), Value("Category"), NullIfEmpty(Value("Role"))));
-            if (result.Count > StaffImportLimits.MaximumRows)
+            if (result.Count > limits.MaxRows)
                 throw new StaffCsvFormatException(record.RowNumber, "File",
-                    $"A file may contain at most {StaffImportLimits.MaximumRows} data rows.");
+                    $"A file may contain at most {limits.MaxRows} data rows.");
         }
 
         return result;

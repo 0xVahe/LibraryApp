@@ -67,6 +67,18 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Staff (`Staff`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Import:MaxRows` | 200 | Maximum non-empty staff data rows, excluding the CSV header; positive integer | MEM-09 |
+| `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (in-memory parser bound) | MEM-09 |
+| `RestrictedLimits:MaxLoans` | 1 | Loan limit for Restricted members; positive integer | BR-MEM-3 |
+
+All three values are required. Missing or invalid settings prevent startup. Restricted members cannot renew (BR-MEM-3, BR-BOR-1); their renewal limit is fixed at `0` in code, not configured. Staff-category limits remain in the administrator-managed database.
+
+CSV file limits are enforced in bytes and displayed as readable decimal sizes (for example, `1000000` as `1 MB` and `500000` as `500 KB`). HTTP request and multipart limits include an additional 100000 bytes for the multipart envelope. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit.
+
 ### Access tokens (`Jwt`)
 
 | Key | Value | Meaning | Requirement |
