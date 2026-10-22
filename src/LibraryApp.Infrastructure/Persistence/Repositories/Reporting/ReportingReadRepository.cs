@@ -126,6 +126,25 @@ public sealed class ReportingReadRepository(
                 grouped.Key.DepartmentId, grouped.Key.CategoryId, grouped.Key.Name, grouped.Count()))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        DateTime nowUtc,
+        CancellationToken ct = default) => await (
+            from penalty in db.PenaltyRecords.AsNoTracking()
+            where penalty.CreatedAtUtc >= fromUtc && penalty.CreatedAtUtc <= toUtc
+            join staff in db.StaffMembers.AsNoTracking() on penalty.StaffMemberId equals staff.Id
+            group penalty by staff.DepartmentId into grouped
+            select new DepartmentPenaltiesData(
+                grouped.Key,
+                grouped.Count(),
+                grouped.Sum(penalty => penalty.Points),
+                grouped.Sum(penalty => penalty.Status == PenaltyRecordStatus.Waived ? penalty.Points : 0),
+                grouped.Sum(penalty => penalty.Status == PenaltyRecordStatus.Active && penalty.ExpiresAtUtc > nowUtc
+                    ? penalty.Points
+                    : 0)))
+            .ToListAsync(ct);
+
     public Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default) =>
         db.Categories.AsNoTracking()
             .Where(category => category.Id == categoryId)

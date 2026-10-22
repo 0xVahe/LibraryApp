@@ -11,6 +11,7 @@ public interface IReportingReadRepository
     Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<IReadOnlyList<DepartmentEmployeesData>> GetDepartmentEmployeesAsync(CancellationToken ct = default);
     Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+    Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(DateTime fromUtc, DateTime toUtc, DateTime nowUtc, CancellationToken ct = default);
     Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default);
     Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default);
     Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default);
@@ -24,6 +25,10 @@ public sealed record DepartmentEmployeesData(Guid DepartmentId, string Departmen
 
 /// <summary>REP-04: loans issued in the period, counted per department of the borrower and book category.</summary>
 public sealed record DepartmentCategoryLoansData(Guid DepartmentId, Guid CategoryId, string Category, int LoanCount);
+
+/// <summary>REP-06: penalty records created in the period, summed per department of the employee.</summary>
+public sealed record DepartmentPenaltiesData(
+    Guid DepartmentId, int Penalties, int IssuedPoints, int WaivedPoints, int ActivePoints);
 
 public sealed record OverdueLoanData(
     Guid LoanId,
