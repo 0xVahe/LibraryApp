@@ -9,6 +9,7 @@ using LibraryApp.Infrastructure.Identity;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
@@ -286,5 +287,17 @@ public class AuthEndpointTests(AuthFactory factory) : IClassFixture<AuthFactory>
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType!.MediaType);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(StaffErrors.InvalidCredentials.Code, body.GetProperty("code").GetString());
+    }
+    
+    [Fact]
+    public async Task Login_token_carries_the_member_name()
+    {
+        using var response = await Login("anna.petrosyan@ameriabank.am", StaffSeedData.Password);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var login = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(login);
+        Assert.Equal("Anna Petrosyan",
+            new JsonWebToken(login.AccessToken).GetClaim(JwtRegisteredClaimNames.Name).Value);
     }
 }

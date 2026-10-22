@@ -41,7 +41,7 @@ public static class UiAuthentication
         services.AddOptions<CookieAuthenticationOptions>(CookieScheme)
             .Configure<IOptions<JwtOptions>>((cookie, jwt) => cookie.ExpireTimeSpan = TimeSpan.FromMinutes(jwt.Value.AccessTokenMinutes));
 
-        // After every module: AddLibraryJwtAuthentication made the JWT the default scheme; the selector replaces it.
+        // After every module: the selector is the default scheme (JWT for /api, cookie for pages).
         services.PostConfigure<AuthenticationOptions>(options =>
         {
             options.DefaultScheme = SelectorScheme;

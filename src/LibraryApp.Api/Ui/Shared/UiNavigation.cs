@@ -56,8 +56,8 @@ public static class UiNavigation
     public static string Email(ClaimsPrincipal user) => user.FindFirst(JwtRegisteredClaimNames.Email)?.Value ?? "";
 
     /// <summary>
-    /// The name in the user chip: the <c>name</c> claim when the access token carries one; until then the corporate
-    /// email's name.surname part ("anna.petrosyan@…" → "Anna Petrosyan").
+    /// The name in the user chip: the <c>name</c> claim of the access token ("First Last"); for an account without
+    /// one, the corporate email's name.surname part ("anna.petrosyan@…" → "Anna Petrosyan").
     /// </summary>
     public static string DisplayName(ClaimsPrincipal user) =>
         user.FindFirst(JwtRegisteredClaimNames.Name)?.Value is { Length: > 0 } name
