@@ -1,0 +1,27 @@
+@model IReadOnlyList<LibraryApp.Application.Notifications.Dto.NotificationDto>
+@* "Latest notifications" (Group 4) on My library; "View all" opens the Notifications page. *@
+<section class="card" aria-labelledby="latest-notifications-title">
+    <div class="card-head">
+        <div><h2 id="latest-notifications-title">Notifications</h2><p class="small muted">The latest, unread first.</p></div>
+        <a class="btn btn-secondary btn-sm" href="@UiNavigation.Notifications">View all</a>
+    </div>
+    @if (Model.Count == 0)
+    {
+        <p class="muted">No notifications yet.</p>
+    }
+    else
+    {
+        <ul class="list">
+            @foreach (var notification in Model)
+            {
+                <li>
+                    <span class="@(notification.IsRead ? "read" : "unread")" aria-hidden="true"></span>
+                    <div class="grow">
+                        <span class="title">@if (!notification.IsRead) {<span class="visually-hidden">Unread: </span>}@notification.Subject</span>
+                        <p class="small muted"><partial name="/Areas/Notifications/Pages/_NotificationDate.cshtml" model="notification.CreatedAtUtc" /></p>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</section>
