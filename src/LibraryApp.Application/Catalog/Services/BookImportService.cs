@@ -1,9 +1,11 @@
 using System.Globalization;
 using FluentValidation;
 using LibraryApp.Application.Catalog.Dto;
+using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Catalog.Services;
 
@@ -12,7 +14,8 @@ namespace LibraryApp.Application.Catalog.Services;
 /// rules of a single book (<see cref="CreateBookRequestValidator"/>); category, publisher and author names must
 /// match exactly one existing item (nothing is created silently); ISBNs must be unique in the file and in the
 /// catalog (BR-CAT-1); the language must be one of <see cref="CatalogLanguages"/>. The optional cover path is
-/// checked by the same validator as on the book form.
+/// checked by the same validator as on the book form. The file size and the number of rows are limited by the
+/// <c>Catalog:Import</c> settings (<see cref="CatalogImportOptions"/>).
 /// </summary>
 public sealed class BookImportService(
     IBookCsvParser parser,
@@ -21,7 +24,8 @@ public sealed class BookImportService(
     ICategoryRepository categories,
     IPublisherRepository publishers,
     IAuthorRepository authors,
-    IValidator<CreateBookRequest> validator) : IBookImportService
+    IValidator<CreateBookRequest> validator,
+    IOptions<CatalogImportOptions> importOptions) : IBookImportService
 {
     /// <summary>Separates several authors in the Authors column.</summary>
     public const char AuthorSeparator = ';';
@@ -30,17 +34,18 @@ public sealed class BookImportService(
     {
         ArgumentNullException.ThrowIfNull(csv);
 
-        if (length > BookImportLimits.MaximumFileBytes)
-            throw BookImportFailure.For(1, "File", "The file must be 1 MB or smaller.");
+        var limits = importOptions.Value;
+        if (length > limits.MaxFileBytes)
+            throw BookImportFailure.For(1, "File", $"The file must be {limits.MaxFileSize} or smaller.");
 
         var rows = await parser.ParseAsync(csv, ct);
 
         if (rows.Count == 0)
             throw BookImportFailure.For(2, "File", "The CSV must contain at least one book row.");
 
-        if (rows.Count > BookImportLimits.MaximumRows)
-            throw BookImportFailure.For(rows[BookImportLimits.MaximumRows].RowNumber, "File",
-                $"A file may contain at most {BookImportLimits.MaximumRows} book rows.");
+        if (rows.Count > limits.MaxRows)
+            throw BookImportFailure.For(rows[limits.MaxRows].RowNumber, "File",
+                $"A file may contain at most {limits.MaxRows} book rows.");
 
         // Names → IDs: one query per list, not one per row.
         var categoryIdsByName = GroupIdsByName(await categories.ListAsync(ct), x => x.Name, x => x.Id);
