@@ -27,6 +27,11 @@ public static class NotificationsRegistrationExtensions
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<INotificationService, NotificationService>();
 
+        // Creating notifications from events (NOT-01, NOT-02): handlers call INotificationCreator
+        services.AddScoped<INotificationTemplateRepository, NotificationTemplateRepository>();
+        services.AddScoped<INotificationRecipientReader, NotificationRecipientReader>();
+        services.AddScoped<INotificationCreator, NotificationCreator>();
+
         // Template renderer (NOT-02): stateless, so one instance.
         services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();
 
