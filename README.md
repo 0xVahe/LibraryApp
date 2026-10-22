@@ -136,6 +136,7 @@ All three settings are required. Missing or out-of-range values prevent applicat
 | `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
 | `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
 | `Delivery:Lease` | 00:15:00 | How long a claimed email is reserved for one API instance; must be longer than sending one batch | NOT-03 |
+| `Delivery:RetryDelays` | 00:05:00, 00:15:00, 01:00:00 | Wait before each retry of a Failed email; the number of values is the number of retries (1 to 10, each 1 minute to 1 day) | NOT-08 |
 
 Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
 
