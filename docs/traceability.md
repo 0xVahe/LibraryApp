@@ -122,3 +122,8 @@ Copy this table into the section of your module and add one row per requirement 
 | NFR-11 Every Borrowing endpoint documented in Swagger with responses and examples | `Controllers/Borrowing/*` XML comments, `Api/OpenApi/BorrowingExamples` | `BorrowingSwaggerTests` | ✅ |
 
 ### Module 4 — Notifications & Reporting (Group 4)
+
+| Requirement | Implementation | Tests | Status |
+|---|---|---|---|
+| REP-05 Inventory status: copies by status and condition, filter by category | `GET /api/reports/inventory-status?categoryId=` (Librarian, Administrator) → `ReportingService.GetInventoryStatusAsync`, `ReportingReadRepository.GetCopyCountsAsync` (one grouped query; a category includes its subcategories); every status and condition listed, also with 0; `TotalCopies` and `CopiesInCollection` (without Lost and Withdrawn); errors `reporting.invalid_category_id` (400), `reporting.category_not_found` (404) | `Application.Tests/Reporting/InventoryStatusReportTests`, `Infrastructure.IntegrationTests/Reporting/InventoryStatusRepositoryTests`, `Api.IntegrationTests/Reporting/InventoryStatusEndpointTests` | ✅ |
+| REP-07 Purchase candidates: books with the longest reservation queues | `GET /api/reports/purchase-candidates` (Administrator) → `ReportingService.GetPurchaseCandidatesAsync`, `ReportingReadRepository.GetPurchaseCandidatesAsync` (Waiting reservations per book, longest first, tie by title then ISBN; deleted books left out); at most `Reporting:PurchaseCandidatesLimit` (validated at start) | `Application.Tests/Reporting/PurchaseCandidatesReportTests`, `ReportingOptionsValidatorTests`, `Infrastructure.IntegrationTests/Reporting/PurchaseCandidatesRepositoryTests`, `Api.IntegrationTests/Reporting/PurchaseCandidatesEndpointTests` | ✅ |
