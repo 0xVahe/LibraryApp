@@ -247,6 +247,12 @@ public sealed class StaffEnrolledEventHandlerTests
 
     private sealed class FakeTemplates(Fixture fixture) : INotificationTemplateRepository
     {
+        public Task<IReadOnlyList<NotificationTemplate>> ListAsync(NotificationType? type, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<NotificationTemplate?> GetByIdAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
+        public void Add(NotificationTemplate template) => throw new NotSupportedException();
+        public void Remove(NotificationTemplate template) => throw new NotSupportedException();
+        public Task DeactivateOthersAsync(NotificationType type, Guid exceptId, CancellationToken ct = default) => throw new NotSupportedException();
+
         public Task<NotificationTemplate?> FindActiveAsync(NotificationType type, CancellationToken ct = default) =>
             Task.FromResult(type == NotificationType.Welcome ? fixture.Template : null);
     }

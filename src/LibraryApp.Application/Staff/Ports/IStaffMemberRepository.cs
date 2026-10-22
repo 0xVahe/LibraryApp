@@ -20,6 +20,9 @@ public interface IStaffMemberRepository
 
     /// <summary>The email must already be in lower case, as it is stored.</summary>
     Task<StaffMemberLookup?> FindByCorporateEmailAsync(string corporateEmail, CancellationToken ct);
+    
+    /// <summary>Contacts by id, in one query; ids that do not exist are missing from the result.</summary>
+    Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
 }
 
 /// <summary>Status of a staff member and the limits of their category, read in one query.</summary>
