@@ -32,6 +32,9 @@ public static class NotificationsRegistrationExtensions
         services.AddScoped<INotificationRecipientReader, NotificationRecipientReader>();
         services.AddScoped<INotificationCreator, NotificationCreator>();
 
+        // Administration of the templates (NOT-09)
+        services.AddScoped<INotificationTemplateService, NotificationTemplateService>();
+
         // Template renderer (NOT-02): stateless, so one instance.
         services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();
 
