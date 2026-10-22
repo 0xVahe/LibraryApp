@@ -224,6 +224,10 @@ public sealed class TopBooksAndCategoriesReportTests
         public Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(
             DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+            DateTime fromUtc, DateTime toUtc, DateTime nowUtc, CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class UnusedCalendar : IWorkingDayCalendar

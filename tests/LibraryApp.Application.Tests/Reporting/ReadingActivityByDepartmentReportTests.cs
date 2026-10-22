@@ -189,6 +189,10 @@ public sealed class ReadingActivityByDepartmentReportTests
             return Task.FromResult<IReadOnlyList<DepartmentCategoryLoansData>>(Loans);
         }
 
+        public Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+            DateTime fromUtc, DateTime toUtc, DateTime nowUtc, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<OverdueLoanData>> GetOverdueLoansAsync(
             DateTime nowUtc, Guid? departmentId, CancellationToken ct = default) =>
             throw new NotSupportedException();
