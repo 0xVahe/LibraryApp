@@ -12,7 +12,7 @@ namespace LibraryApp.Api.Controllers.Reporting;
 [Authorize(Roles = StaffRoles.LibraryAdministrator + "," + StaffRoles.Librarian)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
-public sealed class ReportsController(IReportingService reporting) : ControllerBase
+public sealed partial class ReportsController(IReportingService reporting) : ControllerBase
 {
     [HttpGet("overdue-loans")]
     [ProducesResponseType<OverdueLoansReportDto>(StatusCodes.Status200OK)]
