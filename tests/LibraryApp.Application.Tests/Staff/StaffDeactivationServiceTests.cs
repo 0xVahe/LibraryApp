@@ -124,6 +124,9 @@ public class StaffDeactivationServiceTests
 
         public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
             throw new NotSupportedException("Deactivation reads only the active loans.");
+
+        public Task<IReadOnlyList<OpenLoanInfo>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException("Deactivation reads only the active loans.");
     }
 
     private sealed class StaffLock(ManagementFake store, LoanQueries loans) : IApplicationLock
