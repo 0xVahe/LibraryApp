@@ -11,14 +11,20 @@ internal sealed class FakeStaffMemberRepository : IStaffMemberRepository
 
     public static readonly DateTime JoinedAt = new(2026, 10, 6, 8, 0, 0, DateTimeKind.Utc);
 
-    public StaffMember Add(StaffMemberStatus status = StaffMemberStatus.Active, int maxLoans = 3, int loanDays = 21, int maxRenewals = 1, string firstName = "Anna") 
+    public StaffMember Add(
+        StaffMemberStatus status = StaffMemberStatus.Active, 
+        int maxLoans = 3, 
+        int loanDays = 21, 
+        int maxRenewals = 1, 
+        string firstName = "Anna",
+        string? lineManager = null) 
     {
         var category = new StaffCategory(Guid.NewGuid(), $"Category {_categories.Count + 1}", maxLoans, loanDays, maxRenewals);
         _categories[category.Id] = category;
 
         var member = new StaffMember(
             Guid.NewGuid(), Guid.NewGuid(), $"EMP-{_members.Count + 1:0000}", firstName, "Petrosyan",
-            $"anna{_members.Count + 1}@ameriabank.am", Guid.NewGuid(), "Analyst", null, category.Id, JoinedAt);
+            $"anna{_members.Count + 1}@ameriabank.am", Guid.NewGuid(), "Analyst", lineManager, category.Id, JoinedAt);
 
         if (status == StaffMemberStatus.Deactivated)
             member.Deactivate();
@@ -55,6 +61,19 @@ internal sealed class FakeStaffMemberRepository : IStaffMemberRepository
             .Where(_members.ContainsKey)
             .ToDictionary(id => id, id => $"{_members[id].FirstName} {_members[id].LastName}");
         return Task.FromResult(names);
+    }
+    
+    public int GetContactsCalls { get; private set; }
+
+    public Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        GetContactsCalls++;
+        IReadOnlyDictionary<Guid, StaffContact> contacts = ids
+            .Where(_members.ContainsKey)
+            .ToDictionary(id => id, id => new StaffContact(
+                id, $"{_members[id].FirstName} {_members[id].LastName}", _members[id].CorporateEmail,
+                _members[id].LineManagerEmail, _members[id].Status));
+        return Task.FromResult(contacts);
     }
     
     public Task<StaffMemberLookup?> FindByEmployeeIdAsync(string employeeId, CancellationToken ct) =>
