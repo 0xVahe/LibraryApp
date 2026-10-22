@@ -134,7 +134,7 @@ public class MyLibraryPageTests(MyLibraryPageFactory factory) : IClassFixture<My
         Assert.Contains("No reservations.", html);
         Assert.Contains("No penalty points.", html);
         Assert.DoesNotContain("book is overdue", html);
-        Assert.Contains("Latest notifications are currently unavailable.", html);
+        Assert.Contains("No notifications yet.", html);
     }
 
     [Fact]

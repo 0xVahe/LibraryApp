@@ -20,11 +20,7 @@
         <aside class="stack-lg" aria-label="My profile and standing">
             <vc:my-profile-card />
             <vc:my-penalties staff-member-id="@memberId" />
-            @* Group 4's LatestNotifications View Component belongs here once its contract is merged. *@
-            <section class="card" aria-labelledby="latest-emails-title">
-                <div class="card-head"><h2 id="latest-emails-title">Latest emails</h2></div>
-                <p class="muted">Latest notifications are currently unavailable.</p>
-            </section>
+            <vc:latest-notifications />
         </aside>
     </div>
 </div>
