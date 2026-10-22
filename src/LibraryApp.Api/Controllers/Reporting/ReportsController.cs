@@ -55,4 +55,33 @@ public sealed class ReportsController(IReportingService reporting) : ControllerB
     {
         return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
     }
+
+    /// <summary>REP-05: copies by status and condition, for the whole library or one category.</summary>
+    /// <param name="categoryId">A category; its subcategories are included. Left out: the whole library.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">Every status with its copies per condition, also with 0 copies.</response>
+    /// <response code="400"><c>reporting.invalid_category_id</c>: an empty id.</response>
+    /// <response code="404"><c>reporting.category_not_found</c>: no such category.</response>
+    [HttpGet("inventory-status")]
+    [ProducesResponseType<InventoryStatusReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<InventoryStatusReportDto>> GetInventoryStatus(
+        [FromQuery] Guid? categoryId,
+        CancellationToken ct)
+    {
+        return Ok(await reporting.GetInventoryStatusAsync(categoryId, ct));
+    }
+
+    /// <summary>
+    /// REP-07: the books with the longest reservation queues, longest first; at most
+    /// <c>Reporting:PurchaseCandidatesLimit</c>. Administrator only.
+    /// </summary>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">The books with their waiting reservations and the copies the library still has.</response>
+    [HttpGet("purchase-candidates")]
+    [Authorize(Roles = StaffRoles.LibraryAdministrator)]
+    [ProducesResponseType<PurchaseCandidatesReportDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PurchaseCandidatesReportDto>> GetPurchaseCandidates(CancellationToken ct) =>
+        Ok(await reporting.GetPurchaseCandidatesAsync(ct));
 }
