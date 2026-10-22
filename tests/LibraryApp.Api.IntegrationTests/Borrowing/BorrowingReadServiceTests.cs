@@ -162,4 +162,41 @@ public class BorrowingReadServiceTests(ApiHostWithoutBorrowingSeed factory) : IC
 
         Assert.Equal([first.Id, last.Id], due.Select(loan => loan.LoanId));
     }
+
+    [Fact]
+    public async Task Overdue_loans_are_the_ones_marked_Overdue_earliest_due_first_with_their_books()
+    {
+        // Not Mariam: the first test expects her without open loans.
+        Guid member = Members.LilitGrigoryan;
+        Loan Issued(int book, int daysAgo) =>
+            Loan.Issue(Guid.NewGuid(), CatalogSeedIds.Copy(book, 1), member, Now.AddDays(-daysAgo), 14);
+        var older = Issued(38, 40);
+        older.MarkOverdue(Now);
+        var newer = Issued(39, 20);
+        newer.MarkOverdue(Now);
+        // Past its due date but not marked by the daily job yet: not Overdue.
+        var notMarked = Issued(40, 30);
+        var returned = Issued(41, 50);
+        returned.MarkOverdue(Now.AddDays(-30));
+        returned.Return(Now.AddDays(-25));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibraryDbContext>();
+        db.Loans.AddRange(older, newer, notMarked, returned);
+        await db.SaveChangesAsync();
+
+        var overdue = await scope.ServiceProvider.GetRequiredService<IBorrowingReadService>().GetOverdueLoansAsync();
+
+        // Other tests of this host add overdue loans too: the rule is checked for all, the exact rows for this member.
+        Assert.All(overdue, loan => Assert.Equal(LoanStatus.Overdue, loan.Status));
+        Assert.Equal(overdue.OrderBy(loan => loan.DueAtUtc).Select(loan => loan.LoanId), overdue.Select(loan => loan.LoanId));
+        Assert.Equal(
+            [
+                new OpenLoanInfo(older.Id, member, CatalogSeedIds.Copy(38, 1), CatalogSeedIds.Book(38), older.DueAtUtc, LoanStatus.Overdue,
+                    older.IssuedAtUtc, 0),
+                new OpenLoanInfo(newer.Id, member, CatalogSeedIds.Copy(39, 1), CatalogSeedIds.Book(39), newer.DueAtUtc, LoanStatus.Overdue,
+                    newer.IssuedAtUtc, 0),
+            ],
+            overdue.Where(loan => loan.StaffMemberId == member));
+    }
 }
