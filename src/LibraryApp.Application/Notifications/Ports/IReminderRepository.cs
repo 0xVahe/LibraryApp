@@ -12,14 +12,28 @@ public interface IReminderRepository
     Task<IReadOnlyList<ReminderTemplate>> GetTemplatesAsync(IReadOnlyCollection<NotificationType> types, CancellationToken ct = default);
 
     /// <summary>
-    /// Open loans (Active or Overdue) due from <paramref name="dueFromUtc"/> (null: no lower bound) and before
-    /// <paramref name="dueBeforeUtc"/>, earliest first. Loans of staff who left the bank (Deactivated) are left out.
+    /// Open loans (Active or Overdue) due from <paramref name="dueFromUtc"/> and before <paramref name="dueBeforeUtc"/>,
+    /// earliest first. Loans of staff who left the bank (Deactivated) are left out.
     /// </summary>
-    Task<IReadOnlyList<ReminderLoan>> GetOpenLoansDueAsync(DateTime? dueFromUtc, DateTime dueBeforeUtc, CancellationToken ct = default);
+    Task<IReadOnlyList<ReminderLoan>> GetOpenLoansDueAsync(DateTime dueFromUtc, DateTime dueBeforeUtc, CancellationToken ct = default);
+
+    /// <summary>
+    /// Loans that Borrowing has marked Overdue (its rule <c>Borrowing:Loans:OverdueFrom</c>), earliest due first. Loans of
+    /// staff who left the bank (Deactivated) are left out.
+    /// </summary>
+    Task<IReadOnlyList<ReminderLoan>> GetOverdueLoansAsync(CancellationToken ct = default);
 
     /// <summary>The loans that already have a notification of one of these types on this local date (NOT-06).</summary>
     Task<IReadOnlySet<(Guid LoanId, NotificationType Type)>> GetLoanNotificationsOnAsync(
         DateOnly localDate, IReadOnlyCollection<NotificationType> types, CancellationToken ct = default);
+
+    /// <summary>
+    /// The local date of the latest notification of each type for these loans, only dates before
+    /// <paramref name="beforeDate"/>; a loan without one is not in the result.
+    /// </summary>
+    Task<IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly>> GetLastLoanNotificationDatesAsync(
+        IReadOnlyCollection<Guid> loanIds, IReadOnlyCollection<NotificationType> types, DateOnly beforeDate,
+        CancellationToken ct = default);
 
     /// <summary>Adds a new notification; it is saved by the caller's unit of work.</summary>
     void Add(Notification notification);

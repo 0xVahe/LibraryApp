@@ -1,4 +1,5 @@
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Notifications.Options;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
@@ -31,7 +32,7 @@ public sealed class DueReminderJobDatabaseTests : IAsyncLifetime
     private readonly Guid _dueSoon = Guid.NewGuid();            // due Wed 21 Oct: in 2 working days
     private readonly Guid _overdue5 = Guid.NewGuid();           // due Mon 12 Oct: 5 working days overdue
     private readonly Guid _overdue15 = Guid.NewGuid();          // due Mon 28 Sep: 15 working days overdue, manager in CC
-    private readonly Guid _dueTomorrow = Guid.NewGuid();        // due Tue 20 Oct: no reminder today
+    private readonly Guid _dueInThreeDays = Guid.NewGuid();     // due Thu 22 Oct: in 3 working days, no reminder today
     private readonly Guid _returned = Guid.NewGuid();           // due Wed 21 Oct but returned
     private readonly Guid _deactivatedStaff = Guid.NewGuid();   // due Wed 21 Oct, the employee left the bank
 
@@ -57,9 +58,9 @@ public sealed class DueReminderJobDatabaseTests : IAsyncLifetime
         returned.Return(new DateTime(2026, 10, 15, 8, 0, 0, DateTimeKind.Utc));
         db.Loans.AddRange(
             NewLoan(db, bookId, anna, _dueSoon, Due(2026, 10, 21)),
-            NewLoan(db, bookId, anna, _overdue5, Due(2026, 10, 12)),
-            NewLoan(db, bookId, anna, _overdue15, Due(2026, 9, 28)),
-            NewLoan(db, bookId, anna, _dueTomorrow, Due(2026, 10, 20)),
+            Overdue(NewLoan(db, bookId, anna, _overdue5, Due(2026, 10, 12))),
+            Overdue(NewLoan(db, bookId, anna, _overdue15, Due(2026, 9, 28))),
+            NewLoan(db, bookId, anna, _dueInThreeDays, Due(2026, 10, 22)),
             NewLoan(db, bookId, left, _deactivatedStaff, Due(2026, 10, 21)),
             returned);
 
@@ -128,7 +129,7 @@ public sealed class DueReminderJobDatabaseTests : IAsyncLifetime
 
         await using var db = NewContext();
         var store = new NotificationDeliveryStore(db);
-        IReadOnlyList<Notification> claimed = await store.ClaimPendingAsync(NowUtc, NowUtc.AddMinutes(15), max: 10);
+        IReadOnlyList<Notification> claimed = await store.ClaimDueAsync(NowUtc, NowUtc.AddMinutes(15), 10);
 
         Assert.Equal(3, claimed.Count);
         Assert.All(claimed, n => Assert.Equal(NotificationChannel.Outlook, n.Channel));
@@ -150,6 +151,15 @@ public sealed class DueReminderJobDatabaseTests : IAsyncLifetime
             new SequentialGuidGenerator(time),
             clock,
             calendar,
+            Options.Create(new NotificationsOptions
+            {
+                Reminders = new RemindersOptions
+                {
+                    DueSoonWorkingDays = 2,
+                    OverdueEveryWorkingDays = 5,
+                    LineManagerCcAfterWorkingDays = 14,
+                },
+            }),
             NullLogger<DueReminderJob>.Instance);
 
         return await job.RunAsync(new DailyJobRun(DueReminderJob.Name, Today, null), CancellationToken.None);
@@ -187,6 +197,13 @@ public sealed class DueReminderJobDatabaseTests : IAsyncLifetime
             new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         db.StaffMembers.Add(staff);
         return staff;
+    }
+
+    // As the Borrowing daily job does at 00:30 (the reminders only read Borrowing's status).
+    private static Loan Overdue(Loan loan)
+    {
+        loan.MarkOverdue(NowUtc);
+        return loan;
     }
 
     private static Loan NewLoan(LibraryDbContext db, Guid bookId, StaffMember staff, Guid loanId, DateTime dueAtUtc)

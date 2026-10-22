@@ -1,22 +1,31 @@
 using LibraryApp.Application.Abstractions.Common;
+using LibraryApp.Application.Notifications.Options;
 using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Application.Tests.Catalog;
 using LibraryApp.Domain.Notifications;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Notifications;
 
-/// <summary>NOT-05. October 2026: the 15th is a Thursday, the 19th a Monday.</summary>
+/// <summary>NOT-05 / NOT-06. October 2026: the 15th is a Thursday, the 19th a Monday.</summary>
 public sealed class DueReminderJobTests
 {
     private static readonly DateOnly Monday19 = new(2026, 10, 19);
     private static readonly DateOnly Thursday15 = new(2026, 10, 15);
+    private static readonly DateOnly Friday16 = new(2026, 10, 16);
     private const string ManagerEmail = "manager@ameriabank.am";
 
     private readonly FakeReminderRepository _repository = new();
     private readonly FakeUnitOfWork _unitOfWork = new();
     private YerevanClock _clock = new(Monday19);
+    private RemindersOptions _settings = new()
+    {
+        DueSoonWorkingDays = 2,
+        OverdueEveryWorkingDays = 5,
+        LineManagerCcAfterWorkingDays = 14,
+    };
 
     public DueReminderJobTests()
     {
@@ -32,9 +41,11 @@ public sealed class DueReminderJobTests
     private Task<string> RunAsync(DateOnly today)
     {
         _clock = new YerevanClock(today);
+        _repository.OverdueBeforeUtc = _clock.StartOfLocalDayUtc(today);   // Borrowing: overdue from the next local day
         var job = new DueReminderJob(
             _repository, new NotificationTemplateRenderer(), _unitOfWork, new FakeIdGenerator(), _clock,
-            new WeekdayCalendar(), NullLogger<DueReminderJob>.Instance);
+            new WeekdayCalendar(), Options.Create(new NotificationsOptions { Reminders = _settings }),
+            NullLogger<DueReminderJob>.Instance);
         return job.RunAsync(new DailyJobRun(DueReminderJob.Name, today, null), default);
     }
 
@@ -42,7 +53,8 @@ public sealed class DueReminderJobTests
     public async Task Reminds_loans_due_in_2_working_days_on_both_channels()
     {
         ReminderLoan loan = _repository.AddLoan(DueLocal(2026, 10, 21), "Clean Code");   // Wednesday
-        _repository.AddLoan(DueLocal(2026, 10, 20), "Tomorrow");
+        ReminderLoan tomorrow = _repository.AddLoan(DueLocal(2026, 10, 20), "Tomorrow");
+        _repository.AddSent(tomorrow, NotificationType.DueSoonReminder, Friday16);
         _repository.AddLoan(DueLocal(2026, 10, 22), "In 3 days");
 
         await RunAsync(Monday19);
@@ -81,8 +93,10 @@ public sealed class DueReminderJobTests
     [Fact]
     public async Task A_due_date_on_a_day_off_is_reminded_with_the_next_working_day()
     {
-        // Thursday: 1 working day = Friday, 2 working days = Monday. Saturday, Sunday and Monday are reminded today.
-        _repository.AddLoan(DueLocal(2026, 10, 16), "Friday");
+        // Thursday: 1 working day = Friday, 2 working days = Monday. Saturday, Sunday and Monday are reminded today;
+        // Friday was reminded on Wednesday.
+        ReminderLoan friday = _repository.AddLoan(DueLocal(2026, 10, 16), "Friday");
+        _repository.AddSent(friday, NotificationType.DueSoonReminder, new DateOnly(2026, 10, 14));
         _repository.AddLoan(DueLocal(2026, 10, 17), "Saturday");
         _repository.AddLoan(DueLocal(2026, 10, 18), "Sunday");
         _repository.AddLoan(DueLocal(2026, 10, 19), "Monday");
@@ -107,7 +121,6 @@ public sealed class DueReminderJobTests
     [Theory]
     [InlineData(2026, 10, 13, false)]   // 4 working days overdue
     [InlineData(2026, 10, 12, true)]    // 5
-    [InlineData(2026, 10, 9, false)]    // 6
     [InlineData(2026, 10, 5, true)]     // 10
     public async Task Overdue_notice_every_5_working_days(int year, int month, int day, bool expected)
     {
@@ -116,6 +129,42 @@ public sealed class DueReminderJobTests
         await RunAsync(Monday19);
 
         Assert.Equal(expected, Emails.Any(n => n.Subject == "Overdue: Overdue book"));
+    }
+
+    [Fact]
+    public async Task No_overdue_notice_between_the_steps()
+    {
+        // 6 working days overdue; the notice of the 5th day was sent on Friday.
+        ReminderLoan loan = _repository.AddLoan(DueLocal(2026, 10, 9), "Overdue book");
+        _repository.AddSent(loan, NotificationType.OverdueNotice, Friday16);
+
+        await RunAsync(Monday19);
+
+        Assert.Empty(Emails);
+    }
+
+    [Fact]
+    public async Task A_missed_overdue_step_is_caught_up_with_one_notice()
+    {
+        // 6 working days overdue; the last notice is the first one (LoanOverdue event, 1 working day overdue), so the job
+        // did not run on Friday, the 5th day.
+        ReminderLoan loan = _repository.AddLoan(DueLocal(2026, 10, 9), "Overdue book");
+        _repository.AddSent(loan, NotificationType.OverdueNotice, new DateOnly(2026, 10, 12));
+
+        await RunAsync(Monday19);
+
+        Assert.Equal("Overdue: Overdue book", Assert.Single(Emails).Subject);
+    }
+
+    [Fact]
+    public async Task A_loan_that_Borrowing_has_not_marked_Overdue_gets_no_notice()
+    {
+        ReminderLoan loan = _repository.AddLoan(DueLocal(2026, 10, 12), "Overdue book");
+        _repository.NotMarkedOverdue.Add(loan.LoanId);
+
+        await RunAsync(Monday19);
+
+        Assert.Empty(Emails);
     }
 
     [Fact]
@@ -153,22 +202,76 @@ public sealed class DueReminderJobTests
         _repository.AddLoan(DueLocal(2026, 10, 21), "Clean Code");
         await RunAsync(Monday19);
 
-        // Tuesday: the loan is due in 1 working day, so no second due-soon reminder.
+        // Tuesday: the loan is due in 1 working day and was reminded on Monday, so no second due-soon reminder.
         await RunAsync(new DateOnly(2026, 10, 20));
 
         Assert.Single(Emails);
     }
 
     [Fact]
-    public async Task Without_an_active_template_nothing_is_stored()
+    public async Task A_day_the_job_did_not_run_is_caught_up_for_due_soon()
+    {
+        // Tuesday: due in 1 working day, never reminded (the job did not run on Monday).
+        _repository.AddLoan(DueLocal(2026, 10, 21), "Clean Code");
+
+        await RunAsync(new DateOnly(2026, 10, 20));
+
+        Assert.Equal("Due soon: Clean Code", Assert.Single(Emails).Subject);
+    }
+
+    [Fact]
+    public async Task A_renewed_loan_is_reminded_again_for_its_new_due_date()
+    {
+        // Reminded on 28 September for the old due date; renewed to Wednesday 21 October.
+        ReminderLoan loan = _repository.AddLoan(DueLocal(2026, 10, 21), "Clean Code");
+        _repository.AddSent(loan, NotificationType.DueSoonReminder, new DateOnly(2026, 9, 28));
+
+        await RunAsync(Monday19);
+
+        Assert.Single(Emails);
+    }
+
+    [Fact]
+    public async Task The_numbers_of_working_days_come_from_the_settings()
+    {
+        _settings = new RemindersOptions { DueSoonWorkingDays = 3, OverdueEveryWorkingDays = 3, LineManagerCcAfterWorkingDays = 5 };
+        _repository.AddLoan(DueLocal(2026, 10, 22), "Thursday");            // due in 3 working days
+        _repository.AddLoan(DueLocal(2026, 10, 9), "6 days", ManagerEmail);  // 6 working days overdue
+
+        await RunAsync(Monday19);
+
+        Assert.Equal(["Due soon: Thursday", "Overdue: 6 days"], Emails.Select(n => n.Subject).Order());
+        Assert.Equal(ManagerEmail, Emails.Single(n => n.Subject == "Overdue: 6 days").CcEmail);
+    }
+
+    [Fact]
+    public async Task Without_an_active_template_nothing_is_stored_and_the_run_fails()
     {
         _repository.Templates.RemoveAll(t => t.Type == NotificationType.DueSoonReminder);
         _repository.AddLoan(DueLocal(2026, 10, 21), "Clean Code");
 
-        string summary = await RunAsync(Monday19);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => RunAsync(Monday19));
 
         Assert.Empty(_repository.Stored);
-        Assert.EndsWith("stored 0, failed 1, skipped 0", summary);
+        Assert.EndsWith("stored 0, failed 1, skipped 0", ex.Message);
+    }
+
+    [Fact]
+    public async Task A_failed_run_keeps_what_it_stored_and_the_retry_sends_only_the_rest()
+    {
+        _repository.Templates.RemoveAll(t => t.Type == NotificationType.DueSoonReminder);
+        _repository.AddLoan(DueLocal(2026, 10, 21), "Due soon");
+        _repository.AddLoan(DueLocal(2026, 10, 12), "Overdue");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RunAsync(Monday19));
+        Assert.Equal(["Overdue: Overdue"], Emails.Select(n => n.Subject));
+
+        // The template is fixed; the daily job runner tries the run again.
+        _repository.Templates.Add(new ReminderTemplate(NotificationType.DueSoonReminder, "Due soon: {{BookTitle}}", "<p>Due</p>"));
+        string summary = await RunAsync(Monday19);
+
+        Assert.Equal(["Overdue: Overdue", "Due soon: Due soon"], Emails.Select(n => n.Subject));
+        Assert.EndsWith("stored 1, failed 0, skipped 1", summary);
     }
 
     [Fact]
@@ -192,6 +295,14 @@ public sealed class DueReminderJobTests
         public List<ReminderLoan> Loans { get; } = new();
         public List<Notification> Stored { get; } = new();
 
+        /// <summary>Notifications of earlier days (not counted in <see cref="Stored"/>).</summary>
+        public List<Notification> History { get; } = new();
+
+        /// <summary>Borrowing's rule: a loan due before this is marked Overdue, unless it is in <see cref="NotMarkedOverdue"/>.</summary>
+        public DateTime OverdueBeforeUtc { get; set; }
+
+        public HashSet<Guid> NotMarkedOverdue { get; } = new();
+
         public ReminderLoan AddLoan(DateTime dueAtUtc, string title, string? lineManagerEmail = null)
         {
             var loan = new ReminderLoan(
@@ -201,14 +312,26 @@ public sealed class DueReminderJobTests
             return loan;
         }
 
+        public void AddSent(ReminderLoan loan, NotificationType type, DateOnly localDate) =>
+            History.Add(Notification.Create(
+                Guid.NewGuid(), loan.StaffMemberId, type, NotificationChannel.InApp, loan.CorporateEmail, null,
+                "Earlier", "<p>Earlier</p>", localDate.ToDateTime(new TimeOnly(5, 0), DateTimeKind.Utc), localDate,
+                loanId: loan.LoanId));
+
         public Task<IReadOnlyList<ReminderTemplate>> GetTemplatesAsync(
             IReadOnlyCollection<NotificationType> types, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<ReminderTemplate>>(Templates.Where(t => types.Contains(t.Type)).ToList());
 
         public Task<IReadOnlyList<ReminderLoan>> GetOpenLoansDueAsync(
-            DateTime? dueFromUtc, DateTime dueBeforeUtc, CancellationToken ct = default) =>
+            DateTime dueFromUtc, DateTime dueBeforeUtc, CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<ReminderLoan>>(Loans
-                .Where(l => (dueFromUtc == null || l.DueAtUtc >= dueFromUtc) && l.DueAtUtc < dueBeforeUtc)
+                .Where(l => l.DueAtUtc >= dueFromUtc && l.DueAtUtc < dueBeforeUtc)
+                .OrderBy(l => l.DueAtUtc)
+                .ToList());
+
+        public Task<IReadOnlyList<ReminderLoan>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<ReminderLoan>>(Loans
+                .Where(l => l.DueAtUtc < OverdueBeforeUtc && !NotMarkedOverdue.Contains(l.LoanId))
                 .OrderBy(l => l.DueAtUtc)
                 .ToList());
 
@@ -218,6 +341,14 @@ public sealed class DueReminderJobTests
                 .Where(n => n.LocalDate == localDate && n.LoanId != null && types.Contains(n.Type))
                 .Select(n => (n.LoanId!.Value, n.Type))
                 .ToHashSet());
+
+        public Task<IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly>> GetLastLoanNotificationDatesAsync(
+            IReadOnlyCollection<Guid> loanIds, IReadOnlyCollection<NotificationType> types, DateOnly beforeDate,
+            CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyDictionary<(Guid, NotificationType), DateOnly>>(History.Concat(Stored)
+                .Where(n => n.LoanId is { } id && loanIds.Contains(id) && types.Contains(n.Type) && n.LocalDate < beforeDate)
+                .GroupBy(n => (n.LoanId!.Value, n.Type))
+                .ToDictionary(g => g.Key, g => g.Max(n => n.LocalDate)));
 
         public void Add(Notification notification) => Stored.Add(notification);
     }

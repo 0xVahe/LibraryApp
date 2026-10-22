@@ -1,23 +1,30 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
+using LibraryApp.Application.Notifications.Options;
 using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Notifications;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Notifications.Services;
 
 /// <summary>
-/// NOT-05: the 09:00 job on working days (schedule <c>Jobs:Schedules:notifications-due-reminders</c>).
+/// NOT-05: the 09:00 job on working days (schedule <c>Jobs:Schedules:notifications-due-reminders</c>); the numbers of
+/// working days are the settings <c>Notifications:Reminders</c>.
 /// <list type="bullet">
-/// <item>DueSoonReminder: open loans due in 2 working days. A due date on a day off is reminded together with the next
-/// working day, so every loan gets its reminder once.</item>
-/// <item>OverdueNotice: every 5 working days overdue (5, 10, 15, ...); the first notice comes from the LoanOverdue event.
-/// After 14 working days the line manager is in CC.</item>
+/// <item>DueSoonReminder: open loans due within <c>DueSoonWorkingDays</c> (2) that have not had one for this due date.
+/// A due date on a day off is reminded together with the next working day, so every loan gets its reminder once.</item>
+/// <item>OverdueNotice: loans that Borrowing has marked Overdue, every <c>OverdueEveryWorkingDays</c> (5) working days
+/// overdue (5, 10, 15, ...); the first notice comes from the LoanOverdue event. After
+/// <c>LineManagerCcAfterWorkingDays</c> (14) the line manager is in CC.</item>
 /// </list>
+/// A reminder is due until the loan has it, not only on its exact day: a day the job did not run (or failed) is caught
+/// up at the next run, with one reminder for the latest step.
 /// Each reminder is stored as an in-app notification (delivered when stored) and a Pending Outlook notification, which the
 /// delivery job sends (NOT-03). A loan that already has the same type today is skipped (NOT-06), so a run that is
-/// repeated stores and sends nothing twice.
+/// repeated stores and sends nothing twice. A run in which a reminder failed throws at the end, so the daily job runner
+/// tries it again.
 /// </summary>
 public sealed class DueReminderJob(
     IReminderRepository reminders,
@@ -26,16 +33,15 @@ public sealed class DueReminderJob(
     IIdGenerator ids,
     IClock clock,
     IWorkingDayCalendar calendar,
+    IOptions<NotificationsOptions> options,
     ILogger<DueReminderJob> logger) : IDailyJob
 {
     /// <summary>Stored with every run: never rename.</summary>
     public const string Name = "notifications-due-reminders";
 
-    public const int DueSoonWorkingDays = 2;
-    public const int OverdueEveryWorkingDays = 5;
-    public const int LineManagerCcAfterWorkingDays = 14;
-
     private static readonly NotificationType[] Types = [NotificationType.DueSoonReminder, NotificationType.OverdueNotice];
+
+    private readonly RemindersOptions _settings = options.Value.Reminders;
 
     public async Task<string> RunAsync(DailyJobRun run, CancellationToken ct)
     {
@@ -46,9 +52,15 @@ public sealed class DueReminderJob(
         IReadOnlySet<(Guid LoanId, NotificationType Type)> alreadySent =
             await reminders.GetLoanNotificationsOnAsync(today, Types, ct);
 
+        IReadOnlyList<ReminderLoan> dueSoon = await DueSoonLoansAsync(today, ct);
+        IReadOnlyList<ReminderLoan> overdue = await reminders.GetOverdueLoansAsync(ct);
+        IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly> lastSent =
+            await reminders.GetLastLoanNotificationDatesAsync(
+                dueSoon.Concat(overdue).Select(loan => loan.LoanId).ToHashSet(), Types, today, ct);
+
         List<Reminder> due = [];
-        due.AddRange(await DueSoonAsync(today, ct));
-        due.AddRange(await OverdueAsync(today, ct));
+        due.AddRange(DueSoon(dueSoon, lastSent));
+        due.AddRange(Overdue(overdue, lastSent, today));
 
         var counts = new Counts();
         foreach (Reminder reminder in due)
@@ -69,35 +81,58 @@ public sealed class DueReminderJob(
             await StoreAsync(reminder, template, today, counts, ct);
         }
 
-        return $"due soon {due.Count(r => r.Type == NotificationType.DueSoonReminder)}, " +
-               $"overdue {due.Count(r => r.Type == NotificationType.OverdueNotice)}, " +
-               $"stored {counts.Stored}, failed {counts.Failed}, skipped {counts.Skipped}";
+        string summary = $"due soon {due.Count(r => r.Type == NotificationType.DueSoonReminder)}, " +
+                         $"overdue {due.Count(r => r.Type == NotificationType.OverdueNotice)}, " +
+                         $"stored {counts.Stored}, failed {counts.Failed}, skipped {counts.Skipped}";
+
+        // The stored reminders stay; the runner's next attempt skips them (NOT-06) and tries the failed ones again.
+        if (counts.Failed > 0)
+            throw new InvalidOperationException($"Some reminders could not be stored: {summary}");
+
+        return summary;
     }
 
-    private async Task<IEnumerable<Reminder>> DueSoonAsync(DateOnly today, CancellationToken ct)
+    /// <summary>Open loans due after today, up to and including the last working day of the due-soon period.</summary>
+    private Task<IReadOnlyList<ReminderLoan>> DueSoonLoansAsync(DateOnly today, CancellationToken ct)
     {
-        // Due after the next working day, up to and including the working day after it.
-        DateOnly afterDate = calendar.AddWorkingDays(today, DueSoonWorkingDays - 1);
-        DateOnly lastDate = calendar.AddWorkingDays(today, DueSoonWorkingDays);
-
-        IReadOnlyList<ReminderLoan> loans = await reminders.GetOpenLoansDueAsync(
-            clock.StartOfLocalDayUtc(afterDate.AddDays(1)), clock.StartOfLocalDayUtc(lastDate.AddDays(1)), ct);
-
-        return loans.Select(loan => new Reminder(NotificationType.DueSoonReminder, loan, CcEmail: null));
+        DateOnly lastDate = calendar.AddWorkingDays(today, _settings.DueSoonWorkingDays);
+        return reminders.GetOpenLoansDueAsync(
+            clock.StartOfLocalDayUtc(today.AddDays(1)), clock.StartOfLocalDayUtc(lastDate.AddDays(1)), ct);
     }
 
-    private async Task<IEnumerable<Reminder>> OverdueAsync(DateOnly today, CancellationToken ct)
-    {
-        // Overdue from the day after the due date: the whole due date is allowed (same rule as Borrowing).
-        IReadOnlyList<ReminderLoan> loans = await reminders.GetOpenLoansDueAsync(null, clock.StartOfLocalDayUtc(today), ct);
+    private IEnumerable<Reminder> DueSoon(
+        IEnumerable<ReminderLoan> loans, IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly> lastSent) =>
+        // Already reminded for this due date: a reminder sent within the due-soon period before it. One sent earlier was
+        // for a due date before a renewal.
+        loans
+            .Where(loan => !lastSent.TryGetValue((loan.LoanId, NotificationType.DueSoonReminder), out DateOnly sentOn)
+                           || calendar.CountWorkingDays(sentOn, clock.ToLocalDate(loan.DueAtUtc)) > _settings.DueSoonWorkingDays)
+            .Select(loan => new Reminder(NotificationType.DueSoonReminder, loan, CcEmail: null));
 
-        return loans
-            .Select(loan => (Loan: loan, Days: calendar.CountWorkingDays(clock.ToLocalDate(loan.DueAtUtc), today)))
-            .Where(x => x.Days > 0 && x.Days % OverdueEveryWorkingDays == 0)
-            .Select(x => new Reminder(
+    private IEnumerable<Reminder> Overdue(
+        IEnumerable<ReminderLoan> loans,
+        IReadOnlyDictionary<(Guid LoanId, NotificationType Type), DateOnly> lastSent,
+        DateOnly today)
+    {
+        int every = _settings.OverdueEveryWorkingDays;
+        foreach (ReminderLoan loan in loans)
+        {
+            DateOnly dueDate = clock.ToLocalDate(loan.DueAtUtc);
+            int days = calendar.CountWorkingDays(dueDate, today);
+            if (days < every)
+                continue;
+
+            // Due unless a notice was sent on or after the latest step (5, 10, 15, ... working days overdue).
+            int step = days - days % every;
+            if (lastSent.TryGetValue((loan.LoanId, NotificationType.OverdueNotice), out DateOnly sentOn)
+                && calendar.CountWorkingDays(dueDate, sentOn) >= step)
+                continue;
+
+            yield return new Reminder(
                 NotificationType.OverdueNotice,
-                x.Loan,
-                x.Days > LineManagerCcAfterWorkingDays ? x.Loan.LineManagerEmail : null));
+                loan,
+                days > _settings.LineManagerCcAfterWorkingDays ? loan.LineManagerEmail : null);
+        }
     }
 
     private async Task StoreAsync(Reminder reminder, ReminderTemplate template, DateOnly today, Counts counts, CancellationToken ct)

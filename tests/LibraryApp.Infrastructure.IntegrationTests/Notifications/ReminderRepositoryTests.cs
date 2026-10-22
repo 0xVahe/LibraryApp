@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace LibraryApp.Infrastructure.IntegrationTests.Notifications;
 
 /// <summary>
-/// NOT-05 data: open loans due 10, 20 and 30 October (the last one of a deactivated employee), a returned loan due
-/// 10 October, the default templates (from the model) with OverdueNotice made inactive, and one notification on
-/// 19 October.
+/// NOT-05 data: open loans due 10 (marked Overdue), 20 and 30 October (the last one of a deactivated employee), a
+/// returned loan due 10 October, the default templates (from the model) with OverdueNotice made inactive, and two
+/// DueSoonReminder notifications of the loan due 20 October, on 15 and 19 October.
 /// </summary>
 public sealed class ReminderDatabase : IAsyncLifetime
 {
@@ -20,6 +20,7 @@ public sealed class ReminderDatabase : IAsyncLifetime
     public static readonly Guid DueOct20 = Guid.NewGuid();
     public static readonly Guid DeactivatedDueOct30 = Guid.NewGuid();
     public static readonly Guid ReturnedDueOct10 = Guid.NewGuid();
+    public static readonly DateOnly EarlierNotified = new(2026, 10, 15);
     public static readonly DateOnly Notified = new(2026, 10, 19);
 
     public string ConnectionString { get; } = TestDatabase.NewDatabase();
@@ -51,8 +52,10 @@ public sealed class ReminderDatabase : IAsyncLifetime
 
         Loan returned = NewLoan(db, bookId, active, ReturnedDueOct10, Due(2026, 10, 10));
         returned.Return(new DateTime(2026, 10, 9, 0, 0, 0, DateTimeKind.Utc));
+        Loan overdueLoan = NewLoan(db, bookId, active, DueOct10, Due(2026, 10, 10));
+        overdueLoan.MarkOverdue(new DateTime(2026, 10, 11, 0, 0, 0, DateTimeKind.Utc));
         db.Loans.AddRange(
-            NewLoan(db, bookId, active, DueOct10, Due(2026, 10, 10)),
+            overdueLoan,
             NewLoan(db, bookId, active, DueOct20, Due(2026, 10, 20)),
             NewLoan(db, bookId, left, DeactivatedDueOct30, Due(2026, 10, 30)),
             returned);
@@ -61,10 +64,13 @@ public sealed class ReminderDatabase : IAsyncLifetime
         NotificationTemplate overdue = await db.NotificationTemplates.SingleAsync(t => t.Type == NotificationType.OverdueNotice);
         overdue.Deactivate();
 
-        DateTime createdAtUtc = new(2026, 10, 19, 5, 0, 0, DateTimeKind.Utc);
-        db.Notifications.Add(Notification.Create(
-            Guid.NewGuid(), active.Id, NotificationType.DueSoonReminder, NotificationChannel.InApp,
-            active.CorporateEmail, null, "Due soon", "<p>Due</p>", createdAtUtc, Notified, loanId: DueOct20));
+        foreach (DateOnly date in new[] { EarlierNotified, Notified })
+        {
+            db.Notifications.Add(Notification.Create(
+                Guid.NewGuid(), active.Id, NotificationType.DueSoonReminder, NotificationChannel.InApp,
+                active.CorporateEmail, null, "Due soon", "<p>Due</p>",
+                date.ToDateTime(new TimeOnly(5, 0), DateTimeKind.Utc), date, loanId: DueOct20));
+        }
 
         await db.SaveChangesAsync();
     }
@@ -130,12 +136,12 @@ public sealed class ReminderRepositoryTests(ReminderDatabase database) : IClassF
     }
 
     [Fact]
-    public async Task Without_a_lower_bound_returns_every_open_loan_due_before_and_leaves_out_returned_ones()
+    public async Task Overdue_loans_are_the_ones_Borrowing_marked_Overdue_not_returned_or_only_past_due()
     {
         await using var db = database.NewContext();
         var repository = new ReminderRepository(db);
 
-        var loans = await repository.GetOpenLoansDueAsync(null, new DateTime(2026, 10, 19, 0, 0, 0, DateTimeKind.Utc));
+        var loans = await repository.GetOverdueLoansAsync();
 
         Assert.Equal(ReminderDatabase.DueOct10, Assert.Single(loans).LoanId);
     }
@@ -146,7 +152,8 @@ public sealed class ReminderRepositoryTests(ReminderDatabase database) : IClassF
         await using var db = database.NewContext();
         var repository = new ReminderRepository(db);
 
-        var loans = await repository.GetOpenLoansDueAsync(null, new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc));
+        var loans = await repository.GetOpenLoansDueAsync(
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), new DateTime(2026, 12, 31, 0, 0, 0, DateTimeKind.Utc));
 
         Assert.DoesNotContain(loans, loan => loan.LoanId == ReminderDatabase.DeactivatedDueOct30);
         Assert.Equal([ReminderDatabase.DueOct10, ReminderDatabase.DueOct20], loans.Select(loan => loan.LoanId));
@@ -174,5 +181,24 @@ public sealed class ReminderRepositoryTests(ReminderDatabase database) : IClassF
 
         Assert.Equal((ReminderDatabase.DueOct20, NotificationType.DueSoonReminder), Assert.Single(onDate));
         Assert.Empty(nextDay);
+    }
+
+    [Fact]
+    public async Task Last_notification_date_per_loan_and_type_before_a_date()
+    {
+        await using var db = database.NewContext();
+        var repository = new ReminderRepository(db);
+        Guid[] loanIds = [ReminderDatabase.DueOct10, ReminderDatabase.DueOct20];
+
+        var beforeNextDay = await repository.GetLastLoanNotificationDatesAsync(loanIds, Types, ReminderDatabase.Notified.AddDays(1));
+        var beforeNotified = await repository.GetLastLoanNotificationDatesAsync(loanIds, Types, ReminderDatabase.Notified);
+        var otherType = await repository.GetLastLoanNotificationDatesAsync(
+            loanIds, [NotificationType.OverdueNotice], ReminderDatabase.Notified.AddDays(1));
+
+        var entry = Assert.Single(beforeNextDay);
+        Assert.Equal((ReminderDatabase.DueOct20, NotificationType.DueSoonReminder), entry.Key);
+        Assert.Equal(ReminderDatabase.Notified, entry.Value);
+        Assert.Equal(ReminderDatabase.EarlierNotified, Assert.Single(beforeNotified).Value);
+        Assert.Empty(otherType);
     }
 }
