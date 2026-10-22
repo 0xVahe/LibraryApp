@@ -32,6 +32,9 @@ public static class NotificationsRegistrationExtensions
         services.AddScoped<INotificationRecipientReader, NotificationRecipientReader>();
         services.AddScoped<INotificationCreator, NotificationCreator>();
 
+        // Administration of the templates (NOT-09)
+        services.AddScoped<INotificationTemplateService, NotificationTemplateService>();
+
         // Template renderer (NOT-02): stateless, so one instance.
         services.AddSingleton<INotificationTemplateRenderer, NotificationTemplateRenderer>();
 
@@ -43,6 +46,11 @@ public static class NotificationsRegistrationExtensions
         services.AddScoped<INotificationDeliveryStore, NotificationDeliveryStore>();
         services.AddScoped<INotificationDeliveryService, NotificationDeliveryService>();
         services.AddHostedService<NotificationDeliveryJob>();
+
+        // 09:00 due-soon and overdue reminders on working days (NOT-05); schedule in Jobs:Schedules.
+        services.AddScoped<IReminderRepository, ReminderRepository>();
+        services.AddScoped<IReminderLoanReader, ReminderLoanReader>();
+        services.AddDailyJob<DueReminderJob>(DueReminderJob.Name);
 
         return services;
     }

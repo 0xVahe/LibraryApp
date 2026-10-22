@@ -49,6 +49,32 @@ public sealed class NotificationsOptionsValidatorTests
         Assert.Contains("Notifications:Delivery:BatchSize", result.FailureMessage);
         Assert.Contains("Notifications:Delivery:Lease", result.FailureMessage);
         Assert.Contains("Notifications:Delivery:RetryDelays", result.FailureMessage);
+        Assert.Contains("Notifications:Reminders:DueSoonWorkingDays", result.FailureMessage);
+        Assert.Contains("Notifications:Reminders:OverdueEveryWorkingDays", result.FailureMessage);
+        Assert.Contains("Notifications:Reminders:LineManagerCcAfterWorkingDays", result.FailureMessage);
+    }
+
+    [Theory]
+    [InlineData(0, 5, 14)]
+    [InlineData(11, 5, 14)]
+    [InlineData(2, 0, 14)]
+    [InlineData(2, 31, 14)]
+    [InlineData(2, 5, 0)]
+    [InlineData(2, 5, 61)]
+    public void Reminder_working_days_out_of_range_fail(int dueSoon, int overdueEvery, int lineManagerCcAfter)
+    {
+        var options = Options(TimeSpan.FromSeconds(5), 20, TimeSpan.FromMinutes(15));
+        options.Reminders = new RemindersOptions
+        {
+            DueSoonWorkingDays = dueSoon,
+            OverdueEveryWorkingDays = overdueEvery,
+            LineManagerCcAfterWorkingDays = lineManagerCcAfter,
+        };
+
+        var result = Validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains("Notifications:Reminders:", result.FailureMessage);
     }
 
     [Theory]
@@ -75,6 +101,12 @@ public sealed class NotificationsOptionsValidatorTests
                 BatchSize = batchSize,
                 Lease = lease,
                 RetryDelays = [TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15), TimeSpan.FromMinutes(60)],
+            },
+            Reminders = new RemindersOptions
+            {
+                DueSoonWorkingDays = 2,
+                OverdueEveryWorkingDays = 5,
+                LineManagerCcAfterWorkingDays = 14,
             },
         };
 }
