@@ -69,6 +69,9 @@ public sealed class DeactivationLoanQueries : IBorrowingReadService
 
     public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
         throw new NotSupportedException("Deactivation reads only the active loans.");
+
+    public Task<IReadOnlyList<OpenLoanInfo>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+        throw new NotSupportedException("Deactivation reads only the active loans.");
 }
 
 public sealed class ObservedStaffLock(IApplicationLock inner, DeactivationLoanQueries queries) : IApplicationLock
