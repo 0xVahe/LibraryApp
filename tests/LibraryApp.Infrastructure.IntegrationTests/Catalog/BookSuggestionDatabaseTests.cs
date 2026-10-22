@@ -66,7 +66,7 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
     private static BookSuggestionService Service(LibraryDbContext db, Guid? staffId, Guid reviewerId,
         IApplicationLock? applicationLock = null, DateTime? now = null) => new(
         new BookSuggestionRepository(db), new StaffMemberService(new StaffMemberRepository(db),
-            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 1, MaxRenewals = 0 } })),
+            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 1 } })),
         new UnitOfWork(db), applicationLock ?? new SqlServerApplicationLock(db),
         new Caller(staffId, reviewerId), new FixedClock(now ?? BookSuggestionDatabase.Now), new SequentialGuidGenerator(TimeProvider.System));
 

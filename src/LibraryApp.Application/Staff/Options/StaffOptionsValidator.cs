@@ -24,9 +24,6 @@ public sealed class StaffOptionsValidator : IValidateOptions<StaffOptions>
         {
             if (options.RestrictedLimits.MaxLoans <= 0)
                 failures.Add("Staff:RestrictedLimits:MaxLoans is required and must be greater than zero.");
-            // BR-MEM-3 and BR-BOR-1 prohibit renewals for Restricted members.
-            if (options.RestrictedLimits.MaxRenewals is not 0)
-                failures.Add("Staff:RestrictedLimits:MaxRenewals is required and must be 0: Restricted members cannot renew (BR-MEM-3, BR-BOR-1).");
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);

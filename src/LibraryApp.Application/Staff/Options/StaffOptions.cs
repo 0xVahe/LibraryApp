@@ -18,7 +18,4 @@ public sealed class StaffImportOptions
 public sealed class RestrictedStaffLimitsOptions
 {
     public int MaxLoans { get; set; }
-
-    // Zero is valid; null distinguishes an omitted setting from an explicitly configured zero.
-    public int? MaxRenewals { get; set; }
 }

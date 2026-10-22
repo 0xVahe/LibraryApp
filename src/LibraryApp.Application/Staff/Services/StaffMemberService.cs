@@ -25,7 +25,7 @@ public sealed class StaffMemberService(IStaffMemberRepository staffMembers, IOpt
 
         var limits = options.Value.RestrictedLimits;
         return BorrowingEligibilityPolicy.ApplyStatus(info.Status, info.CategoryRules,
-            limits.MaxLoans, limits.MaxRenewals!.Value);
+            limits.MaxLoans);
     }
 
     public async Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default) =>

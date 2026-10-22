@@ -14,8 +14,7 @@ public sealed class StaffOptionsRegistrationTests
     {
         ["Staff:Import:MaxRows"] = "3",
         ["Staff:Import:MaxFileBytes"] = "4096",
-        ["Staff:RestrictedLimits:MaxLoans"] = "2",
-        ["Staff:RestrictedLimits:MaxRenewals"] = "0"
+        ["Staff:RestrictedLimits:MaxLoans"] = "2"
     };
 
     private static IHost Host(Dictionary<string, string?> settings) => new HostBuilder()
@@ -31,7 +30,7 @@ public sealed class StaffOptionsRegistrationTests
         .Build();
 
     [Fact]
-    public async Task The_module_binds_non_default_values_and_accepts_zero_renewals()
+    public async Task The_module_binds_non_default_values_without_a_renewal_setting()
     {
         using var host = Host(Valid());
         await host.StartAsync();
@@ -39,7 +38,6 @@ public sealed class StaffOptionsRegistrationTests
         Assert.Equal(3, options.Import.MaxRows);
         Assert.Equal(4096, options.Import.MaxFileBytes);
         Assert.Equal(2, options.RestrictedLimits.MaxLoans);
-        Assert.Equal(0, options.RestrictedLimits.MaxRenewals);
         await host.StopAsync();
     }
 
@@ -47,7 +45,6 @@ public sealed class StaffOptionsRegistrationTests
     [InlineData("Staff:Import:MaxRows")]
     [InlineData("Staff:Import:MaxFileBytes")]
     [InlineData("Staff:RestrictedLimits:MaxLoans")]
-    [InlineData("Staff:RestrictedLimits:MaxRenewals")]
     public async Task Each_missing_key_prevents_host_start(string key)
     {
         var settings = Valid();
@@ -69,9 +66,6 @@ public sealed class StaffOptionsRegistrationTests
     [InlineData("Staff:Import:MaxRows", "0")]
     [InlineData("Staff:Import:MaxFileBytes", "0")]
     [InlineData("Staff:RestrictedLimits:MaxLoans", "-1")]
-    [InlineData("Staff:RestrictedLimits:MaxRenewals", "-1")]
-    [InlineData("Staff:RestrictedLimits:MaxRenewals", "1")]
-    [InlineData("Staff:RestrictedLimits:MaxRenewals", "2")]
     public async Task Invalid_values_prevent_host_start(string key, string value)
     {
         var settings = Valid();

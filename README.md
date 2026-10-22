@@ -74,9 +74,8 @@ Rule values and decided rule variants are settings in `appsettings.json`, one se
 | `Import:MaxRows` | 200 | Maximum non-empty staff data rows, excluding the CSV header; positive integer | MEM-09 |
 | `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (in-memory parser bound) | MEM-09 |
 | `RestrictedLimits:MaxLoans` | 1 | Loan limit for Restricted members; positive integer | BR-MEM-3 |
-| `RestrictedLimits:MaxRenewals` | 0 | Must be 0: Restricted members cannot renew | BR-MEM-3, BR-BOR-1 |
 
-All four values are required. Missing or invalid settings prevent startup, including an omitted `MaxRenewals`. Restricted members cannot renew (BR-MEM-3, BR-BOR-1), so `RestrictedLimits:MaxRenewals` must be exactly `0`. Staff-category limits remain in the administrator-managed database.
+All three values are required. Missing or invalid settings prevent startup. Restricted members cannot renew (BR-MEM-3, BR-BOR-1); their renewal limit is fixed at `0` in code, not configured. Staff-category limits remain in the administrator-managed database.
 
 CSV file limits are enforced in bytes and displayed as readable decimal sizes (for example, `1000000` as `1 MB` and `500000` as `500 KB`). HTTP request and multipart limits include an additional 100000 bytes for the multipart envelope. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit.
 

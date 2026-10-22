@@ -23,7 +23,6 @@ public sealed class ConfiguredStaffRulesFactory : ApiHostFactory
         builder.UseSetting("Staff:Import:MaxRows", "2");
         builder.UseSetting("Staff:Import:MaxFileBytes", "2048");
         builder.UseSetting("Staff:RestrictedLimits:MaxLoans", "2");
-        builder.UseSetting("Staff:RestrictedLimits:MaxRenewals", "0");
     }
 }
 

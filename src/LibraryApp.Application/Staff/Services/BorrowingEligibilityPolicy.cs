@@ -14,9 +14,10 @@ public static class BorrowingEligibilityPolicy
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
     };
 
+    // BR-MEM-3 and BR-BOR-1 prohibit renewals for Restricted members.
     public static LendingRules ApplyStatus(
-        StaffMemberStatus status, LendingRules categoryRules, int restrictedMaxLoans, int restrictedMaxRenewals) =>
+        StaffMemberStatus status, LendingRules categoryRules, int restrictedMaxLoans) =>
         status == StaffMemberStatus.Restricted
-            ? categoryRules with { MaxLoans = restrictedMaxLoans, MaxRenewals = restrictedMaxRenewals }
+            ? categoryRules with { MaxLoans = restrictedMaxLoans, MaxRenewals = 0 }
             : categoryRules;
 }
