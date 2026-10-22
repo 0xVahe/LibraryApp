@@ -1,7 +1,6 @@
 using LibraryApp.Application.Abstractions.Borrowing;
 using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Abstractions.Staff;
-using LibraryApp.Application.Notifications.Ports;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Catalog;
@@ -22,23 +21,22 @@ public sealed class ReminderLoanReaderTests
 
     private readonly BorrowingFake _borrowing = new();
     private readonly CatalogFake _catalog = new();
-    private readonly RecipientsFake _recipients = new();
     private readonly StaffFake _staff = new();
 
     public ReminderLoanReaderTests()
     {
-        _recipients.Add(new NotificationRecipient(Anna, "Anna Petrosyan", "anna.petrosyan@ameriabank.am", "manager@ameriabank.am"));
-        _recipients.Add(new NotificationRecipient(Hayk, "Hayk Manukyan", "hayk.manukyan@ameriabank.am"));
-        _staff.Statuses[Anna] = StaffMemberStatus.Active;
-        _staff.Statuses[Hayk] = StaffMemberStatus.Deactivated;
+        _staff.Contacts[Anna] = new StaffContact(
+            Anna, "Anna Petrosyan", "anna.petrosyan@ameriabank.am", "manager@ameriabank.am", StaffMemberStatus.Active);
+        _staff.Contacts[Hayk] = new StaffContact(
+            Hayk, "Hayk Manukyan", "hayk.manukyan@ameriabank.am", null, StaffMemberStatus.Deactivated);
         _catalog.Titles[CleanCode] = "Clean Code";
         _catalog.Titles[EffectiveJava] = "Effective Java";
     }
 
-    private ReminderLoanReader CreateReader() => new(_borrowing, _catalog, _recipients, _staff);
+    private ReminderLoanReader CreateReader() => new(_borrowing, _catalog, _staff);
 
     [Fact]
-    public async Task A_due_loan_gets_the_recipient_from_Notifications_and_the_title_from_Catalog()
+    public async Task A_due_loan_gets_the_recipient_from_Staff_and_the_title_from_Catalog()
     {
         OpenLoanInfo loan = _borrowing.Due(Wednesday21, Anna, CleanCode);
 
@@ -94,18 +92,45 @@ public sealed class ReminderLoanReaderTests
     }
 
     [Fact]
-    public async Task One_call_per_staff_member_and_per_book_not_per_loan()
+    public async Task One_call_to_Staff_for_all_members_and_one_call_per_book_not_per_loan_or_member()
     {
+        var elen = Guid.NewGuid();
+        _staff.Contacts[elen] = new StaffContact(elen, "Elen Danielyan", "elen.danielyan@ameriabank.am", null, StaffMemberStatus.Active);
         _borrowing.Due(Wednesday21, Anna, CleanCode);
         _borrowing.Due(Wednesday21, Anna, CleanCode);
         _borrowing.Due(Wednesday21, Anna, EffectiveJava);
+        _borrowing.Due(Wednesday21, elen, CleanCode);
+        _borrowing.Due(Wednesday21, Hayk, CleanCode);
 
         var loans = await CreateReader().GetLoansDueOnAsync([Wednesday21]);
 
-        Assert.Equal(3, loans.Count);
-        Assert.Equal(1, _recipients.Calls);
-        Assert.Equal(1, _staff.Calls);
+        Assert.Equal(4, loans.Count);                                   // Hayk left the bank
+        var request = Assert.Single(_staff.Requests);                   // all members in one call, none twice
+        Assert.Equal(new[] { Anna, elen, Hayk }.Order(), request.Order());
         Assert.Equal(2, _catalog.Calls);
+    }
+
+    [Fact]
+    public async Task The_status_comes_with_the_contact_so_Staff_is_not_asked_for_it_member_by_member()
+    {
+        _borrowing.Due(Wednesday21, Anna, CleanCode);
+        _borrowing.Due(Wednesday21, Hayk, CleanCode);
+
+        await CreateReader().GetLoansDueOnAsync([Wednesday21]);
+
+        Assert.Equal(0, _staff.StatusCalls);
+    }
+
+    [Fact]
+    public async Task Overdue_and_due_loans_each_make_one_call_to_Staff()
+    {
+        _borrowing.Due(Wednesday21, Anna, CleanCode);
+        _borrowing.Overdue(new DateOnly(2026, 10, 12), Anna, CleanCode);
+
+        await CreateReader().GetLoansDueOnAsync([Wednesday21]);
+        await CreateReader().GetOverdueLoansAsync();
+
+        Assert.Equal(2, _staff.Requests.Count);
     }
 
     private sealed class BorrowingFake : IBorrowingReadService
@@ -181,29 +206,24 @@ public sealed class ReminderLoanReaderTests
             throw new NotSupportedException();
     }
 
-    private sealed class RecipientsFake : INotificationRecipientReader
-    {
-        private readonly Dictionary<Guid, NotificationRecipient> _recipients = new();
-        public int Calls { get; private set; }
-
-        public void Add(NotificationRecipient recipient) => _recipients[recipient.StaffMemberId] = recipient;
-
-        public Task<NotificationRecipient?> FindAsync(Guid staffMemberId, CancellationToken ct = default)
-        {
-            Calls++;
-            return Task.FromResult(_recipients.GetValueOrDefault(staffMemberId));
-        }
-    }
-
     private sealed class StaffFake : IStaffMemberService
     {
-        public Dictionary<Guid, StaffMemberStatus> Statuses { get; } = new();
-        public int Calls { get; private set; }
+        public Dictionary<Guid, StaffContact> Contacts { get; } = new();
+        public List<Guid[]> Requests { get; } = [];
+        public int StatusCalls { get; private set; }
+
+        public Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
+            IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default)
+        {
+            Requests.Add(staffMemberIds.ToArray());
+            return Task.FromResult<IReadOnlyDictionary<Guid, StaffContact>>(
+                staffMemberIds.Where(Contacts.ContainsKey).ToDictionary(id => id, id => Contacts[id]));
+        }
 
         public Task<StaffMemberStatus> GetStatusAsync(Guid staffMemberId, CancellationToken ct = default)
         {
-            Calls++;
-            return Task.FromResult(Statuses[staffMemberId]);
+            StatusCalls++;
+            throw new NotSupportedException();
         }
 
         public Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default) =>
@@ -220,10 +240,6 @@ public sealed class ReminderLoanReaderTests
             throw new NotSupportedException();
 
         public Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
-            IReadOnlyCollection<Guid> staffMemberIds, CancellationToken ct = default) =>
             throw new NotSupportedException();
     }
 }
