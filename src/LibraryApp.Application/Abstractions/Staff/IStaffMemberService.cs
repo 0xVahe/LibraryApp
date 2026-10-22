@@ -3,7 +3,7 @@ using LibraryApp.Domain.Staff;
 namespace LibraryApp.Application.Abstractions.Staff;
 
 /// <summary>
-/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1).
+/// /// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1), Notifications (Group 4).
 /// <para>
 /// The loan limit is checked by Borrowing, which owns the loans: it compares its active loan count with
 /// <see cref="LendingRules.MaxLoans"/> and reports <see cref="StaffErrors.LoanLimitReached"/>.
@@ -46,4 +46,18 @@ public interface IStaffMemberService
     /// Deactivated members are found too: whether they may borrow is still decided by <see cref="CanBorrowAsync"/>.
     /// </summary>
     Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Name, corporate email and line manager email of one staff member, for notifications. Unknown → <c>null</c>
+    /// (no exception); Deactivated members are returned too, because a notice can arrive after the deactivation.
+    /// </summary>
+    Task<StaffContact?> GetContactAsync(Guid staffMemberId, CancellationToken ct = default);
+
+    /// <summary>
+    /// <see cref="GetContactAsync"/> for many members in one query, for jobs such as reminders. Unknown ids are left
+    /// out of the result; an empty list returns an empty dictionary without a query.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
+        IReadOnlyCollection<Guid> staffMemberIds,
+        CancellationToken ct = default);
 }

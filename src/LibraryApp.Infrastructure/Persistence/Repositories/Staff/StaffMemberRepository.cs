@@ -47,4 +47,11 @@ public sealed class StaffMemberRepository(LibraryDbContext db) : IStaffMemberRep
             .Select(x => new StaffMemberLookup(
                 x.Id, x.EmployeeId, x.FirstName + " " + x.LastName, x.CorporateEmail, x.Status))
             .SingleOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        await db.StaffMembers
+            .AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => new StaffContact(x.Id, x.FirstName + " " + x.LastName, x.CorporateEmail, x.LineManagerEmail))
+            .ToDictionaryAsync(x => x.Id, ct);
 }

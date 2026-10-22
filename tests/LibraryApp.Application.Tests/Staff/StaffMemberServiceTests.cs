@@ -279,4 +279,51 @@ public class StaffMemberServiceTests
 
         Assert.Null(await _service.FindAsync(value));
     }
+    
+    
+    // ---- GetContactAsync / GetContactsAsync (Notifications) ----
+
+    [Fact]
+    public async Task GetContact_returns_name_email_and_line_manager_email()
+    {
+        var anna = _repository.Add(lineManager: "Mariam.Avetisyan@AmeriaBank.am");
+
+        var contact = await _service.GetContactAsync(anna.Id);
+
+        Assert.Equal(new StaffContact(anna.Id, "Anna Petrosyan", anna.CorporateEmail, "mariam.avetisyan@ameriabank.am"), contact);
+    }
+
+    [Fact]
+    public async Task GetContact_returns_null_for_an_unknown_id()
+    {
+        Assert.Null(await _service.GetContactAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GetContact_returns_a_Deactivated_member()
+    {
+        var member = _repository.Add(StaffMemberStatus.Deactivated);
+
+        Assert.Equal(member.Id, (await _service.GetContactAsync(member.Id))?.Id);
+    }
+
+    [Fact]
+    public async Task GetContacts_leaves_out_unknown_ids_and_asks_for_a_repeated_id_once()
+    {
+        var anna = _repository.Add();
+
+        var contacts = await _service.GetContactsAsync([anna.Id, anna.Id, Guid.NewGuid()]);
+
+        Assert.Equal([anna.Id], contacts.Keys);
+        Assert.Null(contacts[anna.Id].LineManagerEmail);
+    }
+
+    [Fact]
+    public async Task GetContacts_of_an_empty_list_is_empty_without_a_query()
+    {
+        var contacts = await _service.GetContactsAsync([]);
+
+        Assert.Empty(contacts);
+        Assert.Equal(0, _repository.GetContactsCalls);
+    }
 }
