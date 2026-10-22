@@ -1,0 +1,9 @@
+@model DateTime
+@using System.Globalization
+@using LibraryApp.Application.Abstractions.Common
+@inject IClock Clock
+@* The local (Asia/Yerevan) date of a notification, in the format of the other pages ("21 Oct 2026"). *@
+@{
+    var date = Clock.ToLocalDate(Model);
+}
+<time datetime="@date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@date.ToString("d MMM yyyy", CultureInfo.InvariantCulture)</time>

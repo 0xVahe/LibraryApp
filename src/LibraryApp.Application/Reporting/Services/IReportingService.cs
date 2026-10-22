@@ -18,4 +18,9 @@ public interface IReportingService
         DateOnly from,
         DateOnly to,
         CancellationToken ct = default);
+
+    Task<ReadingActivityByDepartmentReportDto> GetReadingActivityByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
 }

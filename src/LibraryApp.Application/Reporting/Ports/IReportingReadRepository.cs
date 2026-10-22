@@ -8,7 +8,15 @@ public interface IReportingReadRepository
     Task<DashboardCountsData> GetDashboardCountsAsync(DateTime nowUtc, CancellationToken ct = default);
     Task<IReadOnlyList<TopBookReportItemDto>> GetTopBooksAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<IReadOnlyList<TopCategoryReportItemDto>> GetTopCategoriesAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+    Task<IReadOnlyList<DepartmentEmployeesData>> GetDepartmentEmployeesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
 }
+
+/// <summary>REP-04: every department with its employees who have not left the bank.</summary>
+public sealed record DepartmentEmployeesData(Guid DepartmentId, string Department, int Employees);
+
+/// <summary>REP-04: loans issued in the period, counted per department of the borrower and book category.</summary>
+public sealed record DepartmentCategoryLoansData(Guid DepartmentId, Guid CategoryId, string Category, int LoanCount);
 
 public sealed record OverdueLoanData(
     Guid LoanId,

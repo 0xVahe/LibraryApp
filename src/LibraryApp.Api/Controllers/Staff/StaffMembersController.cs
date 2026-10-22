@@ -1,11 +1,15 @@
+using LibraryApp.Api.Staff;
 using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Exceptions;
+using LibraryApp.Application.Staff.Formatting;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Staff;
 using LibraryApp.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LibraryApp.Application.Common;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.Controllers.Staff;
 
@@ -16,25 +20,26 @@ namespace LibraryApp.Api.Controllers.Staff;
 public sealed class StaffMembersController(
     IStaffManagementService staff,
     IStaffDeactivationService deactivation,
-    IStaffImportService import) : ControllerBase
+    IStaffImportService import,
+    IOptions<StaffOptions> options) : ControllerBase
 {
-    /// <summary>Imports up to 200 staff members from a CSV file (MEM-09). All rows are saved together or none are.</summary>
+    /// <summary>Imports staff members from a CSV file within the configured Staff:Import limits (MEM-09). All rows are saved together or none are.</summary>
     /// <remarks>
     /// Upload multipart/form-data using the <c>file</c> field. A successful response contains each member and a
     /// one-time temporary password. Imported accounts must change that password at their first sign-in.
     /// </remarks>
     [HttpPost("import")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(1_100_000)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 1_100_000)]
+    [StaffImportRequestLimits]
     [ProducesResponseType<StaffImportResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<StaffImportResult>> Import(IFormFile file, CancellationToken ct)
     {
-        if (file.Length > StaffImportLimits.MaximumFileBytes)
-            throw ImportFailure([new StaffImportError(1, "File", "The file must be 1 MB or smaller.")]);
+        var maxFileBytes = options.Value.Import.MaxFileBytes;
+        if (file.Length > maxFileBytes)
+            throw ImportFailure([new StaffImportError(1, "File", $"The file must be {StaffFileSizeFormatter.Format(maxFileBytes)} or smaller.")]);
 
         try
         {

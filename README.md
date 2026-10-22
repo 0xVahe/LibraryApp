@@ -67,6 +67,18 @@ Stop: `Ctrl+C` or `docker compose down`. Start with an empty database: `docker c
 
 Rule values and decided rule variants are settings in `appsettings.json`, one section per module, never constants in code. Each section is checked at start: a missing or inconsistent value stops the API with a message naming the key. Override a value per environment like any setting (for example `Borrowing__Penalties__LifetimeDays=120`). A change takes effect after a restart.
 
+### Staff (`Staff`)
+
+| Key | Value | Meaning | Requirement |
+|---|---|---|---|
+| `Import:MaxRows` | 200 | Maximum non-empty staff data rows, excluding the CSV header; positive integer | MEM-09 |
+| `Import:MaxFileBytes` | 1000000 | Maximum CSV file size in bytes, from 1 to 2147483647 (in-memory parser bound) | MEM-09 |
+| `RestrictedLimits:MaxLoans` | 1 | Loan limit for Restricted members; positive integer | BR-MEM-3 |
+
+All three values are required. Missing or invalid settings prevent startup. Restricted members cannot renew (BR-MEM-3, BR-BOR-1); their renewal limit is fixed at `0` in code, not configured. Staff-category limits remain in the administrator-managed database.
+
+CSV file limits are enforced in bytes and displayed as readable decimal sizes (for example, `1000000` as `1 MB` and `500000` as `500 KB`). HTTP request and multipart limits include an additional 100000 bytes for the multipart envelope. When increasing `Import:MaxFileBytes`, also check the reverse proxy's upload limit.
+
 ### Access tokens (`Jwt`)
 
 | Key | Value | Meaning | Requirement |
@@ -124,6 +136,7 @@ All three settings are required. Missing or out-of-range values prevent applicat
 | `Delivery:PollInterval` | 00:00:05 | Wait before the next round when no Pending email is left | NOT-03 |
 | `Delivery:BatchSize` | 20 | Emails sent in one round | NOT-03 |
 | `Delivery:Lease` | 00:15:00 | How long a claimed email is reserved for one API instance; must be longer than sending one batch | NOT-03 |
+| `Delivery:RetryDelays` | 00:05:00, 00:15:00, 01:00:00 | Wait before each retry of a Failed email; the number of values is the number of retries (1 to 10, each 1 minute to 1 day) | NOT-08 |
 
 Delivery runs only when `Jobs:Enabled` is true (see Daily jobs).
 
@@ -190,6 +203,46 @@ Databases left by an interrupted run (for example after stopping the test proces
 ### Writing tests that need a database
 
 Get the database only through the shared helpers: `TestDatabase.NewConnectionString()` in the infrastructure tests, `ApiHostFactory` in the API tests. Do not write a server address or read `LIBRARYAPP_TEST_DB` in a test: the test `No_test_chooses_its_SQL_Server_on_its_own` fails if a test does.
+
+## Performance benchmark
+
+NFR-01: "Typical API calls respond in under 500 ms; reports in under 2 s on 10,000 loans." `benchmark/LibraryApp.Benchmark` is a console application, not a test, and not part of `LibraryApp.sln`: the solution build, `dotnet test`, CI and the Docker image do not build it. A change in `src/` can therefore break it unnoticed; before a measurement, `dotnet build benchmark/LibraryApp.Benchmark -c Release` shows whether it still compiles. It times the running API over HTTP (Kestrel, authentication, database and serialization included) and writes a report to `docs/performance/`.
+
+| Command | What it does |
+|---|---|
+| `seed [--total 10000]` | Adds synthetic returned loans (built by `Loan.Issue` and `Loan.Return`, spread over the last year in the free time of each copy, so they never overlap another loan of the same copy, the loans already in the database included) until the database holds the target number of loans. A second run adds nothing. No audit rows and no events are written. At the end it counts in the database the added loans that overlap another loan of their copy; exit code 1 when there is one. |
+| `clean` | Removes the loans added by `seed` (their ids start with `be7c0000-0000-0000-0000-`). |
+| `run [--base-url http://localhost:5055] [--iterations 50] [--warmup 5]` | Signs in with the seeded accounts (Administrator, Librarian, Staff Member), calls 17 read endpoints of every module, the three reports included, one at a time, and writes the report. Exit code 0: every endpoint within its limit; 1: a limit exceeded or a call failed; 2: the run could not be done. |
+
+The database is the one of `ConnectionStrings__LibraryDb` (environment or `.env`), or `--connection`. Only a local SQL Server and a local API are accepted unless `--allow-remote` is given. The seeded password of the test accounts is used unless `--password` or `LIBRARYAPP_BENCHMARK_PASSWORD` is set.
+
+A run on a separate database keeps the development data unchanged:
+
+```bash
+docker compose up -d sqlserver
+```
+```bash
+export ConnectionStrings__LibraryDb="Server=localhost,1433;Database=LibraryApp_Benchmark;User Id=sa;Password=<MSSQL_SA_PASSWORD>;TrustServerCertificate=True"
+```
+```bash
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/LibraryApp.Api -c Release --no-launch-profile --urls http://localhost:5155
+```
+In a second terminal with the same `ConnectionStrings__LibraryDb`, once `http://localhost:5155/health/ready` answers 200 (the API has created and seeded the database):
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- seed
+```
+```bash
+dotnet run --project benchmark/LibraryApp.Benchmark -c Release -- run --base-url http://localhost:5155
+```
+
+**The report.** File name: `yyyy-MM-dd[_tag]_<commit>[-dirty].md` (Asia/Yerevan date; `-dirty` when the working tree has uncommitted changes, so the measured code is not exactly the commit). It holds the result per endpoint (min, p50, p95, max, mean, the first call before warm-up, errors), the manifest (commit, tag, branch, API address, OS, CPU, memory, .NET, SQL Server version, row counts of the database) and every measured time. An endpoint passes when every call succeeded and its 95th percentile is within its limit. The dashboard report is cached by the application (`Reporting:DashboardCacheMinutes`): its measured calls are cache hits, and its first call shows the uncached time.
+
+**For comparable numbers:**
+- run the API in Release (`-c Release`), with no debugger attached, and wait until `/health/ready` answers;
+- keep the machine otherwise idle: no build, test run, IDE indexing or second API instance at the same time; on a laptop, connect the power supply;
+- commit first, so the report names exactly the measured code (no `-dirty`);
+- compare only reports made on the same machine: the manifest records which one; numbers of a GitHub runner or another computer are not comparable;
+- one report is one sample: when a result is close to a limit, repeat the run.
 
 ## Demo data
 
