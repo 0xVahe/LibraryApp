@@ -14,7 +14,10 @@ public interface IStaffMemberService
     /// <summary>INT-03. Status check only: Active and Restricted may borrow; Suspended, Deactivated and unknown may not.</summary>
     Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default);
 
-    /// <summary>INT-04. Restricted: configured Staff:RestrictedLimits override category loan and renewal limits (BR-MEM-3). Throws <c>staff.not_found</c>.</summary>
+    /// <summary>
+    /// INT-04. Restricted: <c>Staff:RestrictedLimits:MaxLoans</c> overrides the category loan limit;
+    /// renewals are always 0 (BR-MEM-3, BR-BOR-1). Throws <c>staff.not_found</c>.
+    /// </summary>
     Task<LendingRules> GetLendingRulesAsync(Guid staffMemberId, CancellationToken ct = default);
 
     /// <summary>Current status, so Borrowing changes it only when it differs. Throws <c>staff.not_found</c>.</summary>
