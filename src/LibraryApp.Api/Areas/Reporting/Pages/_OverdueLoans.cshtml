@@ -9,7 +9,7 @@
             <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc) · @IndexModel.Count(report.TotalCount, "loan")</p>
             <p class="small muted">Points so far: @Model.PointsPerLateDay per working day overdue, max @Model.MaxLatePoints, what a return today would add.</p>
         </div>
-        <a class="btn btn-secondary btn-sm" href="@Model.OverdueCsvHref">Export CSV</a>
+        <a class="btn btn-secondary btn-sm" href="@Model.OverdueCsvHref">Export CSV<span class="visually-hidden"> of the overdue loans</span></a>
     </div>
     <form class="row filters card-filters" method="get" action="@(UiNavigation.Reports)#overdue-title" role="search" aria-label="Filter the overdue loans">
         <div class="min-w-200">

@@ -9,7 +9,7 @@
             <p class="small muted">Every department is listed, also with zero penalties · @IndexModel.Date(report.PeriodStart) – @IndexModel.Date(report.PeriodEnd) · generated @Model.Generated(report.GeneratedAtUtc)</p>
             <p class="small muted">Penalties given in the period. Active: points that still count today.</p>
         </div>
-        <a class="btn btn-secondary btn-sm" href="@Model.CsvHref">Export CSV</a>
+        <a class="btn btn-secondary btn-sm" href="@Model.CsvHref">Export CSV<span class="visually-hidden"> of the penalty points</span></a>
     </div>
     <table class="table">
         <thead><tr><th>Department</th><th>Penalties</th><th>Issued</th><th>Waived</th><th>Active</th></tr></thead>

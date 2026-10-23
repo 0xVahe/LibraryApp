@@ -267,9 +267,9 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
 
         string html = await GetAsync(Admin, $"{Route}?departmentId={it}&days=6-10&from=2026-10-01&to=2026-10-31");
 
-        Assert.Contains($"href=\"/reports?handler=csv&amp;report=overdue-loans&amp;departmentId={it}&amp;days=6-10\">Export CSV</a>", html);
-        Assert.Contains("href=\"/reports?handler=csv&amp;report=top-books-and-categories&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV</a>", html);
-        Assert.Contains("href=\"/reports?handler=csv&amp;report=reading-activity-by-department&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV</a>", html);
+        Assert.Contains($"href=\"/reports?handler=csv&amp;report=overdue-loans&amp;departmentId={it}&amp;days=6-10\">Export CSV<span class=\"visually-hidden\"> of the overdue loans</span></a>", html);
+        Assert.Contains("href=\"/reports?handler=csv&amp;report=top-books-and-categories&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV<span class=\"visually-hidden\"> of the most borrowed books</span></a>", html);
+        Assert.Contains("href=\"/reports?handler=csv&amp;report=reading-activity-by-department&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV<span class=\"visually-hidden\"> of the reading activity</span></a>", html);
     }
 
     [Theory]
