@@ -1,4 +1,5 @@
 using System.Globalization;
+using LibraryApp.Api.Controllers.Reporting;
 using LibraryApp.Api.Ui;
 using LibraryApp.Api.Ui.Shared;
 using LibraryApp.Application.Abstractions.Common;
@@ -93,16 +94,11 @@ public sealed class IndexModel(
         Departments = await departments.ListAsync(ct);
         if (DepartmentId is { } id && Departments.All(d => d.Id != id))
             DepartmentId = null;
-        var range = DayRanges.FirstOrDefault(r => r.Value == Days);
-        if (range.Value is null)
-            Days = null;
-        Overdue = await reports.GetOverdueLoansAsync(DepartmentId, range.Value is null ? null : range.Min, range.Max, new PageRequest(page), ct);
+        var (min, max) = DaysRange();
+        Overdue = await reports.GetOverdueLoansAsync(DepartmentId, min, max, new PageRequest(page), ct);
 
         // REP-03, and REP-04 for the administrator, for the chosen period; a reversed period is shown next to the form instead of the reports.
-        DateOnly today = clock.LocalToday;
-        DateOnly monthStart = new(today.Year, today.Month, 1);
-        PeriodFrom = From ?? monthStart;
-        PeriodTo = To ?? monthStart.AddMonths(1).AddDays(-1);
+        SetPeriod();
         try
         {
             Top = await reports.GetTopBooksAndCategoriesAsync(PeriodFrom, PeriodTo, ct);
@@ -113,6 +109,57 @@ public sealed class IndexModel(
         {
             PeriodError = ex.Error.Message;
         }
+    }
+
+    /// <summary>"Export CSV" (REP-08): the whole overdue list with its filters, or a period report.</summary>
+    public async Task<IActionResult> OnGetCsvAsync(string? report, CancellationToken ct)
+    {
+        SetPeriod();
+        switch (report)
+        {
+            case "overdue-loans":
+                var (min, max) = DaysRange();
+                return Csv(report, ReportCsv.OverdueLoans(await reports.GetAllOverdueLoansAsync(DepartmentId, min, max, ct)));
+            case "top-books-and-categories":
+                return Csv(report, ReportCsv.TopBooksAndCategories(await reports.GetTopBooksAndCategoriesAsync(PeriodFrom, PeriodTo, ct)));
+            case "reading-activity-by-department" when IsAdministrator:
+                return Csv(report, ReportCsv.ReadingActivityByDepartment(
+                    await reports.GetReadingActivityByDepartmentAsync(PeriodFrom, PeriodTo, ct)));
+            case "reading-activity-by-department":
+                return Forbid();
+            default:
+                return NotFound();
+        }
+    }
+
+    public string OverdueCsvHref => ReportPaths.CsvHref(UiNavigation.Reports,
+        ("report", "overdue-loans"), ("departmentId", DepartmentId?.ToString()), ("days", Days));
+
+    public string PeriodCsvHref(string report) => ReportPaths.CsvHref(UiNavigation.Reports,
+        ("report", report),
+        ("from", PeriodFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+        ("to", PeriodTo.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+
+    private FileContentResult Csv(string report, byte[] content) => ReportPaths.Csv(this, clock.UtcNow, report, content);
+
+    private (int? Min, int? Max) DaysRange()
+    {
+        var range = DayRanges.FirstOrDefault(r => r.Value == Days);
+        if (range.Value is null)
+        {
+            Days = null;
+            return (null, null);
+        }
+
+        return (range.Min, range.Max);
+    }
+
+    private void SetPeriod()
+    {
+        DateOnly today = clock.LocalToday;
+        DateOnly monthStart = new(today.Year, today.Month, 1);
+        PeriodFrom = From ?? monthStart;
+        PeriodTo = To ?? monthStart.AddMonths(1).AddDays(-1);
     }
 
     public static string Count(int value, string noun) =>

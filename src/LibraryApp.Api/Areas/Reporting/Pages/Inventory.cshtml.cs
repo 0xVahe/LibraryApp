@@ -1,4 +1,5 @@
 using System.Globalization;
+using LibraryApp.Api.Controllers.Reporting;
 using LibraryApp.Api.Ui;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Dto;
@@ -26,7 +27,22 @@ public sealed class InventoryModel(IReportingService reports, ICategoryService c
     public async Task OnGetAsync(CancellationToken ct)
     {
         Response.Headers.CacheControl = "no-store";
+        await LoadCategoriesAsync(ct);
+        Report = await reports.GetInventoryStatusAsync(CategoryId, ct);
+    }
 
+    /// <summary>"Export CSV" of the category shown (REP-08).</summary>
+    public async Task<IActionResult> OnGetCsvAsync(CancellationToken ct)
+    {
+        await LoadCategoriesAsync(ct);
+        return ReportPaths.Csv(this, clock.UtcNow, "inventory-status",
+            ReportCsv.InventoryStatus(await reports.GetInventoryStatusAsync(CategoryId, ct)));
+    }
+
+    public string CsvHref => ReportPaths.CsvHref(ReportPaths.Inventory, ("categoryId", CategoryId?.ToString()));
+
+    private async Task LoadCategoriesAsync(CancellationToken ct)
+    {
         IReadOnlyList<CategoryDto> all = await categories.ListAsync(ct);
         Categories = all
             .Where(category => category.ParentCategoryId is null)
@@ -41,8 +57,6 @@ public sealed class InventoryModel(IReportingService reports, ICategoryService c
         // An unknown category from a hand-written URL shows the whole library instead of an error.
         if (CategoryId is { } id && Categories.All(category => category.Id != id))
             CategoryId = null;
-
-        Report = await reports.GetInventoryStatusAsync(CategoryId, ct);
     }
 
     public string Generated(DateTime utc) => clock.ToLocal(utc).ToString("d MMM yyyy, HH:mm", CultureInfo.InvariantCulture);

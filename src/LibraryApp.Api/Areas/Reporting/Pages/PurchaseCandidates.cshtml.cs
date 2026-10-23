@@ -1,9 +1,11 @@
 using System.Globalization;
+using LibraryApp.Api.Controllers.Reporting;
 using LibraryApp.Api.Ui;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Application.Reporting.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace LibraryApp.Api.Areas.Reporting.Pages;
@@ -19,6 +21,10 @@ public sealed class PurchaseCandidatesModel(IReportingService reports, IClock cl
         Response.Headers.CacheControl = "no-store";
         Report = await reports.GetPurchaseCandidatesAsync(ct);
     }
+
+    /// <summary>"Export CSV" (REP-08).</summary>
+    public async Task<IActionResult> OnGetCsvAsync(CancellationToken ct) =>
+        ReportPaths.Csv(this, clock.UtcNow, "purchase-candidates", ReportCsv.PurchaseCandidates(await reports.GetPurchaseCandidatesAsync(ct)));
 
     public string Generated(DateTime utc) => clock.ToLocal(utc).ToString("d MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
 }

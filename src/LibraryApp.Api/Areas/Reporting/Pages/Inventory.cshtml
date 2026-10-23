@@ -15,6 +15,7 @@
             <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc)</p>
             <p class="small muted">@IndexModel.Count(report.CopiesInCollection, "copy") in the collection · @report.TotalCopies with lost and withdrawn ones</p>
         </div>
+        <a class="btn btn-secondary btn-sm" href="@Model.CsvHref">Export CSV</a>
     </div>
     <form class="row filters card-filters" method="get" action="@(ReportPaths.Inventory)#inventory-title" role="search" aria-label="Filter by category">
         <div class="min-w-200">

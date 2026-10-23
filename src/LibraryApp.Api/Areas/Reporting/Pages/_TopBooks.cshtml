@@ -10,6 +10,7 @@
                 <div class="row"><h2 id="books-title">Most borrowed books</h2><span class="badge badge-grey">Librarian · Admin</span></div>
                 <p class="small muted">Top @Model.TopBooksLimit · @period · generated @Model.Generated(report.GeneratedAtUtc)</p>
             </div>
+            <a class="btn btn-secondary btn-sm" href="@Model.PeriodCsvHref("top-books-and-categories")">Export CSV</a>
         </div>
         @if (report.TopBooks.Count == 0)
         {
@@ -35,6 +36,7 @@
                 <div class="row"><h2 id="categories-title">Top categories</h2><span class="badge badge-grey">Librarian · Admin</span></div>
                 <p class="small muted">Top @Model.TopCategoriesLimit · @period · generated @Model.Generated(report.GeneratedAtUtc)</p>
             </div>
+            <a class="btn btn-secondary btn-sm" href="@Model.PeriodCsvHref("top-books-and-categories")">Export CSV</a>
         </div>
         @if (report.TopCategories.Count == 0)
         {

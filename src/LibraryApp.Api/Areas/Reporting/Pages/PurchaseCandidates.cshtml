@@ -13,6 +13,7 @@
             <div class="row"><h2 id="candidates-title">Longest reservation queues</h2><span class="badge badge-blue">Admin only</span></div>
             <p class="small muted">Top @report.Limit · as of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc)</p>
         </div>
+        <a class="btn btn-secondary btn-sm" href="@ReportPaths.CsvHref(ReportPaths.PurchaseCandidates)">Export CSV</a>
     </div>
     @if (report.Books.Count == 0)
     {

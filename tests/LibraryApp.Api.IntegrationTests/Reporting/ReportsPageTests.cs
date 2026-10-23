@@ -260,6 +260,62 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         Assert.Equal("/forbidden", response.Headers.Location?.AbsolutePath);
     }
 
+    [Fact]
+    public async Task Reports_have_export_csv_links_for_the_filters_and_period_shown()
+    {
+        var it = StaffSeedIds.Departments.InformationTechnology;
+
+        string html = await GetAsync(Admin, $"{Route}?departmentId={it}&days=6-10&from=2026-10-01&to=2026-10-31");
+
+        Assert.Contains($"href=\"/reports?handler=csv&amp;report=overdue-loans&amp;departmentId={it}&amp;days=6-10\">Export CSV</a>", html);
+        Assert.Contains("href=\"/reports?handler=csv&amp;report=top-books-and-categories&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV</a>", html);
+        Assert.Contains("href=\"/reports?handler=csv&amp;report=reading-activity-by-department&amp;from=2026-10-01&amp;to=2026-10-31\">Export CSV</a>", html);
+    }
+
+    [Theory]
+    [InlineData(Librarian, "/reports?handler=csv&report=overdue-loans", "\"AsOfDate\",\"GeneratedAtUtc\",\"LoanId\"")]
+    [InlineData(Librarian, "/reports?handler=csv&report=top-books-and-categories&from=2026-10-01&to=2026-10-31", "\"PeriodStart\",\"PeriodEnd\",\"GeneratedAtUtc\",\"Type\"")]
+    [InlineData(Admin, "/reports?handler=csv&report=reading-activity-by-department&from=2026-10-01&to=2026-10-31", "\"Information Technology\"")]
+    [InlineData(Admin, "/reports/penalties?handler=csv&from=2026-10-01&to=2026-10-31", "\"IssuedPoints\",\"WaivedPoints\",\"ActivePoints\"")]
+    [InlineData(Librarian, "/reports/inventory?handler=csv", "\"Status\",\"StatusCopies\",\"Condition\"")]
+    [InlineData(Admin, "/reports/purchase-candidates?handler=csv", "\"WaitingReservations\"")]
+    public async Task Export_csv_downloads_the_report(string email, string path, string expected)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
+
+        using var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+        Assert.EndsWith(".csv", response.Content.Headers.ContentDisposition?.FileNameStar ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Contains(expected, await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("/reports?handler=csv&report=reading-activity-by-department")]
+    [InlineData("/reports/penalties?handler=csv")]
+    [InlineData("/reports/purchase-candidates?handler=csv")]
+    public async Task Librarian_cannot_export_the_administrator_reports(string path)
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/forbidden", response.Headers.Location?.AbsolutePath);
+    }
+
+    [Fact]
+    public async Task Unknown_report_export_is_not_found()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await client.GetAsync("/reports?handler=csv&report=unknown");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private async Task<string> GetAsync(string email, string path)
     {
         using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);
