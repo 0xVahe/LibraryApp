@@ -10,6 +10,7 @@ using LibraryApp.Application.Staff.Dto;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Borrowing;
 using LibraryApp.Domain.Common;
+using LibraryApp.Domain.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -64,6 +65,11 @@ public sealed class IndexModel(
 
     public TopBooksAndCategoriesReportDto? Top { get; private set; }
 
+    /// <summary>REP-04 shows department figures, so only the administrator gets it (REP-F5).</summary>
+    public ReadingActivityByDepartmentReportDto? ReadingActivity { get; private set; }
+
+    public bool IsAdministrator => User.IsInRole(StaffRoles.LibraryAdministrator);
+
     public int TopBooksLimit => options.Value.TopBooksLimit;
 
     public int TopCategoriesLimit => options.Value.TopCategoriesLimit;
@@ -92,7 +98,7 @@ public sealed class IndexModel(
             Days = null;
         Overdue = await reports.GetOverdueLoansAsync(DepartmentId, range.Value is null ? null : range.Min, range.Max, new PageRequest(page), ct);
 
-        // REP-03 for the chosen period; a reversed period is shown next to the form instead of the reports.
+        // REP-03, and REP-04 for the administrator, for the chosen period; a reversed period is shown next to the form instead of the reports.
         DateOnly today = clock.LocalToday;
         DateOnly monthStart = new(today.Year, today.Month, 1);
         PeriodFrom = From ?? monthStart;
@@ -100,6 +106,8 @@ public sealed class IndexModel(
         try
         {
             Top = await reports.GetTopBooksAndCategoriesAsync(PeriodFrom, PeriodTo, ct);
+            if (IsAdministrator)
+                ReadingActivity = await reports.GetReadingActivityByDepartmentAsync(PeriodFrom, PeriodTo, ct);
         }
         catch (DomainException ex) when (ex.Error.Kind == ErrorKind.Validation)
         {

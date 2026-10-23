@@ -1,0 +1,33 @@
+@page "/reports/penalties"
+@model PenaltiesModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Penalty points";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Penalty points", "Issued, waived and active points by department. Dates are Asia/Yerevan days, both ends included.", Crumbs: [new("Reports", UiNavigation.Reports)]))' />
+
+<div class="stack-lg">
+    <form class="card" method="get" action="@(ReportPaths.Penalties)#period-title" aria-labelledby="period-title">
+        <h2 id="period-title" class="mb-16">Report period</h2>
+        <div class="row filters">
+            <div class="field grow-160">
+                <label for="period-from">From</label>
+                <input id="period-from" name="from" type="date" required value="@Model.PeriodFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" aria-invalid="@(Model.PeriodError is null ? null : "true")">
+            </div>
+            <div class="field grow-160">
+                <label for="period-to">To</label>
+                <input id="period-to" name="to" type="date" required value="@Model.PeriodTo.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" aria-invalid="@(Model.PeriodError is null ? null : "true")">
+            </div>
+            <button class="btn btn-primary self-end" type="submit">Show period</button>
+        </div>
+        @if (Model.PeriodError is { } error)
+        {
+            <p class="error-text mt-12" id="period-error">@error</p>
+        }
+    </form>
+    @if (Model.Report is not null)
+    {
+        <partial name="_Penalties" model="Model" />
+    }
+</div>

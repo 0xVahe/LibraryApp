@@ -127,6 +127,86 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         Assert.DoesNotContain("id=\"books-title\"", html);
     }
 
+    [Fact]
+    public async Task Administrator_sees_reading_activity_for_every_department()
+    {
+        string html = await GetAsync(Admin, $"{Route}?from=2026-10-01&to=2026-10-31");
+
+        Assert.Contains("id=\"reading-title\"", html);
+        Assert.Contains("<th>Per 10 staff</th>", html);
+        Assert.Contains("Every department is listed, also with zero loans · 1 Oct 2026 – 31 Oct 2026 · generated", html);
+        string reading = html[html.IndexOf("id=\"reading-title\"", StringComparison.Ordinal)..html.IndexOf("id=\"more-title\"", StringComparison.Ordinal)];
+        Assert.All(StaffSeedData.DepartmentList, department =>
+            Assert.Contains($"<td data-label=\"Department\">{department.Name}</td>", reading));
+    }
+
+    [Fact]
+    public async Task Administrator_can_open_every_other_report()
+    {
+        string html = await GetAsync(Admin, Route);
+
+        Assert.Contains("id=\"more-title\"", html);
+        Assert.Contains("href=\"/reports/inventory\"", html);
+        Assert.Contains("href=\"/reports/penalties\"", html);
+        Assert.Contains("href=\"/reports/purchase-candidates\"", html);
+        Assert.DoesNotContain("Department-level figures are for the administrator only.", html);
+    }
+
+    [Fact]
+    public async Task Librarian_sees_no_department_figures_and_only_the_inventory_report()
+    {
+        string html = await GetAsync(Librarian, Route);
+
+        Assert.Contains("Department-level figures are for the administrator only.", html);
+        Assert.DoesNotContain("id=\"reading-title\"", html);
+        Assert.Contains("href=\"/reports/inventory\"", html);
+        Assert.DoesNotContain("href=\"/reports/penalties\"", html);
+        Assert.DoesNotContain("href=\"/reports/purchase-candidates\"", html);
+    }
+
+    [Fact]
+    public async Task Reversed_period_hides_reading_activity_too()
+    {
+        string html = await GetAsync(Admin, $"{Route}?from=2026-10-31&to=2026-10-01");
+
+        Assert.Contains("id=\"period-error\"", html);
+        Assert.DoesNotContain("id=\"reading-title\"", html);
+    }
+
+    [Fact]
+    public async Task Penalties_page_lists_every_department_for_the_period()
+    {
+        string html = await GetAsync(Admin, "/reports/penalties?from=2026-10-01&to=2026-10-31");
+
+        Assert.Contains("id=\"penalties-title\"", html);
+        Assert.Contains("<th>Issued</th><th>Waived</th><th>Active</th>", html);
+        Assert.Contains("1 Oct 2026 – 31 Oct 2026 · generated", html);
+        Assert.Contains("<a href=\"/reports\">Reports</a>", html);
+        Assert.All(StaffSeedData.DepartmentList, department =>
+            Assert.Contains($"<td data-label=\"Department\">{department.Name}</td>", html));
+        Assert.DoesNotContain("style=\"", html);
+    }
+
+    [Fact]
+    public async Task Penalties_page_shows_a_reversed_period_as_an_error()
+    {
+        string html = await GetAsync(Admin, "/reports/penalties?from=2026-10-31&to=2026-10-01");
+
+        Assert.Contains("id=\"period-error\"", html);
+        Assert.DoesNotContain("id=\"penalties-title\"", html);
+    }
+
+    [Fact]
+    public async Task Librarian_cannot_open_the_penalties_page()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await client.GetAsync("/reports/penalties");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/forbidden", response.Headers.Location?.AbsolutePath);
+    }
+
     private async Task<string> GetAsync(string email, string path)
     {
         using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);

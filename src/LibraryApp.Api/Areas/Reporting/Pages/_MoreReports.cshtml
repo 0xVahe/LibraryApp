@@ -1,0 +1,12 @@
+@model IndexModel
+<section class="card" aria-labelledby="more-title">
+    <h2 id="more-title" class="mb-16">More reports</h2>
+    <ul class="list">
+        <li><div class="grow"><p class="title">Inventory status</p><p class="small muted">Copies by status and condition, filter by category</p><span class="badge badge-grey">Librarian · Admin</span></div><a class="btn btn-secondary btn-sm" href="@ReportPaths.Inventory">Open</a></li>
+        @if (Model.IsAdministrator)
+        {
+            <li><div class="grow"><p class="title">Penalty points</p><p class="small muted">Issued, waived and active points by department</p><span class="badge badge-blue">Admin only</span></div><a class="btn btn-secondary btn-sm" href="@ReportPaths.Penalties">Open</a></li>
+            <li><div class="grow"><p class="title">Purchase candidates</p><p class="small muted">Books with the longest reservation queues</p><span class="badge badge-blue">Admin only</span></div><a class="btn btn-secondary btn-sm" href="@ReportPaths.PurchaseCandidates">Open</a></li>
+        }
+    </ul>
+</section>

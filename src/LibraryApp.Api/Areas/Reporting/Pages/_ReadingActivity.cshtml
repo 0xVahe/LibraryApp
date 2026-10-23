@@ -1,0 +1,28 @@
+@model IndexModel
+@using System.Globalization
+@{
+    var report = Model.ReadingActivity!;
+}
+<section class="card flush" aria-labelledby="reading-title">
+    <div class="card-head">
+        <div>
+            <div class="row"><h2 id="reading-title">Reading activity by department</h2><span class="badge badge-blue">Admin only</span></div>
+            <p class="small muted">Every department is listed, also with zero loans · @IndexModel.Date(report.PeriodStart) – @IndexModel.Date(report.PeriodEnd) · generated @Model.Generated(report.GeneratedAtUtc)</p>
+        </div>
+    </div>
+    <table class="table">
+        <thead><tr><th>Department</th><th>Staff</th><th>Loans</th><th>Per 10 staff</th><th>Top category</th></tr></thead>
+        <tbody>
+            @foreach (var department in report.Departments)
+            {
+                <tr>
+                    <td data-label="Department">@department.Department</td>
+                    <td data-label="Staff">@department.Employees</td>
+                    <td data-label="Loans">@department.LoanCount</td>
+                    <td data-label="Per 10 staff">@department.LoansPer10Employees.ToString("0.0", CultureInfo.InvariantCulture)</td>
+                    <td data-label="Top category">@if (department.TopCategory is { } category) {<text>@category</text>} else {<span class="muted">—</span>}</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
