@@ -32,7 +32,7 @@ internal static class ReportCsvWriter
     private static string Escape(string? value)
     {
         string text = value ?? string.Empty;
-        string normalized = text.TrimStart(' ');
+        string normalized = text.TrimStart();
 
         if (normalized.Length > 0 &&
             "=+-@\t\r\n".Contains(normalized[0]))
