@@ -1,5 +1,6 @@
 using System.Net;
 using LibraryApp.Api.IntegrationTests.Ui;
+using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 
 namespace LibraryApp.Api.IntegrationTests.Reporting;
@@ -202,6 +203,58 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
 
         using var response = await client.GetAsync("/reports/penalties");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/forbidden", response.Headers.Location?.AbsolutePath);
+    }
+
+    [Theory]
+    [InlineData(Admin)]
+    [InlineData(Librarian)]
+    public async Task Inventory_page_lists_every_status_and_condition(string email)
+    {
+        string html = await GetAsync(email, "/reports/inventory");
+
+        Assert.Contains("id=\"inventory-title\">All categories</h2>", html);
+        Assert.Contains("<th>Status</th><th>Copies</th>", html);
+        foreach (var condition in new[] { "New", "Good", "Fair", "Poor" })
+            Assert.Contains($"<th>{condition}</th>", html);
+        foreach (var status in new[] { "Available", "On loan", "Reserved", "Under repair", "Lost", "Withdrawn" })
+            Assert.Contains($">{status}</span>", html);
+        Assert.Contains("in the collection · ", html);
+        Assert.DoesNotContain("style=\"", html);
+    }
+
+    [Fact]
+    public async Task Inventory_filter_keeps_the_category_and_ignores_an_unknown_one()
+    {
+        var it = CatalogSeedIds.Category(3);
+
+        string html = await GetAsync(Librarian, $"/reports/inventory?categoryId={it}");
+        Assert.Contains($"<option value=\"{it}\" selected=\"selected\">", html);
+        Assert.Contains("id=\"inventory-title\">IT &amp; Software Engineering</h2>", html);
+
+        html = await GetAsync(Librarian, $"/reports/inventory?categoryId={Guid.NewGuid()}");
+        Assert.Contains("id=\"inventory-title\">All categories</h2>", html);
+    }
+
+    [Fact]
+    public async Task Purchase_candidates_page_lists_the_queued_books()
+    {
+        string html = await GetAsync(Admin, "/reports/purchase-candidates");
+
+        Assert.Contains("id=\"candidates-title\"", html);
+        Assert.Contains("<th>Waiting</th><th>Copies</th>", html);
+        Assert.Contains($"href=\"/catalog/books/{CatalogSeedIds.Book(1)}\"", html);   // two Waiting reservations in the seed
+        Assert.Contains("Top 10 · as of ", html);
+    }
+
+    [Fact]
+    public async Task Librarian_cannot_open_the_purchase_candidates_page()
+    {
+        using var client = await UiTestClient.SignedInAsync(factory, Librarian, StaffSeedData.Password);
+
+        using var response = await client.GetAsync("/reports/purchase-candidates");
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.Equal("/forbidden", response.Headers.Location?.AbsolutePath);

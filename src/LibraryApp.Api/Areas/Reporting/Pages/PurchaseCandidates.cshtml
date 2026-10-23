@@ -1,0 +1,40 @@
+@page "/reports/purchase-candidates"
+@model PurchaseCandidatesModel
+@{
+    ViewData["Title"] = "Purchase candidates";
+    var report = Model.Report;
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Purchase candidates", "Books with the longest reservation queues: the ones worth buying more copies of.", Crumbs: [new("Reports", UiNavigation.Reports)]))' />
+
+<section class="card flush" aria-labelledby="candidates-title">
+    <div class="card-head">
+        <div>
+            <div class="row"><h2 id="candidates-title">Longest reservation queues</h2><span class="badge badge-blue">Admin only</span></div>
+            <p class="small muted">Top @report.Limit · as of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc)</p>
+        </div>
+    </div>
+    @if (report.Books.Count == 0)
+    {
+        <p class="muted card-filters">No book has a reservation queue.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>#</th><th>Book</th><th>Category</th><th>Waiting</th><th>Copies</th></tr></thead>
+            <tbody>
+                @for (int i = 0; i < report.Books.Count; i++)
+                {
+                    var book = report.Books[i];
+                    <tr>
+                        <td data-label="#">@(i + 1)</td>
+                        <td data-label="Book"><a class="row-link" href="@($"{UiNavigation.Catalog}/books/{book.BookId}")">@book.Title</a> <span class="small muted">@book.Isbn</span></td>
+                        <td data-label="Category">@book.Category</td>
+                        <td data-label="Waiting">@book.WaitingReservations</td>
+                        <td data-label="Copies">@book.CopiesInCollection</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>

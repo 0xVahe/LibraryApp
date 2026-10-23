@@ -1,0 +1,56 @@
+@page "/reports/inventory"
+@model InventoryModel
+@using LibraryApp.Domain.Catalog
+@{
+    ViewData["Title"] = "Inventory status";
+    var report = Model.Report;
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Inventory status", "Copies by status and condition, for the whole library or one category with its subcategories.", Crumbs: [new("Reports", UiNavigation.Reports)]))' />
+
+<section class="card flush" aria-labelledby="inventory-title">
+    <div class="card-head">
+        <div>
+            <div class="row"><h2 id="inventory-title">@(report.Category ?? "All categories")</h2><span class="badge badge-grey">Librarian · Admin</span></div>
+            <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc)</p>
+            <p class="small muted">@IndexModel.Count(report.CopiesInCollection, "copy") in the collection · @report.TotalCopies with lost and withdrawn ones</p>
+        </div>
+    </div>
+    <form class="row filters card-filters" method="get" action="@(ReportPaths.Inventory)#inventory-title" role="search" aria-label="Filter by category">
+        <div class="min-w-200">
+            <label class="visually-hidden" for="inventory-category">Category</label>
+            <select id="inventory-category" name="categoryId">
+                <option value="">All categories</option>
+                @foreach (var category in Model.Categories)
+                {
+                    <option value="@category.Id" selected="@(Model.CategoryId == category.Id)">@category.Text</option>
+                }
+            </select>
+        </div>
+        <button class="btn btn-primary" type="submit">Filter</button>
+    </form>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Status</th><th>Copies</th>
+                @foreach (var condition in Enum.GetValues<BookCopyCondition>())
+                {
+                    <th>@StatusBadge.Label(condition)</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var status in report.Statuses)
+            {
+                <tr>
+                    <td data-label="Status"><partial name="/Pages/Shared/_StatusBadge.cshtml" model="status.Status" /></td>
+                    <td data-label="Copies">@status.Copies</td>
+                    @foreach (var condition in status.Conditions)
+                    {
+                        <td data-label="@StatusBadge.Label(condition.Condition)">@condition.Copies</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
