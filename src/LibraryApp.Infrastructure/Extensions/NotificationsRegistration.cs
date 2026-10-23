@@ -29,7 +29,7 @@ public static class NotificationsRegistrationExtensions
 
         // Creating notifications from events (NOT-01, NOT-02): handlers call INotificationCreator
         services.AddScoped<INotificationTemplateRepository, NotificationTemplateRepository>();
-        services.AddScoped<INotificationRecipientReader, NotificationRecipientReader>();
+        services.AddScoped<INotificationRecipientReader, StaffContactRecipientReader>();
         services.AddScoped<INotificationCreator, NotificationCreator>();
 
         // Administration of the templates (NOT-09)

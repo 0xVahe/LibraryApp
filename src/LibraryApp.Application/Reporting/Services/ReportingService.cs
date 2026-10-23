@@ -6,6 +6,7 @@ using LibraryApp.Application.Reporting.Options;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Caching.Memory;
 using LibraryApp.Domain.Borrowing;
+using LibraryApp.Domain.Catalog;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Reporting;
 
@@ -19,17 +20,13 @@ public sealed class ReportingService(
     PenaltyPolicy penaltyPolicy,
     IOptions<ReportingOptions> options) : IReportingService
 {
-    public Task<OverdueLoansReportDto> GetOverdueLoansAsync(
-        Guid? departmentId,
-        int? minimumDaysOverdue,
-        int? maximumDaysOverdue,
-        CancellationToken ct = default) =>
-        GetOverdueLoansAsync(
-            departmentId,
-            minimumDaysOverdue,
-            maximumDaysOverdue,
-            new PageRequest(),
-            ct);
+
+public Task<OverdueLoansReportDto> GetOverdueLoansAsync(
+    Guid? departmentId,
+    int? minimumDaysOverdue,
+    int? maximumDaysOverdue,
+    CancellationToken ct = default) =>
+    GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, new PageRequest(), ct);
 
     public async Task<OverdueLoansReportDto> GetOverdueLoansAsync(
         Guid? departmentId,
@@ -40,17 +37,30 @@ public sealed class ReportingService(
     {
         ArgumentNullException.ThrowIfNull(paging);
 
+        OverdueLoansReportDto report = await GetAllOverdueLoansAsync(
+            departmentId, minimumDaysOverdue, maximumDaysOverdue, ct);
+
+        return report with
+        {
+            Items = report.Items.Skip(paging.Skip).Take(paging.PageSize).ToList(),
+            Page = paging.Page,
+            PageSize = paging.PageSize
+        };
+    }
+
+    public async Task<OverdueLoansReportDto> GetAllOverdueLoansAsync(
+        Guid? departmentId,
+        int? minimumDaysOverdue,
+        int? maximumDaysOverdue,
+        CancellationToken ct = default)
+    {
         if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0 ||
             (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue &&
              minimumDaysOverdue > maximumDaysOverdue))
-        {
             throw new DomainException(ReportingErrors.InvalidOverdueFilter);
-        }
 
         if (departmentId == Guid.Empty)
-        {
             throw new DomainException(ReportingErrors.InvalidDepartmentId);
-        }
 
         DateTime nowUtc = clock.UtcNow;
         DateOnly today = clock.LocalToday;
@@ -86,24 +96,18 @@ public sealed class ReportingService(
             .ThenBy(item => item.LoanId)
             .ToList();
 
-        int totalCount = items.Count;
-
-        List<OverdueLoanItemDto> pageItems = items
-            .Skip(paging.Skip)
-            .Take(paging.PageSize)
-            .ToList();
-
         return new OverdueLoansReportDto(
             today,
             nowUtc,
             departmentId,
             minimumDaysOverdue,
             maximumDaysOverdue,
-            pageItems,
-            totalCount,
-            paging.Page,
-            paging.PageSize);
+            items,
+            items.Count,
+            1,
+            Math.Max(1, items.Count));
     }
+
 
     public async Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default)
     {
@@ -199,5 +203,94 @@ public sealed class ReportingService(
             .ToList();
 
         return new ReadingActivityByDepartmentReportDto(from, to, clock.UtcNow, items);
+    }
+
+    public async Task<PenaltyReportDto> GetPenaltiesByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default)
+    {
+        if (from == default || to == default || from > to)
+        {
+            throw new DomainException(ReportingErrors.InvalidDateRange);
+        }
+
+        DateTime nowUtc = clock.UtcNow;
+        DateTime fromUtc = clock.StartOfLocalDayUtc(from);
+        DateTime toUtc = clock.EndOfLocalDayUtc(to);
+        IReadOnlyList<DepartmentEmployeesData> departments = await repository.GetDepartmentEmployeesAsync(ct);
+        Dictionary<Guid, DepartmentPenaltiesData> penalties =
+            (await repository.GetDepartmentPenaltiesAsync(fromUtc, toUtc, nowUtc, ct))
+            .ToDictionary(row => row.DepartmentId);
+
+        // Every department is listed, also the ones without penalties in the period.
+        List<DepartmentPenaltiesDto> items = departments
+            .Select(department =>
+            {
+                penalties.TryGetValue(department.DepartmentId, out DepartmentPenaltiesData? row);
+                return new DepartmentPenaltiesDto(
+                    department.DepartmentId,
+                    department.Department,
+                    row?.Penalties ?? 0,
+                    row?.IssuedPoints ?? 0,
+                    row?.WaivedPoints ?? 0,
+                    row?.ActivePoints ?? 0);
+            })
+            .OrderBy(item => item.Department)
+            .ToList();
+
+        return new PenaltyReportDto(from, to, nowUtc, items);
+    }
+
+    public async Task<InventoryStatusReportDto> GetInventoryStatusAsync(
+        Guid? categoryId,
+        CancellationToken ct = default)
+    {
+        if (categoryId == Guid.Empty)
+        {
+            throw new DomainException(ReportingErrors.InvalidCategoryId);
+        }
+
+        string? category = null;
+        if (categoryId is Guid id)
+        {
+            category = await repository.GetCategoryNameAsync(id, ct)
+                       ?? throw new DomainException(ReportingErrors.CategoryNotFound);
+        }
+
+        IReadOnlyList<CopyCountData> counts = await repository.GetCopyCountsAsync(categoryId, ct);
+        Dictionary<(BookCopyStatus, BookCopyCondition), int> copies =
+            counts.ToDictionary(row => (row.Status, row.Condition), row => row.Copies);
+
+        // Every status and condition is listed, also the ones without copies.
+        List<InventoryStatusItemDto> statuses = Enum.GetValues<BookCopyStatus>()
+            .Select(status =>
+            {
+                List<InventoryConditionItemDto> conditions = Enum.GetValues<BookCopyCondition>()
+                    .Select(condition => new InventoryConditionItemDto(
+                        condition, copies.GetValueOrDefault((status, condition))))
+                    .ToList();
+
+                return new InventoryStatusItemDto(status, conditions.Sum(item => item.Copies), conditions);
+            })
+            .ToList();
+
+        return new InventoryStatusReportDto(
+            clock.LocalToday,
+            clock.UtcNow,
+            categoryId,
+            category,
+            statuses.Sum(item => item.Copies),
+            statuses
+                .Where(item => item.Status is not (BookCopyStatus.Lost or BookCopyStatus.Withdrawn))
+                .Sum(item => item.Copies),
+            statuses);
+    }
+
+    public async Task<PurchaseCandidatesReportDto> GetPurchaseCandidatesAsync(CancellationToken ct = default)
+    {
+        IReadOnlyList<PurchaseCandidateItemDto> books = await repository.GetPurchaseCandidatesAsync(ct);
+        return new PurchaseCandidatesReportDto(
+            clock.LocalToday, clock.UtcNow, options.Value.PurchaseCandidatesLimit, books);
     }
 }

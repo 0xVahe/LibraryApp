@@ -463,6 +463,10 @@ namespace LibraryApp.Infrastructure.Persistence.Migrations
                         .HasMaxLength(-1)
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CalendarItem")
+                        .HasMaxLength(-1)
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CcEmail")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");

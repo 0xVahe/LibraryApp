@@ -1,0 +1,83 @@
+using System.Reflection;
+using System.Text;
+
+namespace LibraryApp.Api.IntegrationTests.Reporting;
+
+public sealed class ReportCsvWriterTests
+{
+    [Theory]
+    [InlineData("Hello, World", "\"Hello, World\"")]
+    [InlineData("He said \"Hello\"", "\"He said \"\"Hello\"\"\"")]
+    [InlineData("Հայերեն", "\"Հայերեն\"")]
+    [InlineData("=SUM(1,2)", "\"'=SUM(1,2)\"")]
+    [InlineData("  =SUM(1,2)", "\"'  =SUM(1,2)\"")]
+    [InlineData("@SUM(1,2)", "\"'@SUM(1,2)\"")]
+    [InlineData("\t =SUM(1,2)", "\"'\t =SUM(1,2)\"")]
+    [InlineData("\n =SUM(1,2)", "\"'\n =SUM(1,2)\"")]
+    [InlineData("\u00A0=SUM(1,2)", "\"'\u00A0=SUM(1,2)\"")]
+    [InlineData("Line1\nLine2", "\"Line1\nLine2\"")]
+    [InlineData("+123", "\"'+123\"")]
+    [InlineData("-123", "\"'-123\"")]
+    [InlineData("\t=SUM(1,2)", "\"'\t=SUM(1,2)\"")]
+    [InlineData("\r=SUM(1,2)", "\"'\r=SUM(1,2)\"")]
+    [InlineData("Line1\r\nLine2", "\"Line1\r\nLine2\"")]
+    [InlineData("", "\"\"")]
+    public void Csv_writer_escapes_values(string input, string expected)
+    {
+        string csv = WriteCsv(["Value"], [[input]]);
+
+        Assert.Equal($"\"Value\"\r\n{expected}\r\n", csv);
+    }
+
+    [Fact]
+    public void Csv_writer_includes_utf8_bom()
+    {
+        byte[] bytes = WriteBytes(["Name"], [["Հայերեն"]]);
+
+        Assert.Equal(Encoding.UTF8.GetPreamble(), bytes[..3]);
+    }
+
+    [Fact]
+    public void Csv_writer_rejects_incorrect_column_count()
+    {
+        var exception = Assert.Throws<TargetInvocationException>(() => WriteBytes(["First", "Second"], [["Only one"]]));
+
+        Assert.IsType<ArgumentException>(exception.InnerException);
+    }
+
+    private static string WriteCsv(string[] headers, string?[][] rows)
+    {
+        byte[] bytes = WriteBytes(headers, rows);
+
+        return Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF');
+    }
+
+    private static byte[] WriteBytes(string[] headers, string?[][] rows)
+    {
+        var assembly = typeof(LibraryApp.Api.Controllers.Reporting.ReportsController).Assembly;
+
+        var writer = assembly.GetType(
+            "LibraryApp.Api.Controllers.Reporting.ReportCsvWriter", true)!;
+
+        var method = writer.GetMethod(
+            "Write", BindingFlags.Public | BindingFlags.Static)!;
+
+        return (byte[])method.Invoke(null, [headers, rows])!;
+    }
+
+    [Fact]
+    public void Csv_writer_handles_null_cells()
+    {
+        string csv = WriteCsv(["First", "Second"], [["Hello", null]]);
+
+        Assert.Equal("\"First\",\"Second\"\r\n\"Hello\",\"\"\r\n", csv);
+    }
+
+    [Fact]
+    public void Csv_writer_handles_empty_reports()
+    {
+        string csv = WriteCsv(["Name", "Count"], []);
+
+        Assert.Equal("\"Name\",\"Count\"\r\n", csv);
+    }
+}

@@ -17,6 +17,9 @@ public sealed class ReportingOptionsValidator : IValidateOptions<ReportingOption
         if (options.TopCategoriesLimit is < 1 or > 100)
             failures.Add("Reporting:TopCategoriesLimit must be between 1 and 100.");
 
+        if (options.PurchaseCandidatesLimit is < 1 or > 100)
+            failures.Add("Reporting:PurchaseCandidatesLimit must be between 1 and 100.");
+
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);

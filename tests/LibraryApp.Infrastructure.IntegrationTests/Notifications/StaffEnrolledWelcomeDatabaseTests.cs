@@ -1,5 +1,7 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Notifications.EventHandlers;
+using LibraryApp.Application.Staff.Options;
+using LibraryApp.Application.Staff.Services;
 using LibraryApp.Application.Notifications.Services;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Events;
@@ -8,9 +10,11 @@ using LibraryApp.Infrastructure.IntegrationTests.Identity;
 using LibraryApp.Infrastructure.IntegrationTests.Persistence;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Repositories.Notifications;
+using LibraryApp.Infrastructure.Persistence.Repositories.Staff;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.IntegrationTests.Notifications;
 
@@ -30,7 +34,8 @@ public class StaffEnrolledWelcomeDatabaseTests(StaffSeederFixture fixture) : ICl
         var creator = new NotificationCreator(
             new NotificationRepository(db),
             new NotificationTemplateRepository(db),
-            new NotificationRecipientReader(db),
+            // The recipient comes from the Staff contract, as in the application.
+            new StaffContactRecipientReader(new StaffMemberService(new StaffMemberRepository(db), Options.Create(new StaffOptions()))),
             new NotificationTemplateRenderer(),
             new SequentialGuidGenerator(TimeProvider.System),
             new FixedClock(Now));

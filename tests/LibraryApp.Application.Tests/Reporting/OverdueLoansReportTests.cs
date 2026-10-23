@@ -298,6 +298,19 @@ public sealed class OverdueLoansReportTests
         public Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(
             DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+            DateTime fromUtc, DateTime toUtc, DateTime nowUtc, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(Guid? categoryId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class WeekdayCalendar : IWorkingDayCalendar

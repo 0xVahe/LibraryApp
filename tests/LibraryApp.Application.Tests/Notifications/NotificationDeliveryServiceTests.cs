@@ -31,6 +31,30 @@ public sealed class NotificationDeliveryServiceTests
         Assert.Equal(Now, store.Notifications[0].SentAtUtc);
     }
 
+    [Fact]
+    public async Task The_calendar_item_of_the_notification_goes_with_the_email_as_due_date_ics()
+    {
+        var notification = NewNotification(calendarItem: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n");
+        var sender = new FakeSender();
+
+        await Service(new FakeStore(notification), sender).DeliverPendingAsync();
+
+        var attachment = Assert.Single(Assert.Single(sender.Sent).Attachments!);
+        Assert.Equal("due-date.ics", attachment.FileName);
+        Assert.StartsWith("text/calendar", attachment.MediaType);
+        Assert.Equal("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", attachment.Text);
+    }
+
+    [Fact]
+    public async Task An_email_without_a_calendar_item_has_no_attachment()
+    {
+        var sender = new FakeSender();
+
+        await Service(new FakeStore(NewNotification()), sender).DeliverPendingAsync();
+
+        Assert.Null(Assert.Single(sender.Sent).Attachments);
+    }
+
     [Theory]
     [InlineData(0, 5)]
     [InlineData(1, 15)]
@@ -160,10 +184,10 @@ public sealed class NotificationDeliveryServiceTests
         },
     });
 
-    private static Notification NewNotification(string to = "anna@ameriabank.am", string? cc = null) =>
+    private static Notification NewNotification(string to = "anna@ameriabank.am", string? cc = null, string? calendarItem = null) =>
         Notification.Create(
             Guid.NewGuid(), Guid.NewGuid(), NotificationType.LoanConfirmation, NotificationChannel.Outlook,
-            to, cc, "Subject", "<p>Body</p>", Now.AddMinutes(-1), DateOnly.FromDateTime(Now));
+            to, cc, "Subject", "<p>Body</p>", Now.AddMinutes(-1), DateOnly.FromDateTime(Now), calendarItem: calendarItem);
 
     private sealed class FakeStore(params Notification[] notifications) : INotificationDeliveryStore
     {
