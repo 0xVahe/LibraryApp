@@ -1,0 +1,58 @@
+@model IndexModel
+@{
+    var report = Model.Top!;
+    var period = $"{IndexModel.Date(report.PeriodStart)} – {IndexModel.Date(report.PeriodEnd)}";
+}
+<div class="grid grid-2">
+    <section class="card flush" aria-labelledby="books-title">
+        <div class="card-head">
+            <div>
+                <h2 id="books-title">Most borrowed books</h2>
+                <p class="small muted">Top @Model.TopBooksLimit · @period · generated @Model.Generated(report.GeneratedAtUtc)</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="@Model.PeriodCsvHref("top-books-and-categories")">Export CSV<span class="visually-hidden"> of the most borrowed books</span></a>
+        </div>
+        @if (report.TopBooks.Count == 0)
+        {
+            <p class="muted card-filters">No loans in this period.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>#</th><th>Book</th><th>Loans</th></tr></thead>
+                <tbody>
+                    @for (int i = 0; i < report.TopBooks.Count; i++)
+                    {
+                        <tr><td data-label="#">@(i + 1)</td><td data-label="Book">@report.TopBooks[i].Title</td><td data-label="Loans">@report.TopBooks[i].LoanCount</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    <section class="card flush" aria-labelledby="categories-title">
+        <div class="card-head">
+            <div>
+                <h2 id="categories-title">Top categories</h2>
+                <p class="small muted">Top @Model.TopCategoriesLimit · @period · generated @Model.Generated(report.GeneratedAtUtc)</p>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="@Model.PeriodCsvHref("top-books-and-categories")">Export CSV<span class="visually-hidden"> of the top categories</span></a>
+        </div>
+        @if (report.TopCategories.Count == 0)
+        {
+            <p class="muted card-filters">No loans in this period.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead><tr><th>#</th><th>Category</th><th>Loans</th></tr></thead>
+                <tbody>
+                    @for (int i = 0; i < report.TopCategories.Count; i++)
+                    {
+                        <tr><td data-label="#">@(i + 1)</td><td data-label="Category">@report.TopCategories[i].Name</td><td data-label="Loans">@report.TopCategories[i].LoanCount</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+</div>

@@ -735,3 +735,15 @@ input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) bright
 .text-wrap { min-width: 0; overflow-wrap: anywhere; }
 .card-foot { padding: 0 24px 24px; }
 @media (max-width: 600px) { .card-foot { padding: 0 16px 16px; } }
+
+/* Bar charts of the Reports page (REP-09): drawn as SVG by the server, no script. The numbers are text next to the bar. */
+.chart { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.chart > li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) 48px; align-items: center; gap: 12px; }
+.chart-bar { display: block; width: 100%; height: 12px; }
+.chart-track { fill: var(--line); }
+.chart-fill { fill: var(--green); }
+.chart-fill.warning { fill: var(--red); }
+@media (max-width: 600px) {
+    .chart > li { grid-template-columns: minmax(0, 1fr) 48px; }
+    .chart-bar { grid-column: 1 / -1; grid-row: 2; }
+}
