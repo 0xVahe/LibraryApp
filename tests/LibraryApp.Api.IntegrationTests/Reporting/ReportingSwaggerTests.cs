@@ -4,8 +4,8 @@ using System.Text.Json;
 namespace LibraryApp.Api.IntegrationTests.Reporting;
 
 /// <summary>
-/// NFR-11 for the inventory status (REP-05) and purchase candidates (REP-07) reports: every response schema has an example
-/// with all of its properties, and every property is described.
+/// NFR-11 for every report (REP-01 to REP-07): every response schema has an example with all of its properties, and every
+/// property is described.
 /// </summary>
 public sealed class ReportingSwaggerTests(ApiHostFactory factory) : IClassFixture<ApiHostFactory>
 {
@@ -13,6 +13,10 @@ public sealed class ReportingSwaggerTests(ApiHostFactory factory) : IClassFixtur
     [
         "InventoryStatusReportDto", "InventoryStatusItemDto", "InventoryConditionItemDto",
         "PurchaseCandidatesReportDto", "PurchaseCandidateItemDto",
+        "OverdueLoansReportDto", "OverdueLoanItemDto", "DashboardReportDto",
+        "TopBooksAndCategoriesReportDto", "TopBookReportItemDto", "TopCategoryReportItemDto",
+        "ReadingActivityByDepartmentReportDto", "DepartmentReadingActivityDto",
+        "PenaltyReportDto", "DepartmentPenaltiesDto",
     ];
 
     [Fact]
@@ -37,6 +41,26 @@ public sealed class ReportingSwaggerTests(ApiHostFactory factory) : IClassFixtur
                 Assert.True(example.TryGetProperty(property.Name, out _), $"{name}.{property.Name}: not in the example");
             }
         }
+    }
+
+    [Theory]
+    [InlineData("/api/reports/overdue-loans")]
+    [InlineData("/api/reports/dashboard")]
+    [InlineData("/api/reports/top-books-and-categories")]
+    [InlineData("/api/reports/reading-activity-by-department")]
+    [InlineData("/api/reports/penalties")]
+    [InlineData("/api/reports/inventory-status")]
+    [InlineData("/api/reports/purchase-candidates")]
+    public async Task Every_report_endpoint_has_a_summary_and_documents_the_format(string path)
+    {
+        using var client = factory.CreateClient();
+        JsonElement get = (await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json"))
+            .GetProperty("paths").GetProperty(path).GetProperty("get");
+
+        Assert.True(get.TryGetProperty("summary", out var summary) && summary.GetString()!.Length > 0, $"{path}: no summary");
+        JsonElement format = get.GetProperty("parameters").EnumerateArray().Single(p => p.GetProperty("name").GetString() == "format");
+        Assert.Contains("csv", format.GetProperty("description").GetString());
+        Assert.True(get.GetProperty("responses").TryGetProperty("400", out _), $"{path}: no 400 response");
     }
 
     [Fact]

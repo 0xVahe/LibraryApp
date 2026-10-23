@@ -10,7 +10,7 @@ namespace LibraryApp.Application.Notifications.EventHandlers;
 /// </summary>
 /// <remarks>
 /// The channels are an ASSUMPTION: the notification catalogue (requirements, section 9) has no row for this type, so
-/// Outlook + in-app is taken as the general rule of the catalogue (G4-05). Change <see cref="Channels"/> once the owner of
+/// Outlook + in-app is taken as the general rule of the catalogue. Change <see cref="Channels"/> once the owner of
 /// the requirements decides.
 /// </remarks>
 public sealed class StaffPasswordChangedEventHandler(INotificationCreator creator) : IEventHandler<StaffPasswordChanged>

@@ -3,12 +3,12 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Domain.Notifications;
 
 /// <summary>
-/// One message to one staff member on one channel (G4-05). Created as Pending before sending (G4-09),
+/// One message to one staff member on one channel. Created as Pending before sending,
 /// so a failed send leaves a row to retry (NOT-08).
 /// </summary>
 public sealed class Notification : Entity
 {
-    public const int SubjectMaxLength = 300;   // G4-07
+    public const int SubjectMaxLength = 300;   // one line in Outlook; the renderer cuts a longer subject
     public const int LastErrorMaxLength = 2000;
 
     public Guid StaffMemberId { get; private set; }
@@ -16,7 +16,7 @@ public sealed class Notification : Entity
     /// <summary>The loan it is about, or null (Welcome, AccessRestricted, ...). Used for NOT-06.</summary>
     public Guid? LoanId { get; private set; }
 
-    /// <summary>The event that caused it, or null for daily-job reminders. A repeated event is ignored (G4-09).</summary>
+    /// <summary>The event that caused it, or null for daily-job reminders. A repeated event is ignored.</summary>
     public Guid? EventId { get; private set; }
 
     public NotificationType Type { get; private set; }
@@ -25,32 +25,32 @@ public sealed class Notification : Entity
 
     public NotificationStatus Status { get; private set; }
 
-    /// <summary>Corporate email, stored when created so a retry goes to the same person (G4-06).</summary>
+    /// <summary>Corporate email, stored when created so a retry goes to the same person.</summary>
     public string RecipientEmail { get; private set; } = null!;
 
-    /// <summary>Line manager in CC, stored when created (G4-06), or null.</summary>
+    /// <summary>Line manager in CC, stored when created, or null.</summary>
     public string? CcEmail { get; private set; }
 
     public string Subject { get; private set; } = null!;
 
-    /// <summary>Rendered HTML body; unlimited length (G4-07).</summary>
+    /// <summary>Rendered HTML body; unlimited length.</summary>
     public string Body { get; private set; } = null!;
 
     public DateTime CreatedAtUtc { get; private set; }
 
-    /// <summary>Yerevan date of <see cref="CreatedAtUtc"/>; part of the once-a-day rule per loan (NOT-06, G4-02).</summary>
+    /// <summary>Yerevan date of <see cref="CreatedAtUtc"/>; part of the once-a-day rule per loan (NOT-06).</summary>
     public DateOnly LocalDate { get; private set; }
 
     public DateTime? SentAtUtc { get; private set; }
 
-    /// <summary>When the staff member marked it as read; null = unread (NOT-04, G4-01).</summary>
+    /// <summary>When the staff member marked it as read; null = unread (NOT-04).</summary>
     public DateTime? ReadAtUtc { get; private set; }
 
-    /// <summary>Number of failed send attempts (NOT-08, G4-03).</summary>
+    /// <summary>Number of failed send attempts (NOT-08).</summary>
     public int Attempts { get; private set; }
 
     /// <summary>
-    /// Lease while the email is being sent (NOT-03), or the retry time of a Failed one (NOT-08, G4-03).
+    /// Lease while the email is being sent (NOT-03), or the retry time of a Failed one (NOT-08, <c>Notifications:Delivery:RetryDelays</c>).
     /// Null: a Pending email is due now; a Failed one is not retried.
     /// </summary>
     public DateTime? NextAttemptAtUtc { get; private set; }

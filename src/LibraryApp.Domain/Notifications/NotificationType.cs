@@ -2,8 +2,8 @@ namespace LibraryApp.Domain.Notifications;
 
 /// <summary>
 /// Kind of notification, from the notification catalogue of the requirements document (section 9).
-/// Explicit values starting at 1 (SD-11); never renumber, only add at the end.
-/// AccessRestricted and AccessSuspended are two types (G4-04).
+/// Explicit values starting at 1, so 0 is never valid; never renumber, only add at the end.
+/// AccessRestricted and AccessSuspended are two types, each with its own template.
 /// </summary>
 public enum NotificationType
 {

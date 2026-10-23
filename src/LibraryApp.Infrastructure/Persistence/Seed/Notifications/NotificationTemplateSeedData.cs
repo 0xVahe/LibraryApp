@@ -10,8 +10,8 @@ namespace LibraryApp.Infrastructure.Persistence.Seed.Notifications;
 /// </summary>
 /// <remarks>
 /// Only {{EmployeeName}}, {{BookTitle}} and {{DueDate}} are named by NOT-02. All other placeholders
-/// ({{ReadyUntil}}, {{Points}}, {{TotalPoints}}, {{Reason}}, {{EffectiveUntil}}, {{ReturnedDate}}) are PROVISIONAL, taken
-/// from the fields of the domain events, and must be aligned with the renderer once it exists. Bodies are plain HTML
+/// ({{ReadyUntil}}, {{Points}}, {{TotalPoints}}, {{Reason}}, {{EffectiveUntil}}, {{ReturnedDate}}) come from
+/// the fields of the domain events; NotificationPlaceholders lists the placeholders of each type. Bodies are plain HTML
 /// fragments in English (NFR-12); the Ameriabank layout wrapper (NOT-02) belongs to the renderer.
 /// </remarks>
 public static class NotificationTemplateSeedData

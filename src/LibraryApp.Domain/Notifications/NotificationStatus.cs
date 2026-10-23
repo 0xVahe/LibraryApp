@@ -1,11 +1,11 @@
 namespace LibraryApp.Domain.Notifications;
 
 /// <summary>
-/// Delivery state of a notification (NOT-04). Explicit values starting at 1 (SD-11).
+/// Delivery state of a notification (NOT-04). Explicit values starting at 1, so 0 is never a valid value.
 /// </summary>
 public enum NotificationStatus
 {
-    /// <summary>Created, not delivered yet (G4-09: the row exists before sending).</summary>
+    /// <summary>Created, not delivered yet: the row exists before sending.</summary>
     Pending = 1,
 
     /// <summary>Delivered.</summary>

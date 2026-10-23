@@ -1,6 +1,6 @@
 namespace LibraryApp.Application.Notifications.Options;
 
-/// <summary>Settings section "Notifications" (SD-21), checked at start.</summary>
+/// <summary>Settings section "Notifications", checked at start by NotificationsOptionsValidator (no defaults in code).</summary>
 public sealed class NotificationsOptions
 {
     public const string SectionName = "Notifications";

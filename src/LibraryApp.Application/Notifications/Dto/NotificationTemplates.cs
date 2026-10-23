@@ -2,7 +2,7 @@ using LibraryApp.Domain.Notifications;
 
 namespace LibraryApp.Application.Notifications.Dto;
 
-/// <summary>An editable notification template (NOT-09). At most one template of a type is active (G4-08).</summary>
+/// <summary>An editable notification template (NOT-09). At most one template of a type is active.</summary>
 /// <param name="Id">Template id.</param>
 /// <param name="Type">The notification type the template is for.</param>
 /// <param name="Subject">Plain text with {{placeholders}}, at most 300 characters.</param>

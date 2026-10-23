@@ -4,11 +4,11 @@ namespace LibraryApp.Domain.Notifications;
 
 /// <summary>
 /// Editable text of one notification type with placeholders such as {{EmployeeName}}, {{BookTitle}},
-/// {{DueDate}} (NOT-02). At most one active template per type (G4-08).
+/// {{DueDate}} (NOT-02). At most one active template per type.
 /// </summary>
 public sealed class NotificationTemplate : Entity
 {
-    public const int SubjectMaxLength = 300;   // G4-07
+    public const int SubjectMaxLength = 300;   // the subject of the rendered notification
 
     public NotificationType Type { get; private set; }
 
@@ -50,7 +50,7 @@ public sealed class NotificationTemplate : Entity
 
     /// <summary>
     /// Makes this template the active one of its type. The caller deactivates the previous one
-    /// in the same transaction; the database refuses two active templates of one type (G4-08).
+    /// in the same transaction; the database refuses two active templates of one type.
     /// </summary>
     public void Activate() => IsActive = true;
 
