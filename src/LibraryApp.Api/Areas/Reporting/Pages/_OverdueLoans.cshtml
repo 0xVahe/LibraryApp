@@ -1,0 +1,66 @@
+@model IndexModel
+@{
+    var report = Model.Overdue;
+}
+<section class="card flush" aria-labelledby="overdue-title">
+    <div class="card-head">
+        <div>
+            <h2 id="overdue-title">Overdue loans</h2>
+            <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc) · @IndexModel.Count(report.TotalCount, "loan")</p>
+            <p class="small muted">Points so far: @Model.PointsPerLateDay per working day overdue, max @Model.MaxLatePoints, what a return today would add.</p>
+        </div>
+        <a class="btn btn-secondary btn-sm" href="@Model.OverdueCsvHref">Export CSV<span class="visually-hidden"> of the overdue loans</span></a>
+    </div>
+    <form class="row filters card-filters" method="get" action="@(UiNavigation.Reports)#overdue-title" role="search" aria-label="Filter the overdue loans">
+        <div class="min-w-200">
+            <label class="visually-hidden" for="overdue-department">Department</label>
+            <select id="overdue-department" name="departmentId">
+                <option value="">All departments</option>
+                @foreach (var department in Model.Departments)
+                {
+                    <option value="@department.Id" selected="@(Model.DepartmentId == department.Id)">@department.Name</option>
+                }
+            </select>
+        </div>
+        <div class="min-w-160">
+            <label class="visually-hidden" for="overdue-days">Working days overdue</label>
+            <select id="overdue-days" name="days">
+                <option value="">Any working days overdue</option>
+                @foreach (var range in IndexModel.DayRanges)
+                {
+                    <option value="@range.Value" selected="@(Model.Days == range.Value)">@range.Text</option>
+                }
+            </select>
+        </div>
+        @if (Model.From is { } from && Model.To is { } to)
+        {
+            <input type="hidden" name="from" value="@from.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+            <input type="hidden" name="to" value="@to.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)" />
+        }
+        <button class="btn btn-primary" type="submit">Filter</button>
+    </form>
+    @if (report.Items.Count == 0)
+    {
+        <p class="muted card-filters">No overdue loans.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead><tr><th>Staff member</th><th>Department</th><th>Line manager</th><th>Book</th><th>Overdue</th><th>Points</th></tr></thead>
+            <tbody>
+                @foreach (var loan in report.Items)
+                {
+                    <tr>
+                        <td data-label="Staff member">@loan.EmployeeName <span class="small muted">@loan.EmployeeId</span></td>
+                        <td data-label="Department">@loan.Department</td>
+                        <td data-label="Line manager">@if (loan.LineManagerEmail is { } manager) {<a href="mailto:@manager">@manager</a>} else {<span class="muted">—</span>}</td>
+                        <td data-label="Book">@loan.BookTitle</td>
+                        <td data-label="Overdue"><span class="badge badge-red">@IndexModel.Count(loan.WorkingDaysOverdue, "working day")</span></td>
+                        <td data-label="Points">@loan.PointsSoFar</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+<partial name="/Pages/Shared/_Pager.cshtml" model="PagerModel.From(Model.OverduePage, Context.Request)" />

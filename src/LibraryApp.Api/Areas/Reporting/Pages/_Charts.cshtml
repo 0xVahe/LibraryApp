@@ -1,0 +1,15 @@
+@model IndexModel
+<section class="card" aria-labelledby="charts-title">
+    <div class="card-head">
+        <div>
+            <h2 id="charts-title">Charts</h2>
+            <p class="small muted">The dashboard, the tops and reading activity of the reports above, as bars.</p>
+        </div>
+    </div>
+    <div class="grid grid-2">
+        @foreach (var chart in Model.Charts)
+        {
+            <partial name="_BarChart" model="chart" />
+        }
+    </div>
+</section>

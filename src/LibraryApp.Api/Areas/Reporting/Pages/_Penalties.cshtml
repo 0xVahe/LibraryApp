@@ -1,0 +1,29 @@
+@model PenaltiesModel
+@{
+    var report = Model.Report!;
+}
+<section class="card flush" aria-labelledby="penalties-title">
+    <div class="card-head">
+        <div>
+            <h2 id="penalties-title">Penalty points by department</h2>
+            <p class="small muted">Every department is listed, also with zero penalties · @IndexModel.Date(report.PeriodStart) – @IndexModel.Date(report.PeriodEnd) · generated @Model.Generated(report.GeneratedAtUtc)</p>
+            <p class="small muted">Penalties given in the period. Active: points that still count today.</p>
+        </div>
+        <a class="btn btn-secondary btn-sm" href="@Model.CsvHref">Export CSV<span class="visually-hidden"> of the penalty points</span></a>
+    </div>
+    <table class="table">
+        <thead><tr><th>Department</th><th>Penalties</th><th>Issued</th><th>Waived</th><th>Active</th></tr></thead>
+        <tbody>
+            @foreach (var department in report.Departments)
+            {
+                <tr>
+                    <td data-label="Department">@department.Department</td>
+                    <td data-label="Penalties">@department.Penalties</td>
+                    <td data-label="Issued">@department.IssuedPoints</td>
+                    <td data-label="Waived">@department.WaivedPoints</td>
+                    <td data-label="Active">@department.ActivePoints</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>

@@ -1,0 +1,25 @@
+@model BarChartModel
+<div>
+    <h3 id="@Model.Id">@Model.Title</h3>
+    <p class="small muted mb-16">@Model.Note</p>
+    @if (Model.Bars.Count == 0)
+    {
+        <p class="muted">Nothing to show for this period.</p>
+    }
+    else
+    {
+        <ul class="chart" aria-labelledby="@Model.Id">
+            @foreach (var bar in Model.Bars)
+            {
+                <li>
+                    <span class="small text-wrap">@bar.Name</span>
+                    <svg class="chart-bar" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+                        <rect class="chart-track" width="100" height="12" />
+                        <rect class="chart-fill@(bar.Warning ? " warning" : "")" width="@Model.Width(bar)" height="12" />
+                    </svg>
+                    <span class="small">@bar.Text</span>
+                </li>
+            }
+        </ul>
+    }
+</div>

@@ -1,0 +1,30 @@
+@page "/reports"
+@model IndexModel
+@{
+    ViewData["Title"] = "Reports";
+}
+<partial name="/Pages/Shared/_PageHead.cshtml"
+         model='@(new PageHeadModel("Reports", Model.IsAdministrator
+             ? "Read-only figures from the catalog, staff and loans. Dates are Asia/Yerevan days, both ends included."
+             : "Read-only figures from the catalog, staff and loans. Department-level figures are for the administrator only. Dates are Asia/Yerevan days, both ends included."))' />
+
+<div class="stack-lg">
+    <partial name="_Dashboard" model="Model" />
+    <div>
+        <partial name="_OverdueLoans" model="Model" />
+    </div>
+    <partial name="_ReportPeriod" model="Model" />
+    @if (Model.Top is not null)
+    {
+        <partial name="_TopBooks" model="Model" />
+    }
+    @if (Model.ReadingActivity is not null)
+    {
+        <partial name="_ReadingActivity" model="Model" />
+    }
+    @if (Model.Charts.Count > 0)
+    {
+        <partial name="_Charts" model="Model" />
+    }
+    <partial name="_MoreReports" model="Model" />
+</div>

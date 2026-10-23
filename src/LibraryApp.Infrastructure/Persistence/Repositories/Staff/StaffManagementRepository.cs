@@ -107,24 +107,23 @@ public sealed class StaffManagementRepository(LibraryDbContext db) : IStaffManag
 
         int totalCount = await members.CountAsync(ct);
 
-        List<StaffMemberListItemDto> items = await members
-            .OrderBy(member => member.LastName)
-            .ThenBy(member => member.FirstName)
-            .ThenBy(member => member.Id)
-            .Skip(paging.Skip)
-            .Take(paging.PageSize)
-            .Select(member => new StaffMemberListItemDto(
+        List<StaffMemberListItemDto> items = await (
+            from member in members
+            join department in db.Departments.AsNoTracking()
+                on member.DepartmentId equals department.Id into departmentRows
+            from department in departmentRows.DefaultIfEmpty()
+            orderby member.LastName, member.FirstName, member.Id
+            select new StaffMemberListItemDto(
                 member.Id,
                 member.EmployeeId,
                 member.FirstName,
                 member.LastName,
                 member.CorporateEmail,
                 member.DepartmentId,
-                db.Departments
-                    .Where(department => department.Id == member.DepartmentId)
-                    .Select(department => department.Name)
-                    .First(),
+                department == null ? string.Empty : department.Name,
                 member.Status.ToString()))
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .ToListAsync(ct);
 
         return new PagedResult<StaffMemberListItemDto>(
