@@ -51,7 +51,7 @@ public sealed class NotificationTemplateService(
             if (template.IsActive)
                 return ToDto(template);
 
-            // The previous one first: the database allows one active template per type (G4-08).
+            // The previous one first: the database allows one active template per type.
             await templates.DeactivateOthersAsync(template.Type, template.Id, token);
             template.Activate();
             return ToDto(template);

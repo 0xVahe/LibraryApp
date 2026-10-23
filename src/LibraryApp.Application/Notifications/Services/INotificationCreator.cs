@@ -9,12 +9,12 @@ namespace LibraryApp.Application.Notifications.Services;
 public interface INotificationCreator
 {
     /// <summary>
-    /// Stores one row per requested channel for the event (G4-05): an Outlook row is Pending and sent later from the stored
+    /// Stores one row per requested channel for the event: an Outlook row is Pending and sent later from the stored
     /// row (NOT-08); an in-app row has nothing to send, so it is stored as Sent. The channel of each type comes from the
     /// notification catalogue (requirements, section 9).
-    /// Must run inside the caller's unit of work (event handlers do). An event that already created this type is ignored (G4-09).
+    /// Must run inside the caller's unit of work (event handlers do). An event that already created this type is ignored.
     /// <paramref name="loanId"/> is stored when the notification is about a loan; then a channel that already has this
-    /// type for this loan on the same Yerevan day is skipped (NOT-06, G4-02).
+    /// type for this loan on the same Yerevan day is skipped (NOT-06).
     /// With <paramref name="ccLineManager"/> the recipient's line manager is put in CC of the Outlook row (when the
     /// recipient has one); in-app rows have no CC.
     /// With <paramref name="calendarItem"/> (iCalendar text, see <see cref="CalendarItemBuilder"/>) the Outlook row carries the

@@ -2,7 +2,7 @@ using LibraryApp.Domain.Common;
 
 namespace LibraryApp.Domain.Notifications;
 
-/// <summary>Errors of the Notifications module (SD-04). Codes never change; messages may be reworded.</summary>
+/// <summary>Errors of the Notifications module. Codes never change; messages may be reworded.</summary>
 public static class NotificationErrors
 {
     // Notification
@@ -47,7 +47,7 @@ public static class NotificationErrors
         Error.Validation("notifications.effective_until_required", "A suspension notification needs the end date of the suspension.");
 
     // Template
-    /// <summary>No active template of the type exists (NOT-02, G4-08).</summary>
+    /// <summary>No active template of the type exists (NOT-02).</summary>
     public static readonly Error TemplateNotFound =
         Error.NotFound("notifications.template_not_found", "There is no active template for this notification type.");
 

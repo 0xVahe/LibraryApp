@@ -37,7 +37,7 @@ public sealed class NotificationCreator(
         DateTime nowUtc = clock.UtcNow;
         DateOnly localDate = clock.ToLocalDate(nowUtc);
 
-        // The inbox already skips a handler that succeeded; this also covers a row that exists for another reason (G4-09).
+        // The inbox already skips a handler that succeeded; this also covers a row that exists for another reason.
         // Per channel, like the unique indexes: only the missing channels are created. A loan notification is also
         // skipped when its type was already created for the loan on this day (NOT-06); checked here because a unique
         // violation would fail the handler and be retried.
