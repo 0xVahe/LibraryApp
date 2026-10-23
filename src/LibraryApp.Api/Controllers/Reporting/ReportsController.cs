@@ -1,3 +1,4 @@
+using LibraryApp.Api.ErrorHandling;
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Common;
 using LibraryApp.Application.Reporting.Dto;
@@ -30,7 +31,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportOverdueLoans(departmentId, minimumDaysOverdue, maximumDaysOverdue, ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
 
         return Ok(await reporting.GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, new PageRequest(page, pageSize), ct));
@@ -44,7 +49,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportDashboard(ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
         return Ok(await reporting.GetDashboardAsync(ct));
     }
@@ -61,7 +70,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportTopBooksAndCategories(from, to, ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
 
         return Ok(await reporting.GetTopBooksAndCategoriesAsync(from, to, ct));
@@ -80,7 +93,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportReadingActivityByDepartment(from, to, ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
 
         return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
@@ -90,11 +107,22 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
     [Authorize(Roles = StaffRoles.LibraryAdministrator)]
     [ProducesResponseType<PenaltyReportDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PenaltyReportDto>> GetPenalties(
+    public async Task<IActionResult> GetPenalties(
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
-        CancellationToken ct)
+        [FromQuery] string format = "json",
+        CancellationToken ct = default)
     {
+        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+            return await ExportPenalties(from, to, ct);
+
+        if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
+
         return Ok(await reporting.GetPenaltiesByDepartmentAsync(from, to, ct));
     }
 
@@ -117,7 +145,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportInventoryStatus(categoryId, ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
 
         return Ok(await reporting.GetInventoryStatusAsync(categoryId, ct));
@@ -139,7 +171,11 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
             return await ExportPurchaseCandidates(ct);
 
         if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
-            return BadRequest("Unsupported report format.");
+            return BadRequest(GlobalExceptionHandler.Problem(
+                StatusCodes.Status400BadRequest,
+                "Validation failed",
+                "Unsupported report format. Use json or csv.",
+                "reporting.invalid_format"));
 
         return Ok(await reporting.GetPurchaseCandidatesAsync(ct));
     }

@@ -124,26 +124,6 @@ public sealed class ReportingCsvEndpointTests(ApiHostFactory factory)
     }
 
     [Fact]
-    public async Task Overdue_loans_export_contains_all_report_rows()
-    {
-        using var client = CreateAuthenticatedClient(StaffRoles.Librarian);
-
-        using var reportResponse = await client.GetAsync(
-            "/api/reports/overdue-loans?page=1&pageSize=1");
-
-        using var exportResponse = await client.GetAsync(
-            "/api/reports/overdue-loans/export");
-
-        Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, exportResponse.StatusCode);
-
-        string csv = await exportResponse.Content.ReadAsStringAsync();
-
-        Assert.StartsWith("\"AsOfDate\"", csv.TrimStart('\uFEFF'));
-        Assert.Contains("\"LoanId\"", csv);
-    }
-
-    [Fact]
     public async Task Overdue_loans_export_includes_more_than_100_rows_without_duplicates()
     {
         const int count = 101;

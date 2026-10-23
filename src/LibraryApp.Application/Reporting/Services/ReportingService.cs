@@ -28,85 +28,85 @@ public Task<OverdueLoansReportDto> GetOverdueLoansAsync(
     CancellationToken ct = default) =>
     GetOverdueLoansAsync(departmentId, minimumDaysOverdue, maximumDaysOverdue, new PageRequest(), ct);
 
-public async Task<OverdueLoansReportDto> GetOverdueLoansAsync(
-    Guid? departmentId,
-    int? minimumDaysOverdue,
-    int? maximumDaysOverdue,
-    PageRequest paging,
-    CancellationToken ct = default)
-{
-    ArgumentNullException.ThrowIfNull(paging);
-
-    OverdueLoansReportDto report = await GetAllOverdueLoansAsync(
-        departmentId, minimumDaysOverdue, maximumDaysOverdue, ct);
-
-    return report with
+    public async Task<OverdueLoansReportDto> GetOverdueLoansAsync(
+        Guid? departmentId,
+        int? minimumDaysOverdue,
+        int? maximumDaysOverdue,
+        PageRequest paging,
+        CancellationToken ct = default)
     {
-        Items = report.Items.Skip(paging.Skip).Take(paging.PageSize).ToList(),
-        Page = paging.Page,
-        PageSize = paging.PageSize
-    };
-}
+        ArgumentNullException.ThrowIfNull(paging);
 
-public async Task<OverdueLoansReportDto> GetAllOverdueLoansAsync(
-    Guid? departmentId,
-    int? minimumDaysOverdue,
-    int? maximumDaysOverdue,
-    CancellationToken ct = default)
-{
-    if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0 ||
-        (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue &&
-         minimumDaysOverdue > maximumDaysOverdue))
-        throw new DomainException(ReportingErrors.InvalidOverdueFilter);
+        OverdueLoansReportDto report = await GetAllOverdueLoansAsync(
+            departmentId, minimumDaysOverdue, maximumDaysOverdue, ct);
 
-    if (departmentId == Guid.Empty)
-        throw new DomainException(ReportingErrors.InvalidDepartmentId);
-
-    DateTime nowUtc = clock.UtcNow;
-    DateOnly today = clock.LocalToday;
-    DateTime overdueCutoffUtc = clock.StartOfLocalDayUtc(today);
-
-    IReadOnlyList<OverdueLoanData> rows =
-        await repository.GetOverdueLoansAsync(overdueCutoffUtc, departmentId, ct);
-
-    List<OverdueLoanItemDto> items = rows
-        .Select(row =>
+        return report with
         {
-            DateOnly dueDate = clock.ToLocalDate(row.DueAtUtc);
-            int workingDaysOverdue =
-                workingDayCalendar.CountWorkingDays(dueDate, today);
+            Items = report.Items.Skip(paging.Skip).Take(paging.PageSize).ToList(),
+            Page = paging.Page,
+            PageSize = paging.PageSize
+        };
+    }
 
-            return new OverdueLoanItemDto(
-                row.LoanId,
-                row.EmployeeId,
-                row.EmployeeName,
-                row.Department,
-                row.LineManagerEmail,
-                row.BookTitle,
-                dueDate,
-                workingDaysOverdue,
-                penaltyPolicy.CalculateLatePoints(workingDaysOverdue));
-        })
-        .Where(item => !minimumDaysOverdue.HasValue ||
-                       item.WorkingDaysOverdue >= minimumDaysOverdue.Value)
-        .Where(item => !maximumDaysOverdue.HasValue ||
-                       item.WorkingDaysOverdue <= maximumDaysOverdue.Value)
-        .OrderByDescending(item => item.WorkingDaysOverdue)
-        .ThenBy(item => item.EmployeeName)
-        .ThenBy(item => item.LoanId)
-        .ToList();
+    public async Task<OverdueLoansReportDto> GetAllOverdueLoansAsync(
+        Guid? departmentId,
+        int? minimumDaysOverdue,
+        int? maximumDaysOverdue,
+        CancellationToken ct = default)
+    {
+        if (minimumDaysOverdue is < 0 || maximumDaysOverdue is < 0 ||
+            (minimumDaysOverdue.HasValue && maximumDaysOverdue.HasValue &&
+             minimumDaysOverdue > maximumDaysOverdue))
+            throw new DomainException(ReportingErrors.InvalidOverdueFilter);
 
-    return new OverdueLoansReportDto(
-        today,
-        nowUtc,
-        departmentId,
-        minimumDaysOverdue,
-        maximumDaysOverdue,
-        items,
-        items.Count,
-        1,
-        Math.Max(1, items.Count));
-}
+        if (departmentId == Guid.Empty)
+            throw new DomainException(ReportingErrors.InvalidDepartmentId);
+
+        DateTime nowUtc = clock.UtcNow;
+        DateOnly today = clock.LocalToday;
+        DateTime overdueCutoffUtc = clock.StartOfLocalDayUtc(today);
+
+        IReadOnlyList<OverdueLoanData> rows =
+            await repository.GetOverdueLoansAsync(overdueCutoffUtc, departmentId, ct);
+
+        List<OverdueLoanItemDto> items = rows
+            .Select(row =>
+            {
+                DateOnly dueDate = clock.ToLocalDate(row.DueAtUtc);
+                int workingDaysOverdue =
+                    workingDayCalendar.CountWorkingDays(dueDate, today);
+
+                return new OverdueLoanItemDto(
+                    row.LoanId,
+                    row.EmployeeId,
+                    row.EmployeeName,
+                    row.Department,
+                    row.LineManagerEmail,
+                    row.BookTitle,
+                    dueDate,
+                    workingDaysOverdue,
+                    penaltyPolicy.CalculateLatePoints(workingDaysOverdue));
+            })
+            .Where(item => !minimumDaysOverdue.HasValue ||
+                           item.WorkingDaysOverdue >= minimumDaysOverdue.Value)
+            .Where(item => !maximumDaysOverdue.HasValue ||
+                           item.WorkingDaysOverdue <= maximumDaysOverdue.Value)
+            .OrderByDescending(item => item.WorkingDaysOverdue)
+            .ThenBy(item => item.EmployeeName)
+            .ThenBy(item => item.LoanId)
+            .ToList();
+
+        return new OverdueLoansReportDto(
+            today,
+            nowUtc,
+            departmentId,
+            minimumDaysOverdue,
+            maximumDaysOverdue,
+            items,
+            items.Count,
+            1,
+            Math.Max(1, items.Count));
+    }
 
 
     public async Task<DashboardReportDto> GetDashboardAsync(CancellationToken ct = default)

@@ -15,6 +15,7 @@ public sealed class ReportingFormatEndpointTests(ApiHostFactory factory)
         { "dashboard", StaffRoles.Librarian },
         { "top-books-and-categories?from=2026-01-01&to=2026-12-31", StaffRoles.Librarian },
         { "reading-activity-by-department?from=2026-01-01&to=2026-12-31", StaffRoles.LibraryAdministrator },
+        { "penalties?from=2026-01-01&to=2026-12-31", StaffRoles.LibraryAdministrator },
         { "inventory-status", StaffRoles.Librarian },
         { "purchase-candidates", StaffRoles.LibraryAdministrator }
     };
@@ -52,6 +53,13 @@ public sealed class ReportingFormatEndpointTests(ApiHostFactory factory)
         using var response = await client.GetAsync(Route(report, "xml"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        using var body = await System.Text.Json.JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync());
+
+        Assert.Equal("reporting.invalid_format",
+            body.RootElement.GetProperty("code").GetString());
     }
 
     [Theory]
@@ -76,6 +84,7 @@ public sealed class ReportingFormatEndpointTests(ApiHostFactory factory)
 
     [Theory]
     [InlineData("reading-activity-by-department?from=2026-01-01&to=2026-12-31")]
+    [InlineData("penalties?from=2026-01-01&to=2026-12-31")]
     [InlineData("purchase-candidates")]
     public async Task Librarian_cannot_export_admin_reports(string report)
     {

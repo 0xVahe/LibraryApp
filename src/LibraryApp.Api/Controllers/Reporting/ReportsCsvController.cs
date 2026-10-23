@@ -139,6 +139,47 @@ public sealed partial class ReportsController
     }
 
 
+    /// <summary>Exports penalties by department as CSV.</summary>
+    [HttpGet("penalties/export")]
+    [Authorize(Roles = StaffRoles.LibraryAdministrator)]
+    [Produces("text/csv")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ExportPenalties(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken ct)
+    {
+        PenaltyReportDto r = await reporting.GetPenaltiesByDepartmentAsync(from, to, ct);
+
+        string[] headers =
+        [
+            "PeriodStart", "PeriodEnd", "GeneratedAtUtc", "DepartmentId",
+            "Department", "Penalties", "IssuedPoints", "WaivedPoints", "ActivePoints"
+        ];
+
+        var rows = r.Departments.Select(d => new string?[]
+        {
+            r.PeriodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            r.PeriodEnd.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            r.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture),
+            d.DepartmentId.ToString(),
+            d.Department,
+            ReportCsvWriter.Value(d.Penalties),
+            ReportCsvWriter.Value(d.IssuedPoints),
+            ReportCsvWriter.Value(d.WaivedPoints),
+            ReportCsvWriter.Value(d.ActivePoints)
+        });
+
+        return Csv("penalties", headers, rows.DefaultIfEmpty(new string?[]
+        {
+            r.PeriodStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            r.PeriodEnd.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            r.GeneratedAtUtc.ToString("O", CultureInfo.InvariantCulture),
+            null, null, null, null, null, null
+        }));
+    }
+
     /// <summary>Exports inventory status as CSV.</summary>
     [HttpGet("inventory-status/export")]
     [Produces("text/csv")]
