@@ -225,6 +225,10 @@ public sealed class TopBooksAndCategoriesReportTests
             DateTime fromUtc, DateTime toUtc, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+            DateTime fromUtc, DateTime toUtc, DateTime nowUtc, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+
         public Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default) =>
             throw new NotSupportedException();
 

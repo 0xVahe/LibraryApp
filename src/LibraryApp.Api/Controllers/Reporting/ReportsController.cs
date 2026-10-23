@@ -86,6 +86,18 @@ public sealed partial class ReportsController(IReportingService reporting, ICloc
         return Ok(await reporting.GetReadingActivityByDepartmentAsync(from, to, ct));
     }
 
+    [HttpGet("penalties")]
+    [Authorize(Roles = StaffRoles.LibraryAdministrator)]
+    [ProducesResponseType<PenaltyReportDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PenaltyReportDto>> GetPenalties(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        CancellationToken ct)
+    {
+        return Ok(await reporting.GetPenaltiesByDepartmentAsync(from, to, ct));
+    }
+
     /// <summary>REP-05: copies by status and condition, for the whole library or one category.</summary>
     /// <param name="format">Response format: json or csv.</param>
     /// <param name="categoryId">A category; its subcategories are included. Left out: the whole library.</param>
