@@ -31,6 +31,10 @@ public sealed class NotificationTemplatesController(INotificationTemplateService
         Ok(await templates.ListAsync(type, ct));
 
     /// <summary>Gets a template (NOT-09).</summary>
+    /// <remarks>
+    /// Returns the subject, the body and the placeholders available for the type of the template, active or not. An unknown
+    /// id is 404. Only the Library Administrator can call it.
+    /// </remarks>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<NotificationTemplateDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

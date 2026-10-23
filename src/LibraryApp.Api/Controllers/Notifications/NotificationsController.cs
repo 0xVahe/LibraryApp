@@ -34,6 +34,10 @@ public sealed class NotificationsController(INotificationService notifications) 
         Ok(await notifications.ListAsync(unreadOnly: false, new PageRequest(page, pageSize), ct));
 
     /// <summary>My unread in-app notifications (NOT-04), newest first.</summary>
+    /// <remarks>
+    /// Only the caller's own in-app notifications that are not read yet; the owner comes from the access token. An account
+    /// without a staff profile gets an empty page. Marking a notification as read removes it from this list.
+    /// </remarks>
     /// <param name="page">Page number, starting from 1.</param>
     /// <param name="pageSize">Items per page: default 20, maximum 100.</param>
     /// <param name="ct">Cancelled when the client disconnects.</param>
