@@ -5,7 +5,7 @@
 <section class="card flush" aria-labelledby="overdue-title">
     <div class="card-head">
         <div>
-            <div class="row"><h2 id="overdue-title">Overdue loans</h2><span class="badge badge-grey">Librarian · Admin</span></div>
+            <h2 id="overdue-title">Overdue loans</h2>
             <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc) · @IndexModel.Count(report.TotalCount, "loan")</p>
             <p class="small muted">Points so far: @Model.PointsPerLateDay per working day overdue, max @Model.MaxLatePoints, what a return today would add.</p>
         </div>

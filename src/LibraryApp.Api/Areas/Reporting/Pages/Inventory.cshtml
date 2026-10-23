@@ -11,7 +11,7 @@
 <section class="card flush" aria-labelledby="inventory-title">
     <div class="card-head">
         <div>
-            <div class="row"><h2 id="inventory-title">@(report.Category ?? "All categories")</h2><span class="badge badge-grey">Librarian · Admin</span></div>
+            <h2 id="inventory-title">@(report.Category ?? "All categories")</h2>
             <p class="small muted">As of @IndexModel.Date(report.AsOfDate) · generated @Model.Generated(report.GeneratedAtUtc)</p>
             <p class="small muted">@IndexModel.Count(report.CopiesInCollection, "copy") in the collection · @report.TotalCopies with lost and withdrawn ones</p>
         </div>
