@@ -1,6 +1,8 @@
 using LibraryApp.Application.Reporting.Dto;
 using LibraryApp.Domain.Catalog;
+using LibraryApp.Domain.Staff;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
+using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -8,13 +10,15 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace LibraryApp.Api.OpenApi;
 
 /// <summary>
-/// Response examples of the inventory status (REP-05) and purchase candidates (REP-07) reports (NFR-11), with books and
-/// categories of the Development seed.
+/// Response examples of every report (REP-01 to REP-07, NFR-11), with the books, categories, departments and staff of the
+/// Development seed.
 /// </summary>
 public sealed class ReportingExamples : ISchemaFilter
 {
     private const string AsOfDate = "2026-10-22";
     private const string GeneratedAtUtc = "2026-10-22T06:30:00Z";
+    private const string PeriodStart = "2026-10-01";
+    private const string PeriodEnd = "2026-10-31";
 
     public void Apply(OpenApiSchema schema, SchemaFilterContext context)
     {
@@ -31,6 +35,35 @@ public sealed class ReportingExamples : ISchemaFilter
                 ["books"] = new OpenApiArray { PurchaseCandidate() },
             },
             Type type when type == typeof(PurchaseCandidateItemDto) => PurchaseCandidate(),
+            Type type when type == typeof(OverdueLoansReportDto) => OverdueLoans(),
+            Type type when type == typeof(OverdueLoanItemDto) => OverdueLoan(),
+            Type type when type == typeof(DashboardReportDto) => Dashboard(),
+            Type type when type == typeof(TopBooksAndCategoriesReportDto) => new OpenApiObject
+            {
+                ["periodStart"] = new OpenApiString(PeriodStart),
+                ["periodEnd"] = new OpenApiString(PeriodEnd),
+                ["generatedAtUtc"] = new OpenApiString(GeneratedAtUtc),
+                ["topBooks"] = new OpenApiArray { TopBook(0, 3), TopBook(1, 2) },
+                ["topCategories"] = new OpenApiArray { TopCategory(0, 4), TopCategory(2, 1) },
+            },
+            Type type when type == typeof(TopBookReportItemDto) => TopBook(0, 3),
+            Type type when type == typeof(TopCategoryReportItemDto) => TopCategory(0, 4),
+            Type type when type == typeof(ReadingActivityByDepartmentReportDto) => new OpenApiObject
+            {
+                ["periodStart"] = new OpenApiString(PeriodStart),
+                ["periodEnd"] = new OpenApiString(PeriodEnd),
+                ["generatedAtUtc"] = new OpenApiString(GeneratedAtUtc),
+                ["departments"] = new OpenApiArray { ReadingActivity(3, 4, 3, 2), ReadingActivity(5, 2, 0, null) },
+            },
+            Type type when type == typeof(DepartmentReadingActivityDto) => ReadingActivity(3, 4, 3, 2),
+            Type type when type == typeof(PenaltyReportDto) => new OpenApiObject
+            {
+                ["periodStart"] = new OpenApiString(PeriodStart),
+                ["periodEnd"] = new OpenApiString(PeriodEnd),
+                ["generatedAtUtc"] = new OpenApiString(GeneratedAtUtc),
+                ["departments"] = new OpenApiArray { DepartmentPenalties(0, 2, 7, 2, 5), DepartmentPenalties(5, 0, 0, 0, 0) },
+            },
+            Type type when type == typeof(DepartmentPenaltiesDto) => DepartmentPenalties(0, 2, 7, 2, 5),
             _ => null,
         };
 
@@ -83,6 +116,113 @@ public sealed class ReportingExamples : ISchemaFilter
         ["condition"] = new OpenApiString(condition.ToString()),
         ["copies"] = new OpenApiInteger(copies),
     };
+
+    /// <summary>One overdue loan of Anna Petrosyan (seeded staff member), the only one of the page.</summary>
+    private static OpenApiObject OverdueLoans() => new()
+    {
+        ["asOfDate"] = new OpenApiString(AsOfDate),
+        ["generatedAtUtc"] = new OpenApiString(GeneratedAtUtc),
+        ["departmentId"] = new OpenApiString(StaffSeedIds.Departments.RetailBanking.ToString()),
+        ["minimumDaysOverdue"] = new OpenApiInteger(1),
+        ["maximumDaysOverdue"] = new OpenApiInteger(5),
+        ["items"] = new OpenApiArray { OverdueLoan() },
+        ["totalCount"] = new OpenApiInteger(1),
+        ["page"] = new OpenApiInteger(1),
+        ["pageSize"] = new OpenApiInteger(20),
+        ["totalPages"] = new OpenApiInteger(1),
+    };
+
+    /// <summary>Due on 16 Oct 2026 (Friday): 4 working days overdue on 22 Oct, so 4 points so far.</summary>
+    private static OpenApiObject OverdueLoan()
+    {
+        SeedPerson anna = StaffSeedData.People.Single(person => person.StaffMemberId == StaffSeedIds.StaffMembers.AnnaPetrosyan);
+        return new OpenApiObject
+        {
+            ["loanId"] = new OpenApiString("30000000-0000-0000-0001-000000000007"),
+            ["employeeId"] = new OpenApiString(anna.EmployeeId),
+            ["employeeName"] = new OpenApiString($"{anna.FirstName} {anna.LastName}"),
+            ["department"] = new OpenApiString(DepartmentName(anna.DepartmentId)),
+            ["lineManagerEmail"] = anna.LineManagerEmail is { } manager ? new OpenApiString(manager) : new OpenApiNull(),
+            ["bookTitle"] = new OpenApiString(CatalogSeedData.Books[1].Title),
+            ["dueDate"] = new OpenApiString("2026-10-16"),
+            ["workingDaysOverdue"] = new OpenApiInteger(4),
+            ["pointsSoFar"] = new OpenApiInteger(4),
+        };
+    }
+
+    /// <summary>The books, copies and staff of the Development seed; 6 of its 40 loans are overdue.</summary>
+    private static OpenApiObject Dashboard() => new()
+    {
+        ["asOfDate"] = new OpenApiString(AsOfDate),
+        ["generatedAtUtc"] = new OpenApiString(GeneratedAtUtc),
+        ["totalBooks"] = new OpenApiInteger(CatalogSeedData.Books.Count),
+        ["totalCopies"] = new OpenApiInteger(CatalogSeedData.CopiesPerBook.Values.Sum()),
+        ["activeReaders"] = new OpenApiInteger(StaffCount(StaffMemberStatus.Active)),
+        ["activeLoans"] = new OpenApiInteger(19),
+        ["overdueLoans"] = new OpenApiInteger(6),
+        ["overduePercentage"] = new OpenApiDouble(15.0),
+        ["restrictedEmployees"] = new OpenApiInteger(StaffCount(StaffMemberStatus.Restricted)),
+        ["suspendedEmployees"] = new OpenApiInteger(StaffCount(StaffMemberStatus.Suspended)),
+    };
+
+    private static OpenApiObject TopBook(int index, int loans)
+    {
+        SeedBook book = CatalogSeedData.Books[index];
+        return new OpenApiObject
+        {
+            ["bookId"] = new OpenApiString(CatalogSeedIds.Book(book.Number).ToString()),
+            ["title"] = new OpenApiString(book.Title),
+            ["loanCount"] = new OpenApiInteger(loans),
+        };
+    }
+
+    private static OpenApiObject TopCategory(int index, int loans)
+    {
+        (Guid id, string name, _) = CatalogSeedData.Categories[index];
+        return new OpenApiObject
+        {
+            ["categoryId"] = new OpenApiString(id.ToString()),
+            ["name"] = new OpenApiString(name),
+            ["loanCount"] = new OpenApiInteger(loans),
+        };
+    }
+
+    /// <summary>A seeded department; without loans it has no top category.</summary>
+    private static OpenApiObject ReadingActivity(int department, int employees, int loans, int? topCategory)
+    {
+        SeedDepartment seeded = StaffSeedData.DepartmentList[department];
+        (Guid categoryId, string category, _) = CatalogSeedData.Categories[topCategory ?? 0];
+        return new OpenApiObject
+        {
+            ["departmentId"] = new OpenApiString(seeded.Id.ToString()),
+            ["department"] = new OpenApiString(seeded.Name),
+            ["employees"] = new OpenApiInteger(employees),
+            ["loanCount"] = new OpenApiInteger(loans),
+            ["loansPer10Employees"] = new OpenApiDouble(employees == 0 ? 0 : Math.Round(loans * 10.0 / employees, 1)),
+            ["topCategoryId"] = topCategory is null ? new OpenApiNull() : new OpenApiString(categoryId.ToString()),
+            ["topCategory"] = topCategory is null ? new OpenApiNull() : new OpenApiString(category),
+            ["topCategoryLoanCount"] = new OpenApiInteger(topCategory is null ? 0 : loans),
+        };
+    }
+
+    /// <summary>Issued = waived + active + expired points of the records created in the period.</summary>
+    private static OpenApiObject DepartmentPenalties(int department, int penalties, int issued, int waived, int active)
+    {
+        SeedDepartment seeded = StaffSeedData.DepartmentList[department];
+        return new OpenApiObject
+        {
+            ["departmentId"] = new OpenApiString(seeded.Id.ToString()),
+            ["department"] = new OpenApiString(seeded.Name),
+            ["penalties"] = new OpenApiInteger(penalties),
+            ["issuedPoints"] = new OpenApiInteger(issued),
+            ["waivedPoints"] = new OpenApiInteger(waived),
+            ["activePoints"] = new OpenApiInteger(active),
+        };
+    }
+
+    private static string DepartmentName(Guid id) => StaffSeedData.DepartmentList.Single(department => department.Id == id).Name;
+
+    private static int StaffCount(StaffMemberStatus status) => StaffSeedData.People.Count(person => person.Status == status);
 
     /// <summary>The first seeded book, with the two Waiting reservations of the Development seed.</summary>
     private static OpenApiObject PurchaseCandidate()
