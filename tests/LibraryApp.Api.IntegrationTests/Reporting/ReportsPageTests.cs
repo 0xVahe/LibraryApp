@@ -316,6 +316,38 @@ public class ReportsPageTests(ApiHostFactory factory) : IClassFixture<ApiHostFac
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Administrator_sees_the_charts_of_rep_02_to_rep_04()
+    {
+        string html = await GetAsync(Admin, $"{Route}?from=2026-10-01&to=2026-10-31");
+
+        Assert.Contains("id=\"charts-title\"", html);
+        foreach (var chart in new[] { "chart-loans", "chart-books", "chart-categories", "chart-departments" })
+            Assert.Contains($"<ul class=\"chart\" aria-labelledby=\"{chart}\">", html);
+        Assert.Contains("<svg class=\"chart-bar\" viewBox=\"0 0 100 12\" preserveAspectRatio=\"none\" aria-hidden=\"true\" focusable=\"false\">", html);
+        Assert.Contains("class=\"chart-fill\" width=\"100\"", html);   // the largest value of a chart fills its bar
+        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("style=\"", html);
+    }
+
+    [Fact]
+    public async Task Librarian_sees_no_charts()
+    {
+        string html = await GetAsync(Librarian, Route);
+
+        Assert.DoesNotContain("id=\"charts-title\"", html);
+    }
+
+    [Fact]
+    public async Task Reversed_period_keeps_only_the_dashboard_chart()
+    {
+        string html = await GetAsync(Admin, $"{Route}?from=2026-10-31&to=2026-10-01");
+
+        Assert.Contains("aria-labelledby=\"chart-loans\"", html);
+        Assert.DoesNotContain("id=\"chart-books\"", html);
+        Assert.DoesNotContain("id=\"chart-departments\"", html);
+    }
+
     private async Task<string> GetAsync(string email, string path)
     {
         using var client = await UiTestClient.SignedInAsync(factory, email, StaffSeedData.Password);

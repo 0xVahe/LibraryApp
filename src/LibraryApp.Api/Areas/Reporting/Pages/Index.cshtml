@@ -22,5 +22,9 @@
     {
         <partial name="_ReadingActivity" model="Model" />
     }
+    @if (Model.Charts.Count > 0)
+    {
+        <partial name="_Charts" model="Model" />
+    }
     <partial name="_MoreReports" model="Model" />
 </div>

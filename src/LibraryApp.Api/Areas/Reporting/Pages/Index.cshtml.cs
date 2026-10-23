@@ -71,6 +71,9 @@ public sealed class IndexModel(
 
     public bool IsAdministrator => User.IsInRole(StaffRoles.LibraryAdministrator);
 
+    /// <summary>REP-09: bar charts of REP-02 to REP-04, for the administrator.</summary>
+    public IReadOnlyList<BarChartModel> Charts { get; private set; } = [];
+
     public int TopBooksLimit => options.Value.TopBooksLimit;
 
     public int TopCategoriesLimit => options.Value.TopCategoriesLimit;
@@ -109,7 +112,47 @@ public sealed class IndexModel(
         {
             PeriodError = ex.Error.Message;
         }
+
+        if (IsAdministrator)
+            Charts = BuildCharts();
     }
+
+    private List<BarChartModel> BuildCharts()
+    {
+        var d = Dashboard;
+        var charts = new List<BarChartModel>
+        {
+            new("chart-loans", "Loans and staff", $"As of {Date(d.AsOfDate)}",
+            [
+                new("Active loans", d.ActiveLoans, Num(d.ActiveLoans)),
+                new("Overdue loans", d.OverdueLoans, Num(d.OverdueLoans), Warning: true),
+                new("Active readers", d.ActiveReaders, Num(d.ActiveReaders)),
+                new("Restricted staff", d.RestrictedEmployees, Num(d.RestrictedEmployees), Warning: true),
+                new("Suspended staff", d.SuspendedEmployees, Num(d.SuspendedEmployees), Warning: true),
+            ]),
+        };
+
+        if (Top is { } top)
+        {
+            string period = $"{Date(top.PeriodStart)} – {Date(top.PeriodEnd)}";
+            charts.Add(new("chart-books", "Most borrowed books", $"Loans · {period}",
+                top.TopBooks.Select(b => new Bar(b.Title, b.LoanCount, Num(b.LoanCount))).ToList()));
+            charts.Add(new("chart-categories", "Top categories", $"Loans · {period}",
+                top.TopCategories.Select(c => new Bar(c.Name, c.LoanCount, Num(c.LoanCount))).ToList()));
+        }
+
+        if (ReadingActivity is { } reading)
+        {
+            charts.Add(new("chart-departments", "Loans per 10 staff",
+                $"By department · {Date(reading.PeriodStart)} – {Date(reading.PeriodEnd)}",
+                reading.Departments.Select(dep => new Bar(dep.Department, dep.LoansPer10Employees,
+                    dep.LoansPer10Employees.ToString("0.0", CultureInfo.InvariantCulture))).ToList()));
+        }
+
+        return charts;
+    }
+
+    private static string Num(int value) => value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>"Export CSV" (REP-08): the whole overdue list with its filters, or a period report.</summary>
     public async Task<IActionResult> OnGetCsvAsync(string? report, CancellationToken ct)
