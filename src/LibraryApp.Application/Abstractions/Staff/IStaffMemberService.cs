@@ -3,7 +3,7 @@ using LibraryApp.Domain.Staff;
 namespace LibraryApp.Application.Abstractions.Staff;
 
 /// <summary>
-/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1).
+/// What the Staff module offers other modules. Provider: Group 2. Consumer: Borrowing (Group 3), Catalog (Group 1), Notifications (Group 4).
 /// <para>
 /// The loan limit is checked by Borrowing, which owns the loans: it compares its active loan count with
 /// <see cref="LendingRules.MaxLoans"/> and reports <see cref="StaffErrors.LoanLimitReached"/>.
@@ -14,7 +14,10 @@ public interface IStaffMemberService
     /// <summary>INT-03. Status check only: Active and Restricted may borrow; Suspended, Deactivated and unknown may not.</summary>
     Task<EligibilityResult> CanBorrowAsync(Guid staffMemberId, CancellationToken ct = default);
 
-    /// <summary>INT-04. Restricted: 1 loan, no renewals (BR-MEM-3). Throws <c>staff.not_found</c>.</summary>
+    /// <summary>
+    /// INT-04. Restricted: <c>Staff:RestrictedLimits:MaxLoans</c> overrides the category loan limit;
+    /// renewals are always 0 (BR-MEM-3, BR-BOR-1). Throws <c>staff.not_found</c>.
+    /// </summary>
     Task<LendingRules> GetLendingRulesAsync(Guid staffMemberId, CancellationToken ct = default);
 
     /// <summary>Current status, so Borrowing changes it only when it differs. Throws <c>staff.not_found</c>.</summary>
@@ -43,4 +46,12 @@ public interface IStaffMemberService
     /// Deactivated members are found too: whether they may borrow is still decided by <see cref="CanBorrowAsync"/>.
     /// </summary>
     Task<StaffMemberLookup?> FindAsync(string employeeIdOrEmail, CancellationToken ct = default);
+    
+    /// <summary>
+    /// Contacts for notifications (X-08), in one query. Unknown ids are left out (no exception); Deactivated members
+    /// are included, with their status. An empty list returns an empty dictionary without a query.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, StaffContact>> GetContactsAsync(
+        IReadOnlyCollection<Guid> staffMemberIds,
+        CancellationToken ct = default);
 }

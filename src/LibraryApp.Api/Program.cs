@@ -87,6 +87,8 @@ builder.Services.AddSwaggerGen(options =>
     options.SchemaFilter<StaffMemberExamples>();
     options.SchemaFilter<CatalogExamples>();
     options.SchemaFilter<BorrowingExamples>();
+    options.SchemaFilter<NotificationExamples>();
+    options.SchemaFilter<ReportingExamples>();
     // "Authorize" button (Group 2, MEM-02): paste the accessToken from POST /api/auth/login.
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {

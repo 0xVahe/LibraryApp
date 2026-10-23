@@ -16,6 +16,9 @@ public sealed class DepartmentService(IDepartmentRepository departments, IUnitOf
 {
     public Task<IReadOnlyList<DepartmentDto>> ListAsync(CancellationToken ct = default) => departments.ListAsync(ct);
 
+    public Task<IReadOnlyList<DepartmentSettingsDto>> ListForSettingsAsync(CancellationToken ct = default) =>
+        departments.ListForSettingsAsync(ct);
+
     public async Task<DepartmentDto> GetAsync(Guid id, CancellationToken ct = default) =>
         ToDto(await FindAsync(id, ct));
 

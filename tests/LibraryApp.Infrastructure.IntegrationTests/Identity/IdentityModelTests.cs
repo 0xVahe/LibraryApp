@@ -53,6 +53,17 @@ public class IdentityModelTests
         Assert.Equal(IdentityConfiguration.KeyLength, token.FindProperty(nameof(IdentityUserToken<Guid>.LoginProvider))!.GetMaxLength());
         Assert.Equal(IdentityConfiguration.KeyLength, token.FindProperty(nameof(IdentityUserToken<Guid>.Name))!.GetMaxLength());
     }
+    
+    [Fact]
+    public void Email_index_is_unique_for_accounts_with_an_email()
+    {
+        var index = Model().FindEntityType(typeof(AppUser))!.GetIndexes()
+            .Single(x => x.Properties.Single().Name == nameof(AppUser.NormalizedEmail));
+
+        Assert.Equal("EmailIndex", index.GetDatabaseName());
+        Assert.True(index.IsUnique);
+        Assert.Equal("[NormalizedEmail] IS NOT NULL", index.GetFilter());
+    }
 
     private static IModel Model()
     {

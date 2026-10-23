@@ -9,4 +9,6 @@ public sealed class ReportingOptions
     public int TopBooksLimit { get; set; }
 
     public int TopCategoriesLimit { get; set; }
+
+    public int PurchaseCandidatesLimit { get; set; }
 }

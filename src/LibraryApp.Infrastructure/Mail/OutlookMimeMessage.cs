@@ -17,7 +17,12 @@ public static class OutlookMimeMessage
             mime.Cc.Add(MailboxAddress.Parse(message.Cc));
 
         mime.Subject = message.Subject;
-        mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody }.ToMessageBody();
+
+        var body = new BodyBuilder { HtmlBody = message.HtmlBody };
+        foreach (var attachment in message.Attachments ?? [])
+            body.Attachments.Add(attachment.FileName, System.Text.Encoding.UTF8.GetBytes(attachment.Text), ContentType.Parse(attachment.MediaType));
+
+        mime.Body = body.ToMessageBody();
         return mime;
     }
 }

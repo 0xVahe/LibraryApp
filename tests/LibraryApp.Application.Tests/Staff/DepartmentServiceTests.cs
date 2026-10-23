@@ -125,6 +125,11 @@ internal sealed class DepartmentFake : IDepartmentRepository, IUnitOfWork, IIdGe
         Task.FromResult<IReadOnlyList<DepartmentDto>>(Departments.Values.Select(x => new DepartmentDto(x.Id, x.Name))
             .ToList());
 
+    public Task<IReadOnlyList<DepartmentSettingsDto>> ListForSettingsAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<DepartmentSettingsDto>>(Departments.Values
+            .Select(x => new DepartmentSettingsDto(x.Id, x.Name, 0))
+            .ToList());
+
     public Task<Department?> GetByIdAsync(Guid id, CancellationToken ct) =>
         Task.FromResult(Departments.GetValueOrDefault(id));
 

@@ -262,6 +262,9 @@ public class MyLibraryServiceTests
 
         public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
             throw new NotSupportedException("My library reads the summary only.");
+
+        public Task<IReadOnlyList<OpenLoanInfo>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+            throw new NotSupportedException("My library reads the summary only.");
     }
 
     private sealed class Catalog : ICatalogService

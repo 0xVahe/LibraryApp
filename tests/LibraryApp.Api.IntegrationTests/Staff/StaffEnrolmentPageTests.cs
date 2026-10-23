@@ -1,16 +1,18 @@
-using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Text;
+using System.Net;
 using System.Text.RegularExpressions;
+using System.Text;
 using LibraryApp.Api.IntegrationTests.Ui;
 using LibraryApp.Application.Staff.Dto;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Staff;
-using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
+using LibraryApp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Api.IntegrationTests.Staff;
 
@@ -310,7 +312,7 @@ public class StaffEnrolmentPageTests(ApiHostFactory factory) : IClassFixture<Api
     public async Task A_file_over_one_mb_is_shown_as_a_file_error()
     {
         using var client = await ClientAsync();
-        var response = await PostCsvAsync(client, new string('x', (int)StaffImportLimits.MaximumFileBytes + 1));
+        var response = await PostCsvAsync(client, new string('x', (int)factory.Services.GetRequiredService<IOptions<StaffOptions>>().Value.Import.MaxFileBytes + 1));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("The file must be 1 MB or smaller.", await response.Content.ReadAsStringAsync());

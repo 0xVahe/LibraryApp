@@ -1,5 +1,6 @@
 using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Ports;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Infrastructure.Identity;
@@ -8,6 +9,7 @@ using LibraryApp.Infrastructure.Persistence.Seed.Staff;
 using LibraryApp.Infrastructure.Staff;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Infrastructure.Extensions;
 
@@ -16,6 +18,11 @@ public static class StaffRegistrationExtensions
     /// <summary>Staff module services, login and JWT authentication. Called from Program.cs after AddLibraryIdentity.</summary>
     public static IServiceCollection AddStaffModule(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton<IValidateOptions<StaffOptions>, StaffOptionsValidator>();
+        services.AddOptions<StaffOptions>()
+            .Bind(configuration.GetSection(StaffOptions.SectionName))
+            .ValidateOnStart();
+
         services.AddScoped<IStaffMemberRepository, StaffMemberRepository>();
         services.AddScoped<IStaffMemberService, StaffMemberService>();
 

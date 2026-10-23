@@ -148,7 +148,7 @@ public sealed class StaffEnrolledEventHandlerTests
     private sealed class NoOpNotificationCreator : INotificationCreator
     {
         public Task CreateAsync(NotificationType type, Guid staffMemberId, Guid eventId,
-            IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values, Guid? loanId = null, bool ccLineManager = false, CancellationToken ct = default) => Task.CompletedTask;
+            IReadOnlyCollection<NotificationChannel> channels, IReadOnlyDictionary<string, string> values, Guid? loanId = null, bool ccLineManager = false, string? calendarItem = null, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class StubCatalogService : ICatalogService

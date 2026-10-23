@@ -23,7 +23,8 @@ public static class JwtRegistration
         services.AddMemoryCache();
         services.AddScoped<JwtAccountValidation>();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        // No default scheme here: the host sets the defaults (UiAuthentication's selector).
+        services.AddAuthentication().AddJwtBearer();
 
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<JwtOptions>>((bearer, jwtOptions) =>

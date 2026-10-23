@@ -100,4 +100,106 @@ public sealed class ReportingReadRepository(
             select new TopCategoryReportItemDto(grouped.Key.Id, grouped.Key.Name, grouped.Count()))
             .Take(options.Value.TopCategoriesLimit)
             .ToListAsync(ct);
+
+   public async Task<IReadOnlyList<DepartmentEmployeesData>> GetDepartmentEmployeesAsync(
+        CancellationToken ct = default) => await (
+            from department in db.Departments.AsNoTracking()
+            select new DepartmentEmployeesData(
+                department.Id,
+                department.Name,
+                db.StaffMembers.Count(staff =>
+                    staff.DepartmentId == department.Id && staff.Status != StaffMemberStatus.Deactivated)))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<DepartmentCategoryLoansData>> GetDepartmentCategoryLoansAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default) => await (
+            from loan in db.Loans.AsNoTracking()
+            where loan.IssuedAtUtc >= fromUtc && loan.IssuedAtUtc <= toUtc
+            join staff in db.StaffMembers.AsNoTracking() on loan.StaffMemberId equals staff.Id
+            join copy in db.BookCopies.AsNoTracking() on loan.BookCopyId equals copy.Id
+            join book in db.Books.AsNoTracking() on copy.BookId equals book.Id
+            join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+            group loan by new { staff.DepartmentId, CategoryId = category.Id, category.Name } into grouped
+            select new DepartmentCategoryLoansData(
+                grouped.Key.DepartmentId, grouped.Key.CategoryId, grouped.Key.Name, grouped.Count()))
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<DepartmentPenaltiesData>> GetDepartmentPenaltiesAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        DateTime nowUtc,
+        CancellationToken ct = default) => await (
+            from penalty in db.PenaltyRecords.AsNoTracking()
+            where penalty.CreatedAtUtc >= fromUtc && penalty.CreatedAtUtc <= toUtc
+            join staff in db.StaffMembers.AsNoTracking() on penalty.StaffMemberId equals staff.Id
+            group penalty by staff.DepartmentId into grouped
+            select new DepartmentPenaltiesData(
+                grouped.Key,
+                grouped.Count(),
+                grouped.Sum(penalty => penalty.Points),
+                grouped.Sum(penalty => penalty.Status == PenaltyRecordStatus.Waived ? penalty.Points : 0),
+                grouped.Sum(penalty => penalty.Status == PenaltyRecordStatus.Active && penalty.ExpiresAtUtc > nowUtc
+                    ? penalty.Points
+                    : 0)))
+            .ToListAsync(ct);
+
+    public Task<string?> GetCategoryNameAsync(Guid categoryId, CancellationToken ct = default) =>
+        db.Categories.AsNoTracking()
+            .Where(category => category.Id == categoryId)
+            .Select(category => category.Name)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<CopyCountData>> GetCopyCountsAsync(
+        Guid? categoryId,
+        CancellationToken ct = default)
+    {
+        IQueryable<Book> books = db.Books.AsNoTracking();
+        if (categoryId is Guid id)
+        {
+            // The category and its subcategories, like the catalog search.
+            books = books.Where(book =>
+                book.CategoryId == id ||
+                db.Categories.Any(category => category.Id == book.CategoryId && category.ParentCategoryId == id));
+        }
+
+        return await (
+            from copy in db.BookCopies.AsNoTracking()
+            join book in books on copy.BookId equals book.Id
+            group copy by new { copy.Status, copy.Condition } into grouped
+            select new CopyCountData(grouped.Key.Status, grouped.Key.Condition, grouped.Count()))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<PurchaseCandidateItemDto>> GetPurchaseCandidatesAsync(CancellationToken ct = default)
+    {
+        var queues = await (
+                from reservation in db.Reservations.AsNoTracking()
+                where reservation.Status == ReservationStatus.Waiting
+                join book in db.Books.AsNoTracking() on reservation.BookId equals book.Id
+                where !book.IsDeleted
+                join category in db.Categories.AsNoTracking() on book.CategoryId equals category.Id
+                group reservation by new { book.Id, book.Title, book.Isbn, Category = category.Name } into grouped
+                orderby grouped.Count() descending, grouped.Key.Title, grouped.Key.Isbn
+                select new { grouped.Key.Id, grouped.Key.Title, grouped.Key.Isbn, grouped.Key.Category, Waiting = grouped.Count() })
+            .Take(options.Value.PurchaseCandidatesLimit)
+            .ToListAsync(ct);
+        if (queues.Count == 0)
+            return [];
+
+        List<Guid> bookIds = queues.Select(queue => queue.Id).ToList();
+        Dictionary<Guid, int> copies = await db.BookCopies.AsNoTracking()
+            .Where(copy => bookIds.Contains(copy.BookId)
+                           && copy.Status != BookCopyStatus.Lost
+                           && copy.Status != BookCopyStatus.Withdrawn)
+            .GroupBy(copy => copy.BookId)
+            .Select(grouped => new { BookId = grouped.Key, Copies = grouped.Count() })
+            .ToDictionaryAsync(row => row.BookId, row => row.Copies, ct);
+
+        return queues
+            .Select(queue => new PurchaseCandidateItemDto(
+                queue.Id, queue.Title, queue.Isbn, queue.Category, queue.Waiting, copies.GetValueOrDefault(queue.Id)))
+            .ToList();
+    }
 }

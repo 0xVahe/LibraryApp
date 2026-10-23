@@ -6,6 +6,7 @@ namespace LibraryApp.Application.Notifications.Options;
 public sealed class NotificationsOptionsValidator : IValidateOptions<NotificationsOptions>
 {
     private const string Delivery = NotificationsOptions.SectionName + ":" + nameof(NotificationsOptions.Delivery);
+    private const string Reminders = NotificationsOptions.SectionName + ":" + nameof(NotificationsOptions.Reminders);
 
     public ValidateOptionsResult Validate(string? name, NotificationsOptions options)
     {
@@ -23,6 +24,25 @@ public sealed class NotificationsOptionsValidator : IValidateOptions<Notificatio
         if (delivery.Lease < TimeSpan.FromMinutes(1) || delivery.Lease > TimeSpan.FromHours(1))
             failures.Add($"{Delivery}:{nameof(delivery.Lease)} must be between 00:01:00 and 01:00:00 " +
                          $"(found {delivery.Lease}); set it in appsettings.json.");
+
+        if (delivery.RetryDelays.Length is < 1 or > 10 ||
+            delivery.RetryDelays.Any(d => d < TimeSpan.FromMinutes(1) || d > TimeSpan.FromDays(1)))
+            failures.Add($"{Delivery}:{nameof(delivery.RetryDelays)} must have 1 to 10 values, each between 00:01:00 and " +
+                         $"1.00:00:00 (found {delivery.RetryDelays.Length} values); set it in appsettings.json.");
+
+        RemindersOptions reminders = options.Reminders;
+
+        if (reminders.DueSoonWorkingDays is < 1 or > 10)
+            failures.Add($"{Reminders}:{nameof(reminders.DueSoonWorkingDays)} must be between 1 and 10 " +
+                         $"(found {reminders.DueSoonWorkingDays}); set it in appsettings.json.");
+
+        if (reminders.OverdueEveryWorkingDays is < 1 or > 30)
+            failures.Add($"{Reminders}:{nameof(reminders.OverdueEveryWorkingDays)} must be between 1 and 30 " +
+                         $"(found {reminders.OverdueEveryWorkingDays}); set it in appsettings.json.");
+
+        if (reminders.LineManagerCcAfterWorkingDays is < 1 or > 60)
+            failures.Add($"{Reminders}:{nameof(reminders.LineManagerCcAfterWorkingDays)} must be between 1 and 60 " +
+                         $"(found {reminders.LineManagerCcAfterWorkingDays}); set it in appsettings.json.");
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }

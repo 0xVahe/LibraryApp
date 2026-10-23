@@ -18,4 +18,26 @@ public interface IReportingService
         DateOnly from,
         DateOnly to,
         CancellationToken ct = default);
+
+    Task<ReadingActivityByDepartmentReportDto> GetReadingActivityByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
+
+Task<OverdueLoansReportDto> GetAllOverdueLoansAsync(
+        Guid? departmentId,
+        int? minimumDaysOverdue,
+        int? maximumDaysOverdue,
+        CancellationToken ct = default);
+
+    Task<PenaltyReportDto> GetPenaltiesByDepartmentAsync(
+        DateOnly from,
+        DateOnly to,
+        CancellationToken ct = default);
+
+    Task<InventoryStatusReportDto> GetInventoryStatusAsync(
+        Guid? categoryId,
+        CancellationToken ct = default);
+
+    Task<PurchaseCandidatesReportDto> GetPurchaseCandidatesAsync(CancellationToken ct = default);
 }

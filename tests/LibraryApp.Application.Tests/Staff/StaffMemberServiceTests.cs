@@ -1,7 +1,9 @@
 using LibraryApp.Application.Abstractions.Staff;
+using LibraryApp.Application.Staff.Options;
 using LibraryApp.Application.Staff.Services;
 using LibraryApp.Domain.Common;
 using LibraryApp.Domain.Staff;
+using Microsoft.Extensions.Options;
 
 namespace LibraryApp.Application.Tests.Staff;
 
@@ -10,7 +12,8 @@ public class StaffMemberServiceTests
     private readonly FakeStaffMemberRepository _repository = new();
     private readonly StaffMemberService _service;
 
-    public StaffMemberServiceTests() => _service = new StaffMemberService(_repository);
+    public StaffMemberServiceTests() => _service = new StaffMemberService(_repository,
+        Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = 1 } }));
 
     // ---- CanBorrowAsync (INT-03) ----
 
@@ -84,6 +87,19 @@ public class StaffMemberServiceTests
         var ex = await Assert.ThrowsAsync<DomainException>(() => _service.GetLendingRulesAsync(Guid.NewGuid()));
 
         Assert.Equal(StaffErrors.NotFound, ex.Error);
+    }
+
+    [Theory]
+    [InlineData(1, 0)]
+    [InlineData(2, 2)]
+    [InlineData(5, 3)]
+    public async Task Restricted_loan_limit_is_configured_but_renewals_are_always_zero(int maxLoans, int categoryMaxRenewals)
+    {
+        var member = _repository.Add(StaffMemberStatus.Restricted, maxLoans: 5, loanDays: 30, maxRenewals: categoryMaxRenewals);
+        var service = new StaffMemberService(_repository,
+            Options.Create(new StaffOptions { RestrictedLimits = new() { MaxLoans = maxLoans } }));
+
+        Assert.Equal(new LendingRules(maxLoans, 30, 0), await service.GetLendingRulesAsync(member.Id));
     }
 
     // ---- GetStatusAsync ----
@@ -262,5 +278,49 @@ public class StaffMemberServiceTests
         _repository.Add();
 
         Assert.Null(await _service.FindAsync(value));
+    }
+    
+    // ---- GetContactsAsync (Notifications, X-08) ----
+
+    [Fact]
+    public async Task GetContacts_returns_name_emails_and_status()
+    {
+        var anna = _repository.Add(lineManager: "Mariam.Avetisyan@AmeriaBank.am");
+
+        var contacts = await _service.GetContactsAsync([anna.Id]);
+
+        Assert.Equal(
+            new StaffContact(anna.Id, "Anna Petrosyan", anna.CorporateEmail, "mariam.avetisyan@ameriabank.am", StaffMemberStatus.Active),
+            contacts[anna.Id]);
+    }
+
+    [Fact]
+    public async Task GetContacts_includes_a_Deactivated_member_with_the_status()
+    {
+        var member = _repository.Add(StaffMemberStatus.Deactivated);
+
+        var contacts = await _service.GetContactsAsync([member.Id]);
+
+        Assert.Equal(StaffMemberStatus.Deactivated, contacts[member.Id].Status);
+    }
+
+    [Fact]
+    public async Task GetContacts_leaves_out_unknown_ids_and_asks_for_a_repeated_id_once()
+    {
+        var anna = _repository.Add();
+
+        var contacts = await _service.GetContactsAsync([anna.Id, anna.Id, Guid.NewGuid()]);
+
+        Assert.Equal([anna.Id], contacts.Keys);
+        Assert.Null(contacts[anna.Id].LineManagerEmail);
+    }
+
+    [Fact]
+    public async Task GetContacts_of_an_empty_list_is_empty_without_a_query()
+    {
+        var contacts = await _service.GetContactsAsync([]);
+
+        Assert.Empty(contacts);
+        Assert.Equal(0, _repository.GetContactsCalls);
     }
 }

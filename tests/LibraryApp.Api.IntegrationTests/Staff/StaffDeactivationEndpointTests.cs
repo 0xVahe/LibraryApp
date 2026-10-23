@@ -52,7 +52,7 @@ public sealed class StaffDeactivationFactory : ApiHostFactory, IAsyncLifetime
         services.AddSingleton<IBorrowingReadService>(Loans);
         services.AddScoped<IApplicationLock>(provider => new ObservedStaffLock(
             new SqlServerApplicationLock(provider.GetRequiredService<LibraryDbContext>()), Loans));
-        services.AddScoped<IEventBus, DeactivationFailureEventBus>();
+        services.DecorateEventBus<DeactivationFailureEventBus>();
         services.AddScoped<IUserValidator<AppUser>, DeactivationFailureUserValidator>();
     }
 }
@@ -69,6 +69,9 @@ public sealed class DeactivationLoanQueries : IBorrowingReadService
 
     public Task<IReadOnlyList<OpenLoanInfo>> GetLoansDueOnAsync(DateOnly localDate, CancellationToken ct = default) =>
         throw new NotSupportedException("Deactivation reads only the active loans.");
+
+    public Task<IReadOnlyList<OpenLoanInfo>> GetOverdueLoansAsync(CancellationToken ct = default) =>
+        throw new NotSupportedException("Deactivation reads only the active loans.");
 }
 
 public sealed class ObservedStaffLock(IApplicationLock inner, DeactivationLoanQueries queries) : IApplicationLock
@@ -80,11 +83,11 @@ public sealed class ObservedStaffLock(IApplicationLock inner, DeactivationLoanQu
     }
 }
 
-public sealed class DeactivationFailureEventBus(LibraryDbContext db, EventTypeRegistry registry) : IEventBus
+public sealed class DeactivationFailureEventBus(IEventBus inner) : IEventBus
 {
     public async Task PublishAsync<TEvent>(TEvent domainEvent, CancellationToken ct = default) where TEvent : class, IDomainEvent
     {
-        await new OutboxEventBus(db, registry).PublishAsync(domainEvent, ct);
+        await inner.PublishAsync(domainEvent, ct);
         if (domainEvent is StaffStatusChanged { Reason: "Simulate event failure" })
             throw new InvalidOperationException("Simulated outbox failure.");
     }
