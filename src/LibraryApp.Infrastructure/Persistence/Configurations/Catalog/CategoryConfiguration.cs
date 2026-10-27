@@ -10,7 +10,7 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
     {
         builder.Property(x => x.Name).HasMaxLength(Category.NameMaxLength).IsRequired();
 
-        // Two-level tree. Delete is restricted (G1-04): a category with subcategories cannot be deleted.
+        // Two-level tree. Delete is restricted: a category with subcategories cannot be deleted.
         builder.HasOne(x => x.Parent)
             .WithMany(x => x.Children)
             .HasForeignKey(x => x.ParentCategoryId)

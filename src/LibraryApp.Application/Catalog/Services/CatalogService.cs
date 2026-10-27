@@ -42,7 +42,7 @@ public sealed class CatalogService(
         if (string.IsNullOrWhiteSpace(barcode))
             return Task.FromResult<BookCopyDto?>(null);
 
-        // Barcodes are stored trimmed and upper case (G1-06), so a scanned " bk-0001-01" still matches.
+        // Barcodes are stored trimmed and upper case, so a scanned " bk-0001-01" still matches.
         return copyQuery.GetByBarcodeAsync(barcode.Trim().ToUpperInvariant(), ct);
     }
 

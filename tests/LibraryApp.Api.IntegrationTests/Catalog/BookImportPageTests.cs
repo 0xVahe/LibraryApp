@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
 using LibraryApp.Api.IntegrationTests.Ui;
-using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;

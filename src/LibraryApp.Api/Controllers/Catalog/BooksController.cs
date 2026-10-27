@@ -1,6 +1,5 @@
 using LibraryApp.Api.Catalog;
 using LibraryApp.Application.Catalog.Dto;
-using LibraryApp.Application.Catalog.Ports;
 using LibraryApp.Application.Catalog.Services;
 using LibraryApp.Application.Common;
 using Microsoft.AspNetCore.Mvc;

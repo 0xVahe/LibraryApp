@@ -225,7 +225,7 @@ public class BookCopyServiceTests
         Assert.Equal(BookCopyStatus.Withdrawn, copy.Status);
     }
 
-    // ---------- offer to the reservation queue (BQ-G1-10, BOR-07) ----------
+    // ---------- offer to the reservation queue (BOR-07) ----------
 
     [Fact]
     public async Task A_new_copy_is_offered_to_the_reservation_queue_inside_the_transaction()

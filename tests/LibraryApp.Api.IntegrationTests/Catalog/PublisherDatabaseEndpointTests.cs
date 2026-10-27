@@ -32,7 +32,7 @@ public class PublisherDatabaseEndpointTests(ApiHostFactory factory)
         await AssertProblem(response, HttpStatusCode.Conflict, "catalog.publisher_in_use");
         Assert.Equal(publisher, await client.GetFromJsonAsync<PublisherDto>($"/api/publishers/{publisher.Id}"));
         db.ChangeTracker.Clear();
-        Assert.Equal(deleted, (await db.Books.IgnoreQueryFilters().SingleAsync(x => x.Id == book.Id)).IsDeleted);
-        Assert.Equal(publisher.Id, (await db.Books.IgnoreQueryFilters().SingleAsync(x => x.Id == book.Id)).PublisherId);
+        Assert.Equal(deleted, (await db.Books.SingleAsync(x => x.Id == book.Id)).IsDeleted);
+        Assert.Equal(publisher.Id, (await db.Books.SingleAsync(x => x.Id == book.Id)).PublisherId);
     }
 }

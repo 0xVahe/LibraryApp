@@ -8,7 +8,7 @@ public sealed class BookCopy : Entity
     public const int BarcodeMaxLength = 32;
     public const int ShelfLocationMaxLength = 50;
 
-    private BookCopy() { }                           
+    private BookCopy() { }                                       // for EF Core only
 
     /// <summary>A new copy always starts as Available.</summary>
     public BookCopy(Guid id, Guid bookId, string barcode, BookCopyCondition condition, string? shelfLocation)
@@ -28,7 +28,7 @@ public sealed class BookCopy : Entity
 
     public Guid BookId { get; private set; }
 
-    /// <summary>Trimmed and upper case (G1-06). The format (A-Z, 0-9, '-', up to 32) is checked by the validator.</summary>
+    /// <summary>Trimmed and upper case. The format (A-Z, 0-9, '-', up to 32) is checked by the validator.</summary>
     public string Barcode { get; private set; } = null!;
 
     public BookCopyStatus Status { get; private set; }

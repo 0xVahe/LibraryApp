@@ -4,7 +4,7 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Domain.Tests.Catalog;
 
 /// <summary>
-/// The numbers are stored in the database (SD-11): if one changes, existing rows change meaning.
+/// The numbers are stored in the database: if one changes, existing rows change meaning.
 /// These tests fail when somebody renumbers an enum.
 /// </summary>
 public class CatalogEnumValuesTests

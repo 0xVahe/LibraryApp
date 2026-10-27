@@ -11,7 +11,7 @@ public sealed class BookCopyConfiguration : IEntityTypeConfiguration<BookCopy>
         builder.Property(x => x.Barcode).HasMaxLength(BookCopy.BarcodeMaxLength).IsRequired();
         builder.Property(x => x.ShelfLocation).HasMaxLength(BookCopy.ShelfLocationMaxLength);
 
-        // Status and Condition are stored as int (SD-11): no conversion needed.
+        // Status and Condition are stored as int: no conversion needed.
 
         // Concurrency token: a second change of the same copy fails and becomes a 409.
         builder.Property(x => x.RowVersion).IsRowVersion();
