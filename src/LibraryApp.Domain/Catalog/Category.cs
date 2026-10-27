@@ -3,7 +3,7 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Domain.Catalog;
 
 /// <summary>
-/// A book category with at most two levels (CAT-03, G1-04). The rule is checked here, in <see cref="SetParent"/>:
+/// A book category with at most two levels (CAT-03). The rule is checked here, in <see cref="SetParent"/>:
 /// the service loads the parent and the subcategories of this category before calling it.
 /// </summary>
 public sealed class Category : Entity

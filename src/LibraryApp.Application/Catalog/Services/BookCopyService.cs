@@ -12,7 +12,7 @@ namespace LibraryApp.Application.Catalog.Services;
 /// Copy management for librarians (CAT-04). Every change runs in <see cref="IUnitOfWork"/>, so a concurrent change of
 /// the same copy (RowVersion) or a duplicate barcode caught by the database index becomes a 409.
 /// A copy that becomes available outside a loan (a new copy, or the end of a repair) is offered to the reservation queue
-/// in the same transaction (BQ-G1-10).
+/// in the same transaction (BOR-07).
 /// </summary>
 public sealed class BookCopyService(
     IBookCopyRepository copies,
@@ -104,7 +104,7 @@ public sealed class BookCopyService(
     /// <summary>
     /// BR-CAT-4. A copy that is OnLoan or Reserved belongs to a loan or a reservation, so only Borrowing changes it.
     /// Otherwise the librarian may set UnderRepair, Lost or Withdrawn, and Available only to end a repair
-    /// (agreed with Group 3 in BQ-G1-06).
+    /// (agreed with Group 3).
     /// </summary>
     private static void EnsureLibrarianMayChange(BookCopy copy, BookCopyStatus newStatus)
     {

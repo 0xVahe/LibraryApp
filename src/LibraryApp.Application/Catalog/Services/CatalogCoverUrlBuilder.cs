@@ -1,4 +1,3 @@
-using LibraryApp.Application.Abstractions.Catalog;
 using LibraryApp.Application.Catalog.Options;
 using Microsoft.Extensions.Options;
 

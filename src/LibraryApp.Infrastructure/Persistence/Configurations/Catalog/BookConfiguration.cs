@@ -9,12 +9,12 @@ public sealed class BookConfiguration : IEntityTypeConfiguration<Book>
     public void Configure(EntityTypeBuilder<Book> builder)
     {
         builder.Property(x => x.Title).HasMaxLength(Book.TitleMaxLength).IsRequired();
-        builder.Property(x => x.Isbn).HasMaxLength(Book.IsbnLength).IsRequired();          // 13 digits (G1-02)
-        builder.Property(x => x.Language).HasMaxLength(Book.LanguageLength).IsRequired();  // ISO 639-1 (G1-03)
+        builder.Property(x => x.Isbn).HasMaxLength(Book.IsbnLength).IsRequired();          // ISBN-13, 13 digits
+        builder.Property(x => x.Language).HasMaxLength(Book.LanguageLength).IsRequired();  // ISO 639-1
         builder.Property(x => x.Description).HasMaxLength(-1);                              // nvarchar(max)
         builder.Property(x => x.CoverImagePath).HasMaxLength(Book.CoverImagePathMaxLength);
 
-        // BR-CAT-1: the ISBN is unique among books that are not deleted (G1-02).
+        // BR-CAT-1: the ISBN is unique among books that are not deleted.
         builder.HasIndex(x => x.Isbn)
             .IsUnique()
             .HasFilter("[IsDeleted] = 0")

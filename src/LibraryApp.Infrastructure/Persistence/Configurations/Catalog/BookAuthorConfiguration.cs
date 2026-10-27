@@ -8,7 +8,7 @@ public sealed class BookAuthorConfiguration : IEntityTypeConfiguration<BookAutho
 {
     public void Configure(EntityTypeBuilder<BookAuthor> builder)
     {
-        // Link table: composite key, no Id (G1-09).
+        // Link table: composite key, no Id.
         builder.HasKey(x => new { x.BookId, x.AuthorId });
 
         // The link rows belong to the book: deleting a book removes them (same aggregate).

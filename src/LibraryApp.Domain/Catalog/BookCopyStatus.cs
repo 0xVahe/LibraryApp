@@ -1,7 +1,7 @@
 namespace LibraryApp.Domain.Catalog;
 
 /// <summary>
-/// Status of a physical copy (requirements: BookCopy.Status). Stored as a number (SD-11):
+/// Status of a physical copy (requirements: BookCopy.Status). Stored as a number:
 /// never renumber or remove a value, only add new ones at the end.
 /// </summary>
 public enum BookCopyStatus

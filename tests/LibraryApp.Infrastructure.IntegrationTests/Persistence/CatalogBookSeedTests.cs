@@ -1,4 +1,3 @@
-using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using Microsoft.EntityFrameworkCore;

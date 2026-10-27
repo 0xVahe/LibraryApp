@@ -6,7 +6,6 @@ using LibraryApp.Domain.Catalog;
 using LibraryApp.Infrastructure.Persistence;
 using LibraryApp.Infrastructure.Persistence.Seed.Catalog;
 using LibraryApp.Infrastructure.Persistence.Seed.Staff;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LibraryApp.Api.IntegrationTests.Catalog;

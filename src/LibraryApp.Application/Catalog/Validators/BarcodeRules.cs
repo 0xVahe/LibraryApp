@@ -2,7 +2,7 @@ using LibraryApp.Domain.Catalog;
 
 namespace LibraryApp.Application.Catalog.Validators;
 
-/// <summary>Barcode format (G1-06): letters, digits and '-', up to 32 characters after trimming. Case does not matter.</summary>
+/// <summary>Barcode format: letters, digits and '-', up to 32 characters after trimming. Case does not matter.</summary>
 internal static class BarcodeRules
 {
     public static readonly string Message =

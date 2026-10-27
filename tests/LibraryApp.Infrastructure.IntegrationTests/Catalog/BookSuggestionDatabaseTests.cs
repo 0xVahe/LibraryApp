@@ -125,7 +125,7 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         await using var db = database.NewContext();
         var service = Service(db, database.FirstStaffId, database.FirstReviewerId);
         var created = await service.CreateAsync(new("Title", "Author", null, "Reason"));
-        var books = await db.Books.IgnoreQueryFilters().CountAsync();
+        var books = await db.Books.CountAsync();
         var copies = await db.BookCopies.CountAsync();
         var reviewAt = BookSuggestionDatabase.Now.AddHours(1);
         var reviewer = Service(db, null, database.FirstReviewerId, now: reviewAt);
@@ -138,7 +138,7 @@ public class BookSuggestionDatabaseTests(BookSuggestionDatabase database) : ICla
         Assert.Equal(reviewAt, saved.ReviewedAtUtc);
         Assert.Equal(DateTimeKind.Utc, saved.ReviewedAtUtc!.Value.Kind);
         Assert.Equal(reject ? "Comment" : null, saved.ReviewComment);
-        Assert.Equal(books, await verify.Books.IgnoreQueryFilters().CountAsync());
+        Assert.Equal(books, await verify.Books.CountAsync());
         Assert.Equal(copies, await verify.BookCopies.CountAsync());
     }
 

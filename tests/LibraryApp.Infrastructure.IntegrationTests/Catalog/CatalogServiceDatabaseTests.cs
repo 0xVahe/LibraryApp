@@ -264,7 +264,7 @@ public class CatalogServiceDatabaseTests(CatalogServiceDatabase database) : ICla
         Assert.Equal(BookCopyStatus.OnLoan, await StatusOfAsync(CatalogServiceDatabase.ConflictCopyId));
     }
 
-    // ---------- a new copy offered to the reservation queue (BQ-G1-10) ----------
+    // ---------- a new copy offered to the reservation queue (BOR-07) ----------
 
     [Fact]
     public async Task A_copy_added_in_a_unit_of_work_can_be_reserved_before_it_is_saved()

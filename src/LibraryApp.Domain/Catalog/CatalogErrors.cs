@@ -3,7 +3,7 @@ using LibraryApp.Domain.Common;
 namespace LibraryApp.Domain.Catalog;
 
 /// <summary>
-/// Errors of the Catalog module (SD-04). The code never changes; the message may be reworded.
+/// Errors of the Catalog module. The code never changes; the message may be reworded.
 /// </summary>
 public static class CatalogErrors
 {

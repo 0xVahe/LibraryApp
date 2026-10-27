@@ -1,7 +1,6 @@
 using LibraryApp.Application.Catalog.Dto;
 using LibraryApp.Application.Catalog.Validators;
 using LibraryApp.Domain.Catalog;
-using LibraryApp.Application.Abstractions.Common;
 using LibraryApp.Application.Catalog.Options;
 using LibraryApp.Application.Tests.Fakes;
 using Microsoft.Extensions.Options;

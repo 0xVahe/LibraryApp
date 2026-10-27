@@ -33,7 +33,7 @@ public sealed class BookCopyRepository(LibraryDbContext db) : IBookCopyRepositor
             .ToListAsync(ct);
 
     // FindAsync looks at the tracked copies first, so a copy added in the same unit of work (not saved yet) is found
-    // too: Borrowing reserves a new copy through SetCopyStatusAsync before the transaction is saved (BQ-G1-10).
+    // too: Borrowing reserves a new copy through SetCopyStatusAsync before the transaction is saved (BOR-07).
     public async Task<BookCopy?> GetByIdAsync(Guid copyId, CancellationToken ct) =>
         await db.BookCopies.FindAsync(new object[] { copyId }, ct);
 

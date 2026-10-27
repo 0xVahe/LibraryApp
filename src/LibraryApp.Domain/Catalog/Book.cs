@@ -32,12 +32,15 @@ public sealed class Book : Entity
 
     public string Title { get; private set; } = null!;
 
-    /// <summary>13 digits without hyphens or spaces (G1-02). Unique among books that are not deleted.</summary>
+    /// <summary>
+    /// 13 digits without hyphens or spaces: an ISBN-10 is stored as its ISBN-13. Unique among books that are not
+    /// deleted (BR-CAT-1).
+    /// </summary>
     public string Isbn { get; private set; } = null!;
 
     public int PublicationYear { get; private set; }
 
-    /// <summary>ISO 639-1 code, two lower case letters (G1-03).</summary>
+    /// <summary>ISO 639-1 code, two lower case letters.</summary>
     public string Language { get; private set; } = null!;
 
     public string? Description { get; private set; }

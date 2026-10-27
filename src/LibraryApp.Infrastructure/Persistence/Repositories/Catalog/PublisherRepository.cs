@@ -19,5 +19,5 @@ public sealed class PublisherRepository(LibraryDbContext db) : IPublisherReposit
 
     /// <summary>Soft-deleted books count too: their rows stay in the table and the foreign key would block the delete.</summary>
     public Task<bool> IsInUseAsync(Guid id, CancellationToken ct) =>
-        db.Books.IgnoreQueryFilters().AnyAsync(x => x.PublisherId == id, ct);
+        db.Books.AnyAsync(x => x.PublisherId == id, ct);
 }
